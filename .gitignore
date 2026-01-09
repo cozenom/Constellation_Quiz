@@ -1,0 +1,33 @@
+# AI Assistant working files
+claude/
+
+# Stellarium source files (not our data - see README.md)
+data/raw/*.fab
+data/raw/*.cat
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Optional: Hipparcos catalog cache (large file)
+# data/scripts/hip_main.dat
