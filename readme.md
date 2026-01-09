@@ -57,35 +57,6 @@ git push
 - **Rendering**: HTML Canvas for clean constellation display
 - **Hosting**: GitHub Pages (free, fast, offline-capable)
 
-## Project Structure
-
-```
-constellation-quiz/
-├── data/
-│   ├── raw/                        # Source data files
-│   │   └── constellation_abbreviations.json
-│   ├── scripts/                    # Python data extraction
-│   └── constellations.json         # Generated output
-├── public/
-│   └── index.html                  # Deployable web app
-└── screenshots/                    # Optional UI screenshots
-```
-
-## Coordinate System
-
-Uses standard celestial coordinates (RA/Dec) normalized to 0-1 range:
-- Right Ascension (0-24h) → x-axis (0-1)
-- Declination (-90° to +90°) → y-axis (0-1)
-- Standard chart orientation (North up, East left)
-
-## Future Enhancements
-
-- Bayer designation quiz (Greek letters)
-- Abbreviation matching quiz
-- Sky visibility quiz (stereographic projection)
-- Cross-session progress tracking
-- Timed mode and streak counter
-
 ## Attribution
 
 Constellation line data from [Stellarium](https://github.com/Stellarium/stellarium) (`constellationship.fab`, `name.fab`, `cross-id.cat`).
