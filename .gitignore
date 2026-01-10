@@ -29,5 +29,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# Optional: Hipparcos catalog cache (large file)
-# data/scripts/hip_main.dat
+# Hipparcos catalog cache (large file)
+data/raw/hip_main.dat
