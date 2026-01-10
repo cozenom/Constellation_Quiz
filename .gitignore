@@ -29,5 +29,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# Hipparcos catalog cache (large file)
+# Hipparcos catalog cache
 data/raw/hip_main.dat
+
+# IAU Star catalog file
+data/raw/*.csv
