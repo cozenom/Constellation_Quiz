@@ -14,7 +14,6 @@ Output:
 
 import csv
 import json
-from pathlib import Path
 from typing import Dict, List
 
 try:
@@ -281,55 +280,29 @@ def merge_star_data(
             }
         }
     """
-    # Complete Greek alphabet used in Bayer designations
-    greek_letters = [
-        "α",
-        "β",
-        "γ",
-        "δ",
-        "ε",
-        "ζ",
-        "η",
-        "θ",
-        "ι",
-        "κ",
-        "λ",
-        "μ",
-        "ν",
-        "ξ",
-        "ο",
-        "π",
-        "ρ",
-        "σ",
-        "τ",
-        "υ",
-        "φ",
-        "χ",
-        "ψ",
-        "ω",
-    ]
-
     merged_stars = {}
 
-    # First, extract Bayer designations from Stellarium
+    # Extract all star designations from Stellarium (Bayer, Flamsteed, Latin letters, etc.)
     for hip_id, designations in stellarium_names.items():
-        bayer = None
+        designation_str = None
         constellation = None
 
         for designation in designations:
-            # Check if designation contains a Greek letter
-            if any(greek in designation for greek in greek_letters):
-                bayer = designation
-                # Extract constellation abbreviation (last 3 chars, e.g., "α Ori" -> "Ori")
-                parts = designation.split()
-                if len(parts) >= 2:
-                    constellation = parts[-1]
-                break
+            # Accept any designation with a constellation abbreviation
+            # Format: "<letter/number> <constellation>" (e.g., "α Ori", "q Vel", "22 And", "π3 Ori")
+            parts = designation.split()
+            if len(parts) >= 2:
+                # Last part should be constellation abbreviation (2-3 chars)
+                potential_const = parts[-1]
+                if 2 <= len(potential_const) <= 3 and potential_const.isalpha():
+                    designation_str = designation
+                    constellation = potential_const
+                    break
 
-        # Only keep stars with Bayer designations
-        if bayer:
+        # Keep all stars with valid designations
+        if designation_str:
             merged_stars[str(hip_id)] = {
-                "bayer": bayer,
+                "bayer": designation_str,
                 "name": None,
                 "constellation": constellation,
                 "constellation_full": (
@@ -484,38 +457,14 @@ def main():
     print("=" * 70)
     print()
 
-    # File paths - relative to project root
-    name_fab_path = "data/raw/name.fab"
-    iau_csv_path = "data/raw/IAU_Star_Catalog.csv"
-    const_names_path = "data/raw/constellation_abbreviations.json"
-    output_path = "data/stars.json"
-
-    # Check if required files exist
-    if not Path(name_fab_path).exists():
-        print(f"❌ Error: {name_fab_path} not found")
-        return
-
     # Load Stellarium Bayer designations
-    star_names = parse_name_fab(name_fab_path)
-    if not star_names:
-        print("❌ No star data extracted. Aborting.")
-        return
+    star_names = parse_name_fab("data/raw/name.fab")
 
     # Load IAU star names
-    iau_stars = {}
-    if Path(iau_csv_path).exists():
-        iau_stars = parse_iau_csv(iau_csv_path)
-    else:
-        print(f"⚠️  Warning: {iau_csv_path} not found, skipping IAU names")
+    iau_stars = parse_iau_csv("data/raw/IAU_Star_Catalog.csv")
 
     # Load constellation names
-    constellation_names = {}
-    if Path(const_names_path).exists():
-        constellation_names = load_constellation_names(const_names_path)
-    else:
-        print(
-            f"⚠️  Warning: {const_names_path} not found, skipping full constellation names"
-        )
+    constellation_names = load_constellation_names("data/raw/constellation_abbreviations.json")
 
     # Load Hipparcos physical data
     print()
@@ -523,22 +472,46 @@ def main():
 
     # Merge all data
     print("\n🔗 Merging Stellarium + IAU + Hipparcos data...")
-    star_data = merge_star_data(
-        star_names, iau_stars, constellation_names, hipparcos_data
-    )
+    star_data = merge_star_data(star_names, iau_stars, constellation_names, hipparcos_data)
 
-    # Print sample
-    print_sample_data(star_data)
+    # Ensure all stars used in constellation lines are included
+    print("\n🔗 Adding any missing constellation line stars...")
+    with open("data/constellations.json", 'r') as f:
+        constellations = json.load(f)
+
+    # Collect all HIP IDs used in constellation lines
+    used_in_lines = set()
+    for const_data in constellations.values():
+        for line in const_data['lines']:
+            used_in_lines.add(str(line[0]))
+            used_in_lines.add(str(line[1]))
+
+    # Add missing stars from Hipparcos data
+    missing_count = 0
+    for hip_str in used_in_lines:
+        if hip_str not in star_data and int(hip_str) in hipparcos_data:
+            hip_id = int(hip_str)
+            star_data[hip_str] = {
+                "bayer": None,
+                "name": None,
+                "constellation": None,
+                "constellation_full": None,
+                "cultural_group": None,
+                "date_adopted": None,
+                "origin": None,
+                **{k: hipparcos_data[hip_id].get(k) for k in ["magnitude", "distance_ly", "ra", "dec", "x", "y"]}
+            }
+            missing_count += 1
+
+    if missing_count > 0:
+        print(f"✅ Added {missing_count} constellation line stars without designations")
 
     # Generate JSON
-    generate_star_json(output_path, star_data)
+    generate_star_json("data/stars.json", star_data)
 
     print("\n" + "=" * 70)
     print("✨ STAR DATA MERGE COMPLETE!")
     print("=" * 70)
-    print(f"\n📄 Output file: {output_path}")
-    print("   Merged: Stellarium Bayer + IAU names + Hipparcos physical data")
-    print("   Ready to use for constellation quiz application")
 
 
 if __name__ == "__main__":

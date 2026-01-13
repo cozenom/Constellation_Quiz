@@ -4,6 +4,8 @@ claude/
 # Stellarium source files (not our data - see README.md)
 data/raw/*.fab
 data/raw/*.cat
+data/raw/generate_*.py
+data/raw/SnT*
 
 # Python
 __pycache__/
@@ -34,3 +36,6 @@ data/raw/hip_main.dat
 
 # IAU Star catalog file
 data/raw/*.csv
+
+# Random
+/data/ascii_gallery
