@@ -1,11 +1,17 @@
 # AI Assistant working files
 claude/
 
-# Stellarium source files (not our data - see README.md)
-data/raw/*.fab
+# Generated constellation data (can be regenerated from SnT source)
+data/raw/constellationship.fab
+
+# Stellarium files not used
 data/raw/*.cat
-data/raw/generate_*.py
-data/raw/SnT*
+
+# Large Hipparcos cache (Skyfield re-downloads automatically)
+data/raw/hip_main.dat
+
+# Generated ASCII gallery (can regenerate)
+/data/ascii_gallery
 
 # Python
 __pycache__/
@@ -30,12 +36,3 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-
-# Hipparcos catalog cache
-data/raw/hip_main.dat
-
-# IAU Star catalog file
-data/raw/*.csv
-
-# Random
-/data/ascii_gallery
