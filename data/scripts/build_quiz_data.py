@@ -182,12 +182,17 @@ def parse_iau_catalog(filepath: str) -> Dict[int, Dict[str, str]]:
             continue
 
         hip_id = int(hip_id)
+
+        # Helper to convert pandas NaN to empty string
+        def clean_value(val):
+            return "" if pd.isna(val) else str(val)
+
         iau_stars[hip_id] = {
-            "name": row.get("proper names", ""),
-            "constellation": row.get("Constellation", ""),
-            "origin": row.get("Origin", ""),
-            "cultural_group": row.get("Ethnic-Cultural_Group_or_Language", ""),
-            "date_adopted": row.get("Date of Adoption", "")
+            "name": clean_value(row.get("proper names", "")),
+            "constellation": clean_value(row.get("Constellation", "")),
+            "origin": clean_value(row.get("Origin", "")),
+            "cultural_group": clean_value(row.get("Ethnic-Cultural_Group_or_Language", "")),
+            "date_adopted": clean_value(row.get("Date of Adoption", ""))
         }
 
     print(f"✅ Parsed {len(iau_stars)} IAU star names")
@@ -412,14 +417,14 @@ def build_quiz_data(output_path: str):
                 # Add optional star metadata if available
                 if star.get('bayer'):
                     star_entry['bayer'] = star['bayer']
+
+                # If star has IAU data (name exists), include all IAU fields for consistency
+                # (even if some are empty strings like origin for Diadem and Alpherg)
                 if star.get('name'):
                     star_entry['name'] = star['name']
-                if star.get('cultural_group'):
-                    star_entry['cultural_group'] = star['cultural_group']
-                if star.get('date_adopted'):
-                    star_entry['date_adopted'] = star['date_adopted']
-                if star.get('origin'):
-                    star_entry['origin'] = star['origin']
+                    star_entry['cultural_group'] = star.get('cultural_group', '')
+                    star_entry['date_adopted'] = star.get('date_adopted', '')
+                    star_entry['origin'] = star.get('origin', '')
 
                 star_array.append(star_entry)
 
