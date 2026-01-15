@@ -7,7 +7,7 @@ Outputs:
 - {abbrev}_with_lines.txt: Full constellation pattern with connecting lines
 - {abbrev}_stars_only.txt: Just the stars (for quiz mode)
 
-Uses pre-projected coordinates from constellations_stereographic.json for consistent rendering.
+Uses pre-projected coordinates from constellations_quiz.json for consistent rendering.
 """
 
 import json
@@ -16,13 +16,13 @@ from typing import Dict, List, Tuple
 
 
 def load_data(constellations_path: str) -> Dict:
-    """Load pre-computed stereographic constellation data."""
-    print("📖 Loading stereographic projection data...")
+    """Load pre-computed quiz constellation data with stereographic projections."""
+    print("📖 Loading constellation quiz data...")
 
     with open(constellations_path, 'r', encoding='utf-8') as f:
         constellations = json.load(f)
 
-    print(f"✅ Loaded {len(constellations)} constellations with pre-computed projections")
+    print(f"✅ Loaded {len(constellations)} constellations with quiz metadata and projections")
     return constellations
 
 
@@ -98,20 +98,25 @@ def render_constellation(constellation_abbrev: str, constellation_data: Dict,
                 draw_line_bresenham(canvas, x1, y1, x2, y2, width, height)
 
     # Draw stars on top
+    # Star magnitude to symbol mapping (lower magnitude = brighter star):
+    #   ⬤  mag < 1.0   (brightest stars: Sirius, Vega, Rigel, etc.)
+    #   ●  mag 1.0-2.5 (bright stars, easily visible)
+    #   ○  mag 2.5-4.0 (medium brightness)
+    #   ∘  mag > 4.0   (dimmer stars, faint to naked eye)
+    # Lines use · (middle dot) to distinguish from stars
     star_positions = {}
     for idx, star in enumerate(stars):
         gx, gy = to_grid(star['x'], star['y'])
         if 0 <= gx < width and 0 <= gy < height:
-            # Use different symbols based on magnitude
             mag = star.get('magnitude') or 99
             if mag < 1.0:
-                symbol = '⬤'  # Brightest (filled circle)
+                symbol = '⬤'
             elif mag < 2.5:
-                symbol = '●'  # Bright (medium circle)
+                symbol = '●'
             elif mag < 4.0:
-                symbol = '○'  # Medium (hollow circle)
+                symbol = '○'
             else:
-                symbol = '∘'  # Dimmer (small hollow circle/ring)
+                symbol = '∘'
             canvas[gy][gx] = symbol
             star_positions[idx] = (gx, gy)
 
@@ -223,7 +228,7 @@ def main():
     print()
 
     # File paths
-    constellations_path = "data/constellations_stereographic.json"
+    constellations_path = "data/constellations_quiz.json"
     output_dir = "data/ascii_gallery"
 
     # Load data
