@@ -10,6 +10,9 @@ data/raw/hip_main.dat
 # Generated ASCII gallery (can regenerate)
 /data/ascii_gallery
 
+# Deprecated/old data files (kept as backup)
+data/deprecated/
+
 # Python
 __pycache__/
 *.py[cod]
