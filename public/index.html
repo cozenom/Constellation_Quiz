@@ -373,7 +373,7 @@
 
             // Load constellation data from external JSON
             useEffect(() => {
-                fetch('../data/constellations_quiz.json')
+                fetch('../data/constellation_data.json')
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`Failed to load constellation data: ${response.statusText}`);
@@ -498,13 +498,14 @@
 
         // Generate quiz questions based on config
         function generateQuestions(config, constellationData) {
-            const { hemisphere, difficulty, numQuestions, inputMode, renderMode, showLines } = config;
+            const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude } = config;
 
             // Filter constellations
             let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
                 const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere;
                 const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
-                return matchesHemisphere && matchesDifficulty;
+                const matchesSeason = season === 'all' || data.seasons.includes(season);
+                return matchesHemisphere && matchesDifficulty && matchesSeason;
             });
 
             // Shuffle and limit
@@ -520,11 +521,16 @@
                     ...wrongAnswers.map(w => ({ abbrev: w[0], name: w[1].name, correct: false }))
                 ]);
 
+                // Generate random rotation angle (0-360 degrees) if rotation is enabled
+                const rotationAngle = randomRotation ? Math.random() * 360 : 0;
+
                 return {
                     constellation: { abbrev, ...data },
                     choices: allChoices,
                     showLines,
-                    renderMode
+                    renderMode,
+                    maxMagnitude,
+                    rotationAngle
                 };
             });
         }
@@ -564,19 +570,25 @@
         function SetupScreen({ onStart }) {
             const [hemisphere, setHemisphere] = useState('both');
             const [difficulty, setDifficulty] = useState('all');
+            const [season, setSeason] = useState('all');
             const [numQuestions, setNumQuestions] = useState(10);
             const [inputMode, setInputMode] = useState('multiple-choice');
             const [renderMode, setRenderMode] = useState('canvas');
             const [showLines, setShowLines] = useState(true);
+            const [randomRotation, setRandomRotation] = useState(false);
+            const [maxMagnitude, setMaxMagnitude] = useState(6);
 
             const handleStart = () => {
                 onStart({
                     hemisphere,
                     difficulty,
+                    season,
                     numQuestions,
                     inputMode,
                     renderMode,
-                    showLines
+                    showLines,
+                    randomRotation,
+                    maxMagnitude
                 });
             };
 
@@ -611,6 +623,21 @@
                                     <option value="easy">Easy (20 constellations)</option>
                                     <option value="medium">Medium (36 constellations)</option>
                                     <option value="hard">Hard (32 constellations)</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="season">Season Visibility</label>
+                                <select
+                                    id="season"
+                                    value={season}
+                                    onChange={(e) => setSeason(e.target.value)}
+                                >
+                                    <option value="all">All Seasons</option>
+                                    <option value="winter">Winter</option>
+                                    <option value="spring">Spring</option>
+                                    <option value="summer">Summer</option>
+                                    <option value="autumn">Autumn</option>
                                 </select>
                             </div>
 
@@ -661,6 +688,45 @@
                                 />
                                 <label htmlFor="showLines">Show constellation lines</label>
                             </div>
+
+                            <div className="checkbox-group">
+                                <input
+                                    type="checkbox"
+                                    id="randomRotation"
+                                    checked={randomRotation}
+                                    onChange={(e) => setRandomRotation(e.target.checked)}
+                                />
+                                <label htmlFor="randomRotation">Random rotation (harder!)</label>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="maxMagnitude">
+                                    Star Brightness Filter (Mag ≤ {maxMagnitude.toFixed(1)})
+                                </label>
+                                <input
+                                    type="range"
+                                    id="maxMagnitude"
+                                    list="magnitude-presets"
+                                    min="0"
+                                    max="6"
+                                    step="0.5"
+                                    value={maxMagnitude}
+                                    onChange={(e) => setMaxMagnitude(parseFloat(e.target.value))}
+                                    style={{width: '100%'}}
+                                />
+                                <datalist id="magnitude-presets">
+                                    <option value="2.5" label="City"></option>
+                                    <option value="4.0" label="Suburban"></option>
+                                    <option value="5.0" label="Rural"></option>
+                                    <option value="6.0" label="Dark Sky"></option>
+                                </datalist>
+                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center'}}>
+                                    <span>Bright City<br/>(2.5)</span>
+                                    <span>Suburban<br/>(4.0)</span>
+                                    <span>Rural<br/>(5.0)</span>
+                                    <span>Dark Sky<br/>(6.0)</span>
+                                </div>
+                            </div>
                         </div>
 
                         <button className="button-primary" onClick={handleStart}>
@@ -672,7 +738,7 @@
         }
 
         // Constellation Canvas Component
-        function ConstellationCanvas({ constellation, showLines }) {
+        function ConstellationCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0 }) {
             const canvasRef = useRef(null);
 
             useEffect(() => {
@@ -689,15 +755,62 @@
 
                 const { stars, lines } = constellation;
 
+                // Process coordinates with rotation and bounds fitting
+                let processedStars = stars.map(s => ({ ...s }));
+
+                if (rotationAngle !== 0) {
+                    // Calculate constellation center
+                    const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
+                    const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
+                    const angleRad = rotationAngle * Math.PI / 180;
+
+                    // Rotate all coordinates
+                    processedStars = stars.map(star => {
+                        const dx = star.x - centerX;
+                        const dy = star.y - centerY;
+                        const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+                        const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+                        return {
+                            ...star,
+                            x: rotatedX + centerX,
+                            y: rotatedY + centerY
+                        };
+                    });
+
+                    // Find bounding box of rotated constellation
+                    const minX = Math.min(...processedStars.map(s => s.x));
+                    const maxX = Math.max(...processedStars.map(s => s.x));
+                    const minY = Math.min(...processedStars.map(s => s.y));
+                    const maxY = Math.max(...processedStars.map(s => s.y));
+
+                    // Calculate scale to fit within 0-1 range with 10% padding
+                    const spanX = maxX - minX;
+                    const spanY = maxY - minY;
+                    const scale = Math.min(0.9 / spanX, 0.9 / spanY);
+
+                    // Normalize and center
+                    processedStars = processedStars.map(star => {
+                        const scaledX = (star.x - minX) * scale;
+                        const scaledY = (star.y - minY) * scale;
+                        const offsetX = (1 - spanX * scale) / 2;
+                        const offsetY = (1 - spanY * scale) / 2;
+                        return {
+                            ...star,
+                            x: scaledX + offsetX,
+                            y: scaledY + offsetY
+                        };
+                    });
+                }
+
                 // Draw lines first (if enabled)
                 if (showLines && lines) {
                     ctx.strokeStyle = '#475569';
                     ctx.lineWidth = 1.5;
 
                     lines.forEach(([idx1, idx2]) => {
-                        if (idx1 < stars.length && idx2 < stars.length) {
-                            const star1 = stars[idx1];
-                            const star2 = stars[idx2];
+                        if (idx1 < processedStars.length && idx2 < processedStars.length) {
+                            const star1 = processedStars[idx1];
+                            const star2 = processedStars[idx2];
                             const x1 = star1.x * width;
                             const y1 = (1 - star1.y) * height;
                             const x2 = star2.x * width;
@@ -711,11 +824,15 @@
                     });
                 }
 
-                // Draw stars
-                stars.forEach(star => {
+                // Draw stars (filtered by magnitude)
+                processedStars.forEach(star => {
+                    const mag = star.magnitude || 5;
+
+                    // Skip stars dimmer than the filter threshold
+                    if (mag > maxMagnitude) return;
+
                     const x = star.x * width;
                     const y = (1 - star.y) * height;
-                    const mag = star.magnitude || 5;
 
                     // Size based on magnitude (lower magnitude = brighter = bigger)
                     let radius;
@@ -743,13 +860,13 @@
                     ctx.fill();
                 });
 
-            }, [constellation, showLines]);
+            }, [constellation, showLines, maxMagnitude, rotationAngle]);
 
             return <canvas ref={canvasRef} width="500" height="500" />;
         }
 
         // ASCII Constellation Component
-        function ASCIIConstellation({ constellation, showLines }) {
+        function ASCIIConstellation({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0 }) {
             const ascii = useMemo(() => {
                 const { stars, lines } = constellation;
                 const width = 70;
@@ -757,6 +874,53 @@
 
                 // Create character grid
                 const grid = Array(height).fill().map(() => Array(width).fill(' '));
+
+                // Process coordinates with rotation and bounds fitting
+                let processedStars = stars.map(s => ({ ...s }));
+
+                if (rotationAngle !== 0) {
+                    // Calculate constellation center
+                    const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
+                    const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
+                    const angleRad = rotationAngle * Math.PI / 180;
+
+                    // Rotate all coordinates
+                    processedStars = stars.map(star => {
+                        const dx = star.x - centerX;
+                        const dy = star.y - centerY;
+                        const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+                        const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+                        return {
+                            ...star,
+                            x: rotatedX + centerX,
+                            y: rotatedY + centerY
+                        };
+                    });
+
+                    // Find bounding box of rotated constellation
+                    const minX = Math.min(...processedStars.map(s => s.x));
+                    const maxX = Math.max(...processedStars.map(s => s.x));
+                    const minY = Math.min(...processedStars.map(s => s.y));
+                    const maxY = Math.max(...processedStars.map(s => s.y));
+
+                    // Calculate scale to fit within 0-1 range with 10% padding
+                    const spanX = maxX - minX;
+                    const spanY = maxY - minY;
+                    const scale = Math.min(0.9 / spanX, 0.9 / spanY);
+
+                    // Normalize and center
+                    processedStars = processedStars.map(star => {
+                        const scaledX = (star.x - minX) * scale;
+                        const scaledY = (star.y - minY) * scale;
+                        const offsetX = (1 - spanX * scale) / 2;
+                        const offsetY = (1 - spanY * scale) / 2;
+                        return {
+                            ...star,
+                            x: scaledX + offsetX,
+                            y: scaledY + offsetY
+                        };
+                    });
+                }
 
                 // Bresenham line drawing algorithm
                 const drawLine = (x1, y1, x2, y2) => {
@@ -790,9 +954,10 @@
                 // Draw lines first (if enabled)
                 if (showLines && lines) {
                     lines.forEach(([idx1, idx2]) => {
-                        if (idx1 < stars.length && idx2 < stars.length) {
-                            const star1 = stars[idx1];
-                            const star2 = stars[idx2];
+                        if (idx1 < processedStars.length && idx2 < processedStars.length) {
+                            const star1 = processedStars[idx1];
+                            const star2 = processedStars[idx2];
+
                             const x1 = Math.round(star1.x * (width - 1));
                             const y1 = Math.round((1 - star1.y) * (height - 1));
                             const x2 = Math.round(star2.x * (width - 1));
@@ -802,11 +967,15 @@
                     });
                 }
 
-                // Draw stars on top
-                stars.forEach(star => {
+                // Draw stars on top (filtered by magnitude)
+                processedStars.forEach(star => {
+                    const mag = star.magnitude || 5;
+
+                    // Skip stars dimmer than the filter threshold
+                    if (mag > maxMagnitude) return;
+
                     const x = Math.round(star.x * (width - 1));
                     const y = Math.round((1 - star.y) * (height - 1));
-                    const mag = star.magnitude || 5;
 
                     // Symbol based on magnitude
                     let symbol;
@@ -822,7 +991,7 @@
 
                 // Convert grid to string
                 return grid.map(row => row.join('')).join('\n');
-            }, [constellation, showLines]);
+            }, [constellation, showLines, maxMagnitude, rotationAngle]);
 
             return (
                 <div className="ascii-container">
@@ -915,11 +1084,15 @@
                                     <ASCIIConstellation
                                         constellation={currentQuestion.constellation}
                                         showLines={currentQuestion.showLines}
+                                        maxMagnitude={currentQuestion.maxMagnitude}
+                                        rotationAngle={currentQuestion.rotationAngle}
                                     />
                                 ) : (
                                     <ConstellationCanvas
                                         constellation={currentQuestion.constellation}
                                         showLines={currentQuestion.showLines}
+                                        maxMagnitude={currentQuestion.maxMagnitude}
+                                        rotationAngle={currentQuestion.rotationAngle}
                                     />
                                 )}
                             </div>
