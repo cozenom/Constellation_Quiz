@@ -7,7 +7,7 @@ Outputs:
 - {abbrev}_with_lines.txt: Full constellation pattern with connecting lines
 - {abbrev}_stars_only.txt: Just the stars (for quiz mode)
 
-Uses pre-projected coordinates from constellations_quiz.json for consistent rendering.
+Uses pre-projected coordinates from constellation_data.json for consistent rendering.
 """
 
 import json
@@ -228,7 +228,7 @@ def main():
     print()
 
     # File paths
-    constellations_path = "data/constellations_quiz.json"
+    constellations_path = "data/constellation_data.json"
     output_dir = "data/ascii_gallery"
 
     # Load data

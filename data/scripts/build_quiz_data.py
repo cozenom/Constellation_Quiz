@@ -11,7 +11,9 @@ Input:
 - Hipparcos catalog (via Skyfield)
 
 Output:
-- data/constellations_quiz.json (Complete quiz-ready data with metadata)
+- data/constellation_data.json (Complete quiz-ready data with metadata)
+- data/stars_visible.json (Naked-eye visible stars, mag ≤ 6.5)
+- data/stars_all.json (All Hipparcos stars, ~118k stars)
 """
 
 import json
@@ -239,6 +241,17 @@ def load_constellation_names(filepath: str) -> Dict[str, str]:
     return const_names
 
 
+def load_english_names(filepath: str) -> Dict[str, str]:
+    """Load English translations/meanings for constellation names."""
+    print(f"📖 Reading {filepath}...")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        english_names = json.load(f)
+
+    print(f"✅ Loaded {len(english_names)} English constellation names")
+    return english_names
+
+
 def load_hipparcos_data() -> Dict[int, Dict]:
     """Load Hipparcos catalog via Skyfield."""
     print(f"📖 Loading Hipparcos catalog (this may take a moment)...")
@@ -331,6 +344,7 @@ def build_quiz_data(output_path: str):
     iau_stars = parse_iau_catalog("data/raw/IAU_Star_Catalog.csv")
     constellation_lines = parse_constellationship_fab("data/raw/constellationship.fab")
     constellation_names = load_constellation_names("data/raw/constellation_abbreviations.json")
+    english_names = load_english_names("data/raw/constellation_english.json")
     hipparcos_data = load_hipparcos_data()
 
     # Manual constellation line fixes
@@ -457,6 +471,7 @@ def build_quiz_data(output_path: str):
             # Build final constellation data
             quiz_data[abbrev] = {
                 'name': name,
+                'name_english': english_names.get(name, name),  # English translation/meaning
                 'abbrev': abbrev,
                 'hemisphere': hemisphere,
                 'difficulty': difficulty,
@@ -504,5 +519,123 @@ def build_quiz_data(output_path: str):
     print("=" * 70)
 
 
+def generate_star_catalogs(hipparcos_data: Dict[int, Dict], iau_stars: Dict[int, Dict[str, str]]):
+    """Generate separate star catalog files for background stars."""
+    print("\n" + "=" * 70)
+    print("GENERATING STAR CATALOGS")
+    print("=" * 70)
+    print()
+
+    # Generate visible stars (mag <= 6.5)
+    print("📖 Building visible stars catalog (mag ≤ 6.5)...")
+    visible_stars = []
+
+    for hip_id, hip_data in hipparcos_data.items():
+        mag = hip_data.get('magnitude')
+        ra = hip_data.get('ra')
+        dec = hip_data.get('dec')
+
+        # Skip if no magnitude or coordinates
+        if mag is None or ra is None or dec is None:
+            continue
+
+        # Filter by magnitude
+        if mag <= 6.5:
+            # Simple equatorial projection: x = RA/24, y = (Dec+90)/180
+            x = ra / 24.0
+            y = (dec + 90) / 180.0
+
+            star_entry = {
+                'hip': str(hip_id),
+                'x': round(x, 6),
+                'y': round(y, 6),
+                'mag': round(mag, 2)
+            }
+
+            # Add name if this is a famous star
+            iau_data = iau_stars.get(hip_id, {})
+            if iau_data.get('name'):
+                star_entry['name'] = iau_data['name']
+
+            visible_stars.append(star_entry)
+
+    # Sort by magnitude (brightest first)
+    visible_stars.sort(key=lambda s: s['mag'])
+
+    # Write visible stars
+    output_path = "data/stars_visible.json"
+    print(f"💾 Writing {output_path}...")
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(visible_stars, f, indent=2, ensure_ascii=False)
+
+    named_count = sum(1 for s in visible_stars if 'name' in s)
+    print(f"✅ Generated {output_path}")
+    print(f"   Total stars: {len(visible_stars)}")
+    print(f"   Named stars: {named_count}")
+    print(f"   File size: ~{len(json.dumps(visible_stars)) / 1024:.0f} KB")
+
+    # Generate all stars catalog
+    print(f"\n📖 Building complete star catalog (all Hipparcos stars)...")
+    all_stars = []
+
+    for hip_id, hip_data in hipparcos_data.items():
+        mag = hip_data.get('magnitude')
+        ra = hip_data.get('ra')
+        dec = hip_data.get('dec')
+
+        # Skip if no coordinates (magnitude can be missing)
+        if ra is None or dec is None:
+            continue
+
+        # Simple equatorial projection
+        x = ra / 24.0
+        y = (dec + 90) / 180.0
+
+        star_entry = {
+            'hip': str(hip_id),
+            'x': round(x, 6),
+            'y': round(y, 6)
+        }
+
+        # Add magnitude if available
+        if mag is not None:
+            star_entry['mag'] = round(mag, 2)
+
+        # Add name if this is a famous star
+        iau_data = iau_stars.get(hip_id, {})
+        if iau_data.get('name'):
+            star_entry['name'] = iau_data['name']
+
+        all_stars.append(star_entry)
+
+    # Sort by magnitude (brightest first, nulls last)
+    all_stars.sort(key=lambda s: s.get('mag', 99))
+
+    # Write all stars
+    output_path = "data/stars_all.json"
+    print(f"💾 Writing {output_path}...")
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(all_stars, f, indent=2, ensure_ascii=False)
+
+    named_count = sum(1 for s in all_stars if 'name' in s)
+    print(f"✅ Generated {output_path}")
+    print(f"   Total stars: {len(all_stars)}")
+    print(f"   Named stars: {named_count}")
+    print(f"   File size: ~{len(json.dumps(all_stars)) / 1024:.0f} KB")
+
+    print("\n" + "=" * 70)
+    print("✨ STAR CATALOGS COMPLETE!")
+    print("=" * 70)
+
+
 if __name__ == "__main__":
-    build_quiz_data("data/constellations_quiz.json")
+    # Build main quiz data
+    build_quiz_data("data/constellation_data.json")
+
+    # Load data for star catalogs
+    print("\n")
+    iau_stars = parse_iau_catalog("data/raw/IAU_Star_Catalog.csv")
+    hipparcos_data = load_hipparcos_data()
+
+    # Generate star catalogs
+    generate_star_catalogs(hipparcos_data, iau_stars)
