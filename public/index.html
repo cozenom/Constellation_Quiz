@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Learn to identify all 88 constellations - mobile-friendly quiz app">
+    <meta name="theme-color" content="#0f172a">
+    <title>Constellation Quiz</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+
+        #root {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #f1f5f9;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #cbd5e1;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .setup-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-weight: 500;
+            color: #cbd5e1;
+            font-size: 0.95rem;
+        }
+
+        select, input[type="text"] {
+            padding: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        select:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        button {
+            padding: 0.875rem 1.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        button:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-primary {
+            background: #3b82f6;
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .button-secondary {
+            background: #64748b;
+        }
+
+        .button-secondary:hover {
+            background: #475569;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .score {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .question-number {
+            font-size: 1rem;
+            color: #94a3b8;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            margin: 0 auto 1.5rem;
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+
+        .answer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .answer-button {
+            padding: 1rem;
+            background: #1e293b;
+            border: 2px solid #475569;
+            color: #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 50px;
+        }
+
+        .answer-button:hover {
+            background: #334155;
+            border-color: #64748b;
+        }
+
+        .answer-button.correct {
+            background: #065f46;
+            border-color: #10b981;
+            color: #d1fae5;
+        }
+
+        .answer-button.incorrect {
+            background: #7f1d1d;
+            border-color: #ef4444;
+            color: #fecaca;
+        }
+
+        .feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .feedback.correct {
+            background: rgba(6, 95, 70, 0.3);
+            border: 1px solid #10b981;
+            color: #d1fae5;
+        }
+
+        .feedback.incorrect {
+            background: rgba(127, 29, 29, 0.3);
+            border: 1px solid #ef4444;
+            color: #fecaca;
+        }
+
+        .text-input-container {
+            margin-top: 1.5rem;
+        }
+
+        .text-input-container input {
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+
+        .results-summary {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .results-summary .score-big {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #60a5fa;
+            margin: 1rem 0;
+        }
+
+        .results-summary .percentage {
+            font-size: 1.5rem;
+            color: #94a3b8;
+        }
+
+        .missed-list {
+            list-style: none;
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .missed-list li {
+            padding: 0.75rem;
+            background: rgba(127, 29, 29, 0.2);
+            border-left: 3px solid #ef4444;
+            border-radius: 4px;
+            color: #fecaca;
+        }
+
+        .button-group {
+            display: grid;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        @media (min-width: 640px) {
+            .button-group {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #94a3b8;
+        }
+
+        .ascii-container {
+            background: #0f172a;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            padding: 1rem;
+            margin: 0 auto 1.5rem;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .ascii-art {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.55rem;
+            line-height: 1.1;
+            color: #e2e8f0;
+            white-space: pre;
+            text-align: left;
+        }
+
+        .back-button {
+            background: #64748b;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .back-button:hover {
+            background: #475569;
+        }
+
+        @media (min-width: 768px) {
+            .ascii-art {
+                font-size: 0.7rem;
+            }
+
+            .quiz-desktop-grid {
+                display: grid;
+                grid-template-columns: 500px 1fr;
+                gap: 2rem;
+                align-items: start;
+            }
+
+            .quiz-constellation-col {
+                position: sticky;
+                top: 1rem;
+            }
+
+            .quiz-interaction-col {
+                min-height: 500px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+
+    <!-- React from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Quiz App -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // Main App Component
+        function App() {
+            const [screen, setScreen] = useState('setup'); // 'setup', 'quiz', 'results'
+            const [config, setConfig] = useState(null);
+            const [quizState, setQuizState] = useState(null);
+            const [constellationData, setConstellationData] = useState(null);
+            const [loadingError, setLoadingError] = useState(null);
+
+            // Load constellation data from external JSON
+            useEffect(() => {
+                fetch('../data/constellations_quiz.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Failed to load constellation data: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        setConstellationData(data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading constellation data:', error);
+                        setLoadingError(error.message);
+                    });
+            }, []);
+
+            const startQuiz = (quizConfig) => {
+                setConfig(quizConfig);
+                const questions = generateQuestions(quizConfig, constellationData);
+                setQuizState({
+                    questions,
+                    currentIndex: 0,
+                    score: 0,
+                    answers: []
+                });
+                setScreen('quiz');
+            };
+
+            const handleAnswer = (isCorrect, userAnswer, correctAnswer) => {
+                const newAnswers = [...quizState.answers, {
+                    constellation: correctAnswer,
+                    userAnswer,
+                    correct: isCorrect
+                }];
+
+                const newScore = isCorrect ? quizState.score + 1 : quizState.score;
+
+                setQuizState({
+                    ...quizState,
+                    score: newScore,
+                    answers: newAnswers
+                });
+            };
+
+            const nextQuestion = () => {
+                if (quizState.currentIndex + 1 < quizState.questions.length) {
+                    setQuizState({
+                        ...quizState,
+                        currentIndex: quizState.currentIndex + 1
+                    });
+                } else {
+                    setScreen('results');
+                }
+            };
+
+            const restartQuiz = () => {
+                startQuiz(config);
+            };
+
+            const newQuiz = () => {
+                setScreen('setup');
+                setConfig(null);
+                setQuizState(null);
+            };
+
+            const backToSetup = () => {
+                setScreen('setup');
+            };
+
+            // Show loading state
+            if (!constellationData && !loadingError) {
+                return (
+                    <div style={{textAlign: 'center', padding: '3rem'}}>
+                        <h1>🌟 Constellation Quiz</h1>
+                        <p style={{marginTop: '2rem', fontSize: '1.25rem'}}>Loading constellation data...</p>
+                    </div>
+                );
+            }
+
+            // Show error state
+            if (loadingError) {
+                return (
+                    <div style={{textAlign: 'center', padding: '3rem'}}>
+                        <h1>❌ Error</h1>
+                        <div className="card" style={{marginTop: '2rem'}}>
+                            <p style={{color: '#dc2626', marginBottom: '1rem'}}>Failed to load constellation data:</p>
+                            <p style={{fontFamily: 'monospace', background: '#1e293b', padding: '1rem', borderRadius: '0.5rem'}}>
+                                {loadingError}
+                            </p>
+                            <p style={{marginTop: '1.5rem', fontSize: '0.875rem', color: '#94a3b8'}}>
+                                Make sure you're running a local HTTP server:
+                            </p>
+                            <p style={{fontFamily: 'monospace', marginTop: '0.5rem', fontSize: '0.875rem'}}>
+                                python -m http.server 8000
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <>
+                    {screen === 'setup' && <SetupScreen onStart={startQuiz} constellationData={constellationData} />}
+                    {screen === 'quiz' && (
+                        <QuizScreen
+                            config={config}
+                            quizState={quizState}
+                            onAnswer={handleAnswer}
+                            onNext={nextQuestion}
+                            onBack={backToSetup}
+                        />
+                    )}
+                    {screen === 'results' && (
+                        <ResultsScreen
+                            quizState={quizState}
+                            onRestart={restartQuiz}
+                            onNewQuiz={newQuiz}
+                        />
+                    )}
+                </>
+            );
+        }
+
+        // Generate quiz questions based on config
+        function generateQuestions(config, constellationData) {
+            const { hemisphere, difficulty, numQuestions, inputMode, renderMode, showLines } = config;
+
+            // Filter constellations
+            let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
+                const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere;
+                const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
+                return matchesHemisphere && matchesDifficulty;
+            });
+
+            // Shuffle and limit
+            pool = shuffleArray(pool);
+            const count = numQuestions === 'endless' ? pool.length : Math.min(numQuestions, pool.length);
+            pool = pool.slice(0, count);
+
+            // Generate questions with multiple choice options
+            return pool.map(([abbrev, data]) => {
+                const wrongAnswers = generateWrongAnswers(abbrev, data, pool, 3);
+                const allChoices = shuffleArray([
+                    { abbrev, name: data.name, correct: true },
+                    ...wrongAnswers.map(w => ({ abbrev: w[0], name: w[1].name, correct: false }))
+                ]);
+
+                return {
+                    constellation: { abbrev, ...data },
+                    choices: allChoices,
+                    showLines,
+                    renderMode
+                };
+            });
+        }
+
+        // Generate wrong answer choices from same hemisphere
+        function generateWrongAnswers(correctAbbrev, correctData, pool, count) {
+            const candidates = pool.filter(([abbrev, data]) =>
+                abbrev !== correctAbbrev && data.hemisphere === correctData.hemisphere
+            );
+
+            // If not enough from same hemisphere, add from other hemispheres
+            if (candidates.length < count) {
+                const candidateAbbrevs = new Set(candidates.map(([abbrev]) => abbrev));
+                const others = pool.filter(([abbrev]) =>
+                    abbrev !== correctAbbrev && !candidateAbbrevs.has(abbrev)
+                );
+
+                // Combine and ensure uniqueness
+                const combined = [...candidates, ...others];
+                return shuffleArray(combined).slice(0, count);
+            }
+
+            return shuffleArray(candidates).slice(0, count);
+        }
+
+        // Shuffle array utility
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // Setup Screen Component
+        function SetupScreen({ onStart }) {
+            const [hemisphere, setHemisphere] = useState('both');
+            const [difficulty, setDifficulty] = useState('all');
+            const [numQuestions, setNumQuestions] = useState(10);
+            const [inputMode, setInputMode] = useState('multiple-choice');
+            const [renderMode, setRenderMode] = useState('canvas');
+            const [showLines, setShowLines] = useState(true);
+
+            const handleStart = () => {
+                onStart({
+                    hemisphere,
+                    difficulty,
+                    numQuestions,
+                    inputMode,
+                    renderMode,
+                    showLines
+                });
+            };
+
+            return (
+                <div>
+                    <h1>🌟 Constellation Quiz</h1>
+                    <p className="subtitle">Learn to identify all 88 constellations by their star patterns</p>
+
+                    <div className="card">
+                        <div className="setup-grid">
+                            <div className="form-group">
+                                <label htmlFor="hemisphere">Hemisphere</label>
+                                <select
+                                    id="hemisphere"
+                                    value={hemisphere}
+                                    onChange={(e) => setHemisphere(e.target.value)}
+                                >
+                                    <option value="both">Both Hemispheres</option>
+                                    <option value="north">Northern Only</option>
+                                    <option value="south">Southern Only</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="difficulty">Difficulty</label>
+                                <select
+                                    id="difficulty"
+                                    value={difficulty}
+                                    onChange={(e) => setDifficulty(e.target.value)}
+                                >
+                                    <option value="all">All Difficulties</option>
+                                    <option value="easy">Easy (20 constellations)</option>
+                                    <option value="medium">Medium (36 constellations)</option>
+                                    <option value="hard">Hard (32 constellations)</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="numQuestions">Number of Questions</label>
+                                <select
+                                    id="numQuestions"
+                                    value={numQuestions}
+                                    onChange={(e) => setNumQuestions(e.target.value === 'endless' ? 'endless' : parseInt(e.target.value))}
+                                >
+                                    <option value="10">10 Questions</option>
+                                    <option value="20">20 Questions</option>
+                                    <option value="50">50 Questions</option>
+                                    <option value="endless">All Available</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="inputMode">Input Mode</label>
+                                <select
+                                    id="inputMode"
+                                    value={inputMode}
+                                    onChange={(e) => setInputMode(e.target.value)}
+                                >
+                                    <option value="multiple-choice">Multiple Choice (4 options)</option>
+                                    <option value="text">Text Input</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="renderMode">Rendering Mode</label>
+                                <select
+                                    id="renderMode"
+                                    value={renderMode}
+                                    onChange={(e) => setRenderMode(e.target.value)}
+                                >
+                                    <option value="canvas">Canvas (Graphical)</option>
+                                    <option value="ascii">ASCII Art</option>
+                                </select>
+                            </div>
+
+                            <div className="checkbox-group">
+                                <input
+                                    type="checkbox"
+                                    id="showLines"
+                                    checked={showLines}
+                                    onChange={(e) => setShowLines(e.target.checked)}
+                                />
+                                <label htmlFor="showLines">Show constellation lines</label>
+                            </div>
+                        </div>
+
+                        <button className="button-primary" onClick={handleStart}>
+                            Start Quiz
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Constellation Canvas Component
+        function ConstellationCanvas({ constellation, showLines }) {
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                if (!canvasRef.current) return;
+
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width = 500;
+                const height = canvas.height = 500;
+
+                // Clear canvas
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, 0, width, height);
+
+                const { stars, lines } = constellation;
+
+                // Draw lines first (if enabled)
+                if (showLines && lines) {
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 1.5;
+
+                    lines.forEach(([idx1, idx2]) => {
+                        if (idx1 < stars.length && idx2 < stars.length) {
+                            const star1 = stars[idx1];
+                            const star2 = stars[idx2];
+                            const x1 = star1.x * width;
+                            const y1 = (1 - star1.y) * height;
+                            const x2 = star2.x * width;
+                            const y2 = (1 - star2.y) * height;
+
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.stroke();
+                        }
+                    });
+                }
+
+                // Draw stars
+                stars.forEach(star => {
+                    const x = star.x * width;
+                    const y = (1 - star.y) * height;
+                    const mag = star.magnitude || 5;
+
+                    // Size based on magnitude (lower magnitude = brighter = bigger)
+                    let radius;
+                    if (mag < 1.0) radius = 5;
+                    else if (mag < 2.5) radius = 4;
+                    else if (mag < 4.0) radius = 3;
+                    else radius = 2;
+
+                    // Glow effect for bright stars
+                    if (mag < 2.5) {
+                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(147, 197, 253, 0.3)');
+                        gradient.addColorStop(1, 'rgba(147, 197, 253, 0)');
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Star itself
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+            }, [constellation, showLines]);
+
+            return <canvas ref={canvasRef} width="500" height="500" />;
+        }
+
+        // ASCII Constellation Component
+        function ASCIIConstellation({ constellation, showLines }) {
+            const ascii = useMemo(() => {
+                const { stars, lines } = constellation;
+                const width = 70;
+                const height = 45;
+
+                // Create character grid
+                const grid = Array(height).fill().map(() => Array(width).fill(' '));
+
+                // Bresenham line drawing algorithm
+                const drawLine = (x1, y1, x2, y2) => {
+                    const dx = Math.abs(x2 - x1);
+                    const dy = Math.abs(y2 - y1);
+                    const sx = x1 < x2 ? 1 : -1;
+                    const sy = y1 < y2 ? 1 : -1;
+                    let err = dx - dy;
+
+                    while (true) {
+                        if (x1 >= 0 && x1 < width && y1 >= 0 && y1 < height) {
+                            if (grid[y1][x1] === ' ') {
+                                grid[y1][x1] = '·';
+                            }
+                        }
+
+                        if (x1 === x2 && y1 === y2) break;
+
+                        const e2 = 2 * err;
+                        if (e2 > -dy) {
+                            err -= dy;
+                            x1 += sx;
+                        }
+                        if (e2 < dx) {
+                            err += dx;
+                            y1 += sy;
+                        }
+                    }
+                };
+
+                // Draw lines first (if enabled)
+                if (showLines && lines) {
+                    lines.forEach(([idx1, idx2]) => {
+                        if (idx1 < stars.length && idx2 < stars.length) {
+                            const star1 = stars[idx1];
+                            const star2 = stars[idx2];
+                            const x1 = Math.round(star1.x * (width - 1));
+                            const y1 = Math.round((1 - star1.y) * (height - 1));
+                            const x2 = Math.round(star2.x * (width - 1));
+                            const y2 = Math.round((1 - star2.y) * (height - 1));
+                            drawLine(x1, y1, x2, y2);
+                        }
+                    });
+                }
+
+                // Draw stars on top
+                stars.forEach(star => {
+                    const x = Math.round(star.x * (width - 1));
+                    const y = Math.round((1 - star.y) * (height - 1));
+                    const mag = star.magnitude || 5;
+
+                    // Symbol based on magnitude
+                    let symbol;
+                    if (mag < 1.0) symbol = '⬤';
+                    else if (mag < 2.5) symbol = '●';
+                    else if (mag < 4.0) symbol = '○';
+                    else symbol = '∘';
+
+                    if (x >= 0 && x < width && y >= 0 && y < height) {
+                        grid[y][x] = symbol;
+                    }
+                });
+
+                // Convert grid to string
+                return grid.map(row => row.join('')).join('\n');
+            }, [constellation, showLines]);
+
+            return (
+                <div className="ascii-container">
+                    <div className="ascii-art">{ascii}</div>
+                </div>
+            );
+        }
+
+        // Quiz Screen Component
+        function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
+            const [selectedAnswer, setSelectedAnswer] = useState(null);
+            const [textInput, setTextInput] = useState('');
+            const [feedback, setFeedback] = useState(null);
+            const [showNextButton, setShowNextButton] = useState(false);
+
+            const currentQuestion = quizState.questions[quizState.currentIndex];
+            const isTextMode = config.inputMode === 'text';
+
+            // Reset state when question changes
+            useEffect(() => {
+                setSelectedAnswer(null);
+                setTextInput('');
+                setFeedback(null);
+                setShowNextButton(false);
+            }, [quizState.currentIndex]);
+
+            const handleMultipleChoiceAnswer = (choice) => {
+                if (feedback) return; // Already answered
+
+                setSelectedAnswer(choice);
+                const isCorrect = choice.correct;
+
+                onAnswer(isCorrect, choice.name, currentQuestion.constellation.name);
+                setFeedback({
+                    correct: isCorrect,
+                    message: isCorrect
+                        ? '✓ Correct!'
+                        : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.name}`
+                });
+                setShowNextButton(true);
+            };
+
+            const handleTextInputSubmit = (e) => {
+                e.preventDefault();
+                if (feedback || !textInput.trim()) return;
+
+                const userAnswer = textInput.trim().toLowerCase();
+                const correctAnswer = currentQuestion.constellation.name.toLowerCase();
+                const correctAbbrev = currentQuestion.constellation.abbrev.toLowerCase();
+
+                // Check if answer matches name or abbreviation
+                const isCorrect = userAnswer === correctAnswer || userAnswer === correctAbbrev;
+
+                onAnswer(isCorrect, textInput, currentQuestion.constellation.name);
+                setFeedback({
+                    correct: isCorrect,
+                    message: isCorrect
+                        ? '✓ Correct!'
+                        : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.name}`
+                });
+                setShowNextButton(true);
+            };
+
+            const handleNext = () => {
+                onNext();
+            };
+
+            const progress = quizState.currentIndex + 1;
+            const total = quizState.questions.length;
+            const percentage = Math.round((quizState.score / progress) * 100);
+
+            return (
+                <div>
+                    <div className="quiz-header">
+                        <button className="back-button" onClick={onBack}>
+                            ← Back to Menu
+                        </button>
+                        <div className="question-number">
+                            Question {progress} of {total}
+                        </div>
+                        <div className="score">
+                            Score: {quizState.score}/{progress} ({percentage}%)
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <div className="quiz-desktop-grid">
+                            <div className="quiz-constellation-col">
+                                {currentQuestion.renderMode === 'ascii' ? (
+                                    <ASCIIConstellation
+                                        constellation={currentQuestion.constellation}
+                                        showLines={currentQuestion.showLines}
+                                    />
+                                ) : (
+                                    <ConstellationCanvas
+                                        constellation={currentQuestion.constellation}
+                                        showLines={currentQuestion.showLines}
+                                    />
+                                )}
+                            </div>
+
+                            <div className="quiz-interaction-col">
+                                <h2 style={{textAlign: 'center', marginBottom: '1.5rem'}}>
+                                    What constellation is this?
+                                </h2>
+
+                                {isTextMode ? (
+                                    <div className="text-input-container">
+                                        <form onSubmit={handleTextInputSubmit}>
+                                            <input
+                                                type="text"
+                                                value={textInput}
+                                                onChange={(e) => setTextInput(e.target.value)}
+                                                placeholder="Enter constellation name..."
+                                                disabled={feedback !== null}
+                                                autoFocus
+                                            />
+                                            {!showNextButton && (
+                                                <button type="submit" className="button-primary">
+                                                    Submit Answer
+                                                </button>
+                                            )}
+                                        </form>
+                                    </div>
+                                ) : (
+                                    <div className="answer-grid">
+                                        {currentQuestion.choices.map((choice, idx) => (
+                                            <button
+                                                key={idx}
+                                                className={`answer-button ${
+                                                    feedback && choice.correct ? 'correct' : ''
+                                                } ${
+                                                    feedback && selectedAnswer === choice && !choice.correct ? 'incorrect' : ''
+                                                }`}
+                                                onClick={() => handleMultipleChoiceAnswer(choice)}
+                                                disabled={feedback !== null}
+                                            >
+                                                {choice.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {feedback && (
+                                    <div className={`feedback ${feedback.correct ? 'correct' : 'incorrect'}`}>
+                                        {feedback.message}
+                                    </div>
+                                )}
+
+                                {showNextButton && (
+                                    <button
+                                        className="button-primary"
+                                        onClick={handleNext}
+                                        style={{marginTop: '1rem'}}
+                                    >
+                                        {progress < total ? 'Next Question →' : 'See Results'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Results Screen Component
+        function ResultsScreen({ quizState, onRestart, onNewQuiz }) {
+            const total = quizState.questions.length;
+            const score = quizState.score;
+            const percentage = Math.round((score / total) * 100);
+            const missed = quizState.answers.filter(a => !a.correct);
+
+            let performanceMessage = '';
+            if (percentage === 100) performanceMessage = 'Perfect Score! 🎉';
+            else if (percentage >= 90) performanceMessage = 'Excellent! 🌟';
+            else if (percentage >= 75) performanceMessage = 'Great Job! ⭐';
+            else if (percentage >= 60) performanceMessage = 'Good Effort! 👍';
+            else performanceMessage = 'Keep Practicing! 📚';
+
+            return (
+                <div>
+                    <h1>Quiz Complete!</h1>
+
+                    <div className="card">
+                        <div className="results-summary">
+                            <div className="score-big">{score}/{total}</div>
+                            <div className="percentage">{percentage}% Correct</div>
+                            <p style={{marginTop: '1rem', fontSize: '1.25rem'}}>{performanceMessage}</p>
+                        </div>
+
+                        {missed.length > 0 && (
+                            <div style={{marginTop: '2rem'}}>
+                                <h2>Missed Constellations ({missed.length})</h2>
+                                <ul className="missed-list">
+                                    {missed.map((answer, idx) => (
+                                        <li key={idx}>
+                                            <strong>{answer.constellation}</strong>
+                                            {answer.userAnswer && ` — You answered: ${answer.userAnswer}`}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="button-group">
+                            <button className="button-primary" onClick={onRestart}>
+                                Try Again (Same Settings)
+                            </button>
+                            <button className="button-secondary" onClick={onNewQuiz}>
+                                New Quiz (Different Settings)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
