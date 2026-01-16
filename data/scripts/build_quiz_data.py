@@ -243,8 +243,15 @@ def load_hipparcos_data() -> Dict[int, Dict]:
     """Load Hipparcos catalog via Skyfield."""
     print(f"📖 Loading Hipparcos catalog (this may take a moment)...")
 
-    with load.open(hipparcos.URL) as f:
-        df = hipparcos.load_dataframe(f)
+    # Use cached file if it exists, otherwise download
+    import os
+    cache_path = "data/raw/hip_main.dat"
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            df = hipparcos.load_dataframe(f)
+    else:
+        with load.open(hipparcos.URL) as f:
+            df = hipparcos.load_dataframe(f)
 
     hip_data = {}
 
@@ -325,6 +332,14 @@ def build_quiz_data(output_path: str):
     constellation_lines = parse_constellationship_fab("data/raw/constellationship.fab")
     constellation_names = load_constellation_names("data/raw/constellation_abbreviations.json")
     hipparcos_data = load_hipparcos_data()
+
+    # Manual constellation line fixes
+    # Hydra: Missing connection between α Crt (HIP 53740) and β Crt (HIP 54682)
+    # The Sky & Telescope source data has a gap here, but Hydra should be continuous.
+    # This connection passes through Crater constellation but is part of Hydra's body.
+    if 'Hya' in constellation_lines:
+        constellation_lines['Hya'].append([53740, 54682])
+        print("✏️  Applied manual fix: Added missing Hydra connection (HIP 53740 → 54682)")
 
     print("\n🔗 Building quiz data for all constellations...")
 
