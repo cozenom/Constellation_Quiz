@@ -628,6 +628,180 @@ def generate_star_catalogs(hipparcos_data: Dict[int, Dict], iau_stars: Dict[int,
     print("=" * 70)
 
 
+def generate_background_stars_for_constellations(constellation_data_path: str, stars_visible_path: str, stars_all_path: str):
+    """Generate background stars for each constellation using correct projections."""
+    print("\n" + "=" * 70)
+    print("GENERATING BACKGROUND STARS PER CONSTELLATION")
+    print("=" * 70)
+    print()
+
+    # Load constellation data
+    print("📖 Loading constellation data...")
+    with open(constellation_data_path, 'r', encoding='utf-8') as f:
+        constellations = json.load(f)
+    print(f"✅ Loaded {len(constellations)} constellations")
+
+    # Load star catalogs
+    print("📖 Loading visible stars catalog...")
+    with open(stars_visible_path, 'r', encoding='utf-8') as f:
+        stars_visible = json.load(f)
+    print(f"✅ Loaded {len(stars_visible)} visible stars")
+
+    print("📖 Loading all stars catalog...")
+    with open(stars_all_path, 'r', encoding='utf-8') as f:
+        stars_all = json.load(f)
+    print(f"✅ Loaded {len(stars_all)} total stars")
+
+    # Convert star arrays to dictionaries for lookups
+    stars_visible_dict = {int(s['hip']): s for s in stars_visible}
+    stars_all_dict = {int(s['hip']): s for s in stars_all}
+
+    # Load Hipparcos data for RA/Dec
+    hipparcos_data = load_hipparcos_data()
+
+    # Process each constellation
+    background_visible = {}
+    background_all = {}
+
+    for abbrev, const in sorted(constellations.items()):
+        name = const['name']
+        ra_center = const['ra_center']
+        dec_center = const['dec_center']
+        projection_type = const['projection_type']
+
+        # First, re-project constellation stars to get normalization bounds
+        const_projected = []
+        for star in const['stars']:
+            hip_id = int(star['hip'])
+            if hip_id not in hipparcos_data:
+                continue
+            hip_data = hipparcos_data[hip_id]
+            ra = hip_data.get('ra')
+            dec = hip_data.get('dec')
+            if ra is None or dec is None:
+                continue
+
+            # Apply same projection as original
+            if projection_type == 'polar_north':
+                x_proj, y_proj = polar_stereographic_projection(ra, dec, pole='north')
+            elif projection_type == 'polar_south':
+                x_proj, y_proj = polar_stereographic_projection(ra, dec, pole='south')
+            else:  # stereographic
+                x_proj, y_proj = stereographic_projection(ra, dec, ra_center, dec_center)
+
+            const_projected.append((x_proj, y_proj))
+
+        if not const_projected:
+            print(f"⚠️  {abbrev:4s} - {name:25s} (no constellation stars to establish bounds)")
+            background_visible[abbrev] = []
+            background_all[abbrev] = []
+            continue
+
+        # Get normalization bounds from constellation stars
+        xs = [x for x, y in const_projected]
+        ys = [y for x, y in const_projected]
+        x_min, x_max = min(xs), max(xs)
+        y_min, y_max = min(ys), max(ys)
+
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        if x_range < 0.001:
+            x_range = 0.01
+            x_min -= 0.005
+            x_max += 0.005
+        if y_range < 0.001:
+            y_range = 0.01
+            y_min -= 0.005
+            y_max += 0.005
+
+        x_padding = x_range * 0.1
+        y_padding = y_range * 0.1
+        x_min -= x_padding
+        x_max += x_padding
+        y_min -= y_padding
+        y_max += y_padding
+
+        # Helper function to normalize using constellation bounds
+        def normalize_to_const_bounds(x_proj, y_proj):
+            norm_x = (x_proj - x_min) / (x_max - x_min)
+            norm_y = (y_proj - y_min) / (y_max - y_min)
+            return norm_x, norm_y
+
+        # Process background stars for both catalogs
+        for catalog_name, star_dict, output_dict in [
+            ('visible', stars_visible_dict, background_visible),
+            ('all', stars_all_dict, background_all)
+        ]:
+            bg_stars = []
+
+            for hip_id, star in star_dict.items():
+                if hip_id not in hipparcos_data:
+                    continue
+                hip_data = hipparcos_data[hip_id]
+                ra = hip_data.get('ra')
+                dec = hip_data.get('dec')
+                mag = star.get('mag')
+
+                if ra is None or dec is None or mag is None:
+                    continue
+
+                # Filter: only stars within viewing region (±6h RA, ±60° Dec)
+                ra_diff = abs(ra - ra_center)
+                if ra_diff > 12:  # Wrap around 24h
+                    ra_diff = 24 - ra_diff
+                if ra_diff > 6 or abs(dec - dec_center) > 60:
+                    continue
+
+                # Project star using constellation's projection
+                if projection_type == 'polar_north':
+                    x_proj, y_proj = polar_stereographic_projection(ra, dec, pole='north')
+                elif projection_type == 'polar_south':
+                    x_proj, y_proj = polar_stereographic_projection(ra, dec, pole='south')
+                else:
+                    x_proj, y_proj = stereographic_projection(ra, dec, ra_center, dec_center)
+
+                # Normalize using constellation bounds
+                norm_x, norm_y = normalize_to_const_bounds(x_proj, y_proj)
+
+                # Only include stars that fall within visible area (0-1 range with some tolerance)
+                if -0.1 <= norm_x <= 1.1 and -0.1 <= norm_y <= 1.1:
+                    bg_stars.append({
+                        'hip': str(hip_id),
+                        'x': round(norm_x, 6),
+                        'y': round(norm_y, 6),
+                        'mag': round(mag, 2)
+                    })
+
+            output_dict[abbrev] = bg_stars
+
+        visible_count = len(background_visible[abbrev])
+        all_count = len(background_all[abbrev])
+        print(f"✅ {abbrev:4s} - {name:25s} ({visible_count} visible, {all_count} all)")
+
+    # Write output files
+    print(f"\n💾 Writing data/background_stars_visible.json...")
+    with open("data/background_stars_visible.json", 'w', encoding='utf-8') as f:
+        json.dump(background_visible, f, indent=2, ensure_ascii=False)
+
+    total_visible = sum(len(stars) for stars in background_visible.values())
+    print(f"✅ Generated data/background_stars_visible.json")
+    print(f"   Total background stars: {total_visible}")
+    print(f"   File size: ~{len(json.dumps(background_visible)) / 1024:.0f} KB")
+
+    print(f"\n💾 Writing data/background_stars_all.json...")
+    with open("data/background_stars_all.json", 'w', encoding='utf-8') as f:
+        json.dump(background_all, f, indent=2, ensure_ascii=False)
+
+    total_all = sum(len(stars) for stars in background_all.values())
+    print(f"✅ Generated data/background_stars_all.json")
+    print(f"   Total background stars: {total_all}")
+    print(f"   File size: ~{len(json.dumps(background_all)) / 1024:.0f} KB")
+
+    print("\n" + "=" * 70)
+    print("✨ BACKGROUND STARS GENERATION COMPLETE!")
+    print("=" * 70)
+
+
 if __name__ == "__main__":
     # Build main quiz data
     build_quiz_data("data/constellation_data.json")
@@ -639,3 +813,10 @@ if __name__ == "__main__":
 
     # Generate star catalogs
     generate_star_catalogs(hipparcos_data, iau_stars)
+
+    # Generate background stars for constellations
+    generate_background_stars_for_constellations(
+        "data/constellation_data.json",
+        "data/stars_visible.json",
+        "data/stars_all.json"
+    )
