@@ -369,6 +369,7 @@
             const [config, setConfig] = useState(null);
             const [quizState, setQuizState] = useState(null);
             const [constellationData, setConstellationData] = useState(null);
+            const [starCatalogData, setStarCatalogData] = useState(null);
             const [loadingError, setLoadingError] = useState(null);
 
             // Load constellation data from external JSON
@@ -389,9 +390,37 @@
                     });
             }, []);
 
+            // Load star catalog when config changes
+            useEffect(() => {
+                if (!config || config.backgroundStars === 'off') {
+                    setStarCatalogData(null);
+                    return;
+                }
+
+                const filename = config.backgroundStars === 'visible'
+                    ? '../data/background_stars_visible.json'
+                    : '../data/background_stars_all.json';
+
+                fetch(filename)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Failed to load star catalog: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        setStarCatalogData(data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading star catalog:', error);
+                        // Don't block quiz if star catalog fails to load
+                        setStarCatalogData(null);
+                    });
+            }, [config]);
+
             const startQuiz = (quizConfig) => {
                 setConfig(quizConfig);
-                const questions = generateQuestions(quizConfig, constellationData);
+                const questions = generateQuestions(quizConfig, constellationData, starCatalogData);
                 setQuizState({
                     questions,
                     currentIndex: 0,
@@ -497,8 +526,8 @@
         }
 
         // Generate quiz questions based on config
-        function generateQuestions(config, constellationData) {
-            const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude } = config;
+        function generateQuestions(config, constellationData, starCatalogData) {
+            const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, backgroundStars, backgroundStarOpacity } = config;
 
             // Filter constellations
             let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
@@ -530,7 +559,9 @@
                     showLines,
                     renderMode,
                     maxMagnitude,
-                    rotationAngle
+                    rotationAngle,
+                    backgroundStars: (starCatalogData && starCatalogData[abbrev]) || [],
+                    backgroundStarOpacity
                 };
             });
         }
@@ -577,6 +608,8 @@
             const [showLines, setShowLines] = useState(true);
             const [randomRotation, setRandomRotation] = useState(false);
             const [maxMagnitude, setMaxMagnitude] = useState(6);
+            const [backgroundStars, setBackgroundStars] = useState('off');
+            const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(50);
 
             const handleStart = () => {
                 onStart({
@@ -588,7 +621,9 @@
                     renderMode,
                     showLines,
                     randomRotation,
-                    maxMagnitude
+                    maxMagnitude,
+                    backgroundStars,
+                    backgroundStarOpacity
                 });
             };
 
@@ -727,6 +762,36 @@
                                     <span>Dark Sky<br/>(6.0)</span>
                                 </div>
                             </div>
+
+                            <div className="form-group">
+                                <label htmlFor="backgroundStars">Background Stars</label>
+                                <select
+                                    id="backgroundStars"
+                                    value={backgroundStars}
+                                    onChange={(e) => setBackgroundStars(e.target.value)}
+                                >
+                                    <option value="off">Off</option>
+                                    <option value="visible">Visible (9k stars)</option>
+                                    <option value="all">All (118k stars)</option>
+                                </select>
+                            </div>
+
+                            {backgroundStars !== 'off' && (
+                                <div className="form-group">
+                                    <label htmlFor="backgroundStarOpacity">
+                                        Background Star Opacity: {backgroundStarOpacity}%
+                                    </label>
+                                    <input
+                                        type="range"
+                                        id="backgroundStarOpacity"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                        value={backgroundStarOpacity}
+                                        onChange={(e) => setBackgroundStarOpacity(Number(e.target.value))}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <button className="button-primary" onClick={handleStart}>
@@ -738,7 +803,7 @@
         }
 
         // Constellation Canvas Component
-        function ConstellationCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0 }) {
+        function ConstellationCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [], backgroundStarOpacity = 100 }) {
             const canvasRef = useRef(null);
 
             useEffect(() => {
@@ -752,6 +817,44 @@
                 // Clear canvas
                 ctx.fillStyle = '#0f172a';
                 ctx.fillRect(0, 0, width, height);
+
+                // Draw background stars first (already projected and normalized)
+                if (backgroundStars && backgroundStars.length > 0) {
+                    // Set opacity for background stars
+                    ctx.globalAlpha = backgroundStarOpacity / 100;
+
+                    backgroundStars.forEach(star => {
+                        const mag = star.mag || 5;
+                        if (mag > maxMagnitude) return; // Skip dim stars
+
+                        // Stars are already projected to 0-1 coordinates
+                        const x = star.x * width;
+                        const y = (1 - star.y) * height;
+
+                        // Same magnitude-to-size logic as constellation stars
+                        const baseSize = mag < 1 ? 8 : mag < 2 ? 6 : mag < 3 ? 4 : mag < 4 ? 3 : 2;
+                        const glowSize = baseSize * 2;
+
+                        // Draw glow
+                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+                        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(x, y, glowSize, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Draw star
+                        ctx.fillStyle = '#ffffff';
+                        ctx.beginPath();
+                        ctx.arc(x, y, baseSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    // Reset opacity for constellation stars
+                    ctx.globalAlpha = 1.0;
+                }
 
                 const { stars, lines } = constellation;
 
@@ -860,13 +963,13 @@
                     ctx.fill();
                 });
 
-            }, [constellation, showLines, maxMagnitude, rotationAngle]);
+            }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars, backgroundStarOpacity]);
 
             return <canvas ref={canvasRef} width="500" height="500" />;
         }
 
         // ASCII Constellation Component
-        function ASCIIConstellation({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0 }) {
+        function ASCIIConstellation({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [] }) {
             const ascii = useMemo(() => {
                 const { stars, lines } = constellation;
                 const width = 70;
@@ -874,6 +977,29 @@
 
                 // Create character grid
                 const grid = Array(height).fill().map(() => Array(width).fill(' '));
+
+                // Draw background stars first (already projected and normalized)
+                if (backgroundStars && backgroundStars.length > 0) {
+                    backgroundStars.forEach(star => {
+                        const mag = star.mag || 5;
+                        if (mag > maxMagnitude) return; // Skip dim stars
+
+                        // Stars are already projected to 0-1 coordinates
+                        const x = Math.round(star.x * (width - 1));
+                        const y = Math.round((1 - star.y) * (height - 1));
+
+                        // Same symbol mapping as constellation stars
+                        let symbol;
+                        if (mag < 1.0) symbol = '⬤';
+                        else if (mag < 2.5) symbol = '●';
+                        else if (mag < 4.0) symbol = '○';
+                        else symbol = '∘';
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            grid[y][x] = symbol;
+                        }
+                    });
+                }
 
                 // Process coordinates with rotation and bounds fitting
                 let processedStars = stars.map(s => ({ ...s }));
@@ -991,7 +1117,7 @@
 
                 // Convert grid to string
                 return grid.map(row => row.join('')).join('\n');
-            }, [constellation, showLines, maxMagnitude, rotationAngle]);
+            }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars]);
 
             return (
                 <div className="ascii-container">
@@ -1086,6 +1212,7 @@
                                         showLines={currentQuestion.showLines}
                                         maxMagnitude={currentQuestion.maxMagnitude}
                                         rotationAngle={currentQuestion.rotationAngle}
+                                        backgroundStars={currentQuestion.backgroundStars}
                                     />
                                 ) : (
                                     <ConstellationCanvas
@@ -1093,6 +1220,8 @@
                                         showLines={currentQuestion.showLines}
                                         maxMagnitude={currentQuestion.maxMagnitude}
                                         rotationAngle={currentQuestion.rotationAngle}
+                                        backgroundStars={currentQuestion.backgroundStars}
+                                        backgroundStarOpacity={currentQuestion.backgroundStarOpacity}
                                     />
                                 )}
                             </div>
