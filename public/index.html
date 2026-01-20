@@ -821,26 +821,101 @@
                 ctx.fillStyle = '#0f172a';
                 ctx.fillRect(0, 0, width, height);
 
-                // Draw background stars first (already projected and normalized)
+                const { stars, lines } = constellation;
+
+                // Process coordinates with rotation and bounds fitting (ALWAYS for consistent scaling)
+                let processedStars = stars.map(s => ({ ...s }));
+                let processedBackgroundStars = backgroundStars ? backgroundStars.map(s => ({ ...s })) : [];
+
+                // Calculate constellation center
+                const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
+                const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
+                const angleRad = rotationAngle * Math.PI / 180;
+
+                // Rotate all coordinates (constellation stars)
+                processedStars = stars.map(star => {
+                    const dx = star.x - centerX;
+                    const dy = star.y - centerY;
+                    const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+                    const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+                    return {
+                        ...star,
+                        x: rotatedX + centerX,
+                        y: rotatedY + centerY
+                    };
+                });
+
+                // Rotate background stars around same center
                 if (backgroundStars && backgroundStars.length > 0) {
-                    // Set opacity for background stars
+                    processedBackgroundStars = backgroundStars.map(star => {
+                        const dx = star.x - centerX;
+                        const dy = star.y - centerY;
+                        const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+                        const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+                        return {
+                            ...star,
+                            x: rotatedX + centerX,
+                            y: rotatedY + centerY
+                        };
+                    });
+                }
+
+                // Find bounding box of rotated constellation
+                const minX = Math.min(...processedStars.map(s => s.x));
+                const maxX = Math.max(...processedStars.map(s => s.x));
+                const minY = Math.min(...processedStars.map(s => s.y));
+                const maxY = Math.max(...processedStars.map(s => s.y));
+
+                // Calculate scale to fit within 0-1 range with 10% padding
+                const spanX = maxX - minX;
+                const spanY = maxY - minY;
+                const scale = Math.min(0.9 / spanX, 0.9 / spanY);
+
+                // Normalize and center constellation stars
+                processedStars = processedStars.map(star => {
+                    const scaledX = (star.x - minX) * scale;
+                    const scaledY = (star.y - minY) * scale;
+                    const offsetX = (1 - spanX * scale) / 2;
+                    const offsetY = (1 - spanY * scale) / 2;
+                    return {
+                        ...star,
+                        x: scaledX + offsetX,
+                        y: scaledY + offsetY
+                    };
+                });
+
+                // Apply same normalization to background stars
+                if (backgroundStars && backgroundStars.length > 0) {
+                    processedBackgroundStars = processedBackgroundStars.map(star => {
+                        const scaledX = (star.x - minX) * scale;
+                        const scaledY = (star.y - minY) * scale;
+                        const offsetX = (1 - spanX * scale) / 2;
+                        const offsetY = (1 - spanY * scale) / 2;
+                        return {
+                            ...star,
+                            x: scaledX + offsetX,
+                            y: scaledY + offsetY
+                        };
+                    });
+                }
+
+                // Draw background stars first (behind constellation)
+                if (processedBackgroundStars.length > 0) {
                     ctx.globalAlpha = backgroundStarOpacity / 100;
 
-                    backgroundStars.forEach(star => {
+                    processedBackgroundStars.forEach(star => {
                         const mag = star.mag || 5;
-                        if (mag > maxMagnitude) return; // Skip dim stars
+                        if (mag > maxMagnitude) return;
 
-                        // Stars are already projected to 0-1 coordinates
                         const x = star.x * width;
                         const y = (1 - star.y) * height;
 
                         // Skip stars outside visible canvas area
                         if (x < -10 || x > width + 10 || y < -10 || y > height + 10) return;
 
-                        // Logarithmic size based on magnitude (more astronomically accurate)
                         const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
 
-                        // Glow effect for bright stars (mag < 2.5)
+                        // Glow effect for bright stars
                         if (mag < 2.5) {
                             const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
                             gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
@@ -859,57 +934,7 @@
                         ctx.fill();
                     });
 
-                    // Reset opacity for constellation stars
                     ctx.globalAlpha = 1.0;
-                }
-
-                const { stars, lines } = constellation;
-
-                // Process coordinates with rotation and bounds fitting
-                let processedStars = stars.map(s => ({ ...s }));
-
-                if (rotationAngle !== 0) {
-                    // Calculate constellation center
-                    const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
-                    const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
-                    const angleRad = rotationAngle * Math.PI / 180;
-
-                    // Rotate all coordinates
-                    processedStars = stars.map(star => {
-                        const dx = star.x - centerX;
-                        const dy = star.y - centerY;
-                        const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
-                        const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
-                        return {
-                            ...star,
-                            x: rotatedX + centerX,
-                            y: rotatedY + centerY
-                        };
-                    });
-
-                    // Find bounding box of rotated constellation
-                    const minX = Math.min(...processedStars.map(s => s.x));
-                    const maxX = Math.max(...processedStars.map(s => s.x));
-                    const minY = Math.min(...processedStars.map(s => s.y));
-                    const maxY = Math.max(...processedStars.map(s => s.y));
-
-                    // Calculate scale to fit within 0-1 range with 10% padding
-                    const spanX = maxX - minX;
-                    const spanY = maxY - minY;
-                    const scale = Math.min(0.9 / spanX, 0.9 / spanY);
-
-                    // Normalize and center
-                    processedStars = processedStars.map(star => {
-                        const scaledX = (star.x - minX) * scale;
-                        const scaledY = (star.y - minY) * scale;
-                        const offsetX = (1 - spanX * scale) / 2;
-                        const offsetY = (1 - spanY * scale) / 2;
-                        return {
-                            ...star,
-                            x: scaledX + offsetX,
-                            y: scaledY + offsetY
-                        };
-                    });
                 }
 
                 // Draw lines first (if enabled)
@@ -981,40 +1006,31 @@
                 // Create character grid
                 const grid = Array(height).fill().map(() => Array(width).fill(' '));
 
-                // Draw background stars first (already projected and normalized)
-                if (backgroundStars && backgroundStars.length > 0) {
-                    backgroundStars.forEach(star => {
-                        const mag = star.mag || 5;
-                        if (mag > maxMagnitude) return; // Skip dim stars
-
-                        // Stars are already projected to 0-1 coordinates
-                        const x = Math.round(star.x * (width - 1));
-                        const y = Math.round((1 - star.y) * (height - 1));
-
-                        // Same symbol mapping as constellation stars
-                        let symbol;
-                        if (mag < 1.0) symbol = '⬤';
-                        else if (mag < 2.5) symbol = '●';
-                        else if (mag < 4.0) symbol = '○';
-                        else symbol = '∘';
-
-                        if (x >= 0 && x < width && y >= 0 && y < height) {
-                            grid[y][x] = symbol;
-                        }
-                    });
-                }
-
-                // Process coordinates with rotation and bounds fitting
+                // Process coordinates with rotation and bounds fitting (ALWAYS for consistent scaling)
                 let processedStars = stars.map(s => ({ ...s }));
+                let processedBackgroundStars = backgroundStars ? backgroundStars.map(s => ({ ...s })) : [];
 
-                if (rotationAngle !== 0) {
-                    // Calculate constellation center
-                    const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
-                    const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
-                    const angleRad = rotationAngle * Math.PI / 180;
+                // Calculate constellation center
+                const centerX = stars.reduce((sum, s) => sum + s.x, 0) / stars.length;
+                const centerY = stars.reduce((sum, s) => sum + s.y, 0) / stars.length;
+                const angleRad = rotationAngle * Math.PI / 180;
 
-                    // Rotate all coordinates
-                    processedStars = stars.map(star => {
+                // Rotate all coordinates (constellation stars)
+                processedStars = stars.map(star => {
+                    const dx = star.x - centerX;
+                    const dy = star.y - centerY;
+                    const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+                    const rotatedY = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+                    return {
+                        ...star,
+                        x: rotatedX + centerX,
+                        y: rotatedY + centerY
+                    };
+                });
+
+                // Rotate background stars around same center
+                if (backgroundStars && backgroundStars.length > 0) {
+                    processedBackgroundStars = backgroundStars.map(star => {
                         const dx = star.x - centerX;
                         const dy = star.y - centerY;
                         const rotatedX = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
@@ -1025,20 +1041,35 @@
                             y: rotatedY + centerY
                         };
                     });
+                }
 
-                    // Find bounding box of rotated constellation
-                    const minX = Math.min(...processedStars.map(s => s.x));
-                    const maxX = Math.max(...processedStars.map(s => s.x));
-                    const minY = Math.min(...processedStars.map(s => s.y));
-                    const maxY = Math.max(...processedStars.map(s => s.y));
+                // Find bounding box of rotated constellation
+                const minX = Math.min(...processedStars.map(s => s.x));
+                const maxX = Math.max(...processedStars.map(s => s.x));
+                const minY = Math.min(...processedStars.map(s => s.y));
+                const maxY = Math.max(...processedStars.map(s => s.y));
 
-                    // Calculate scale to fit within 0-1 range with 10% padding
-                    const spanX = maxX - minX;
-                    const spanY = maxY - minY;
-                    const scale = Math.min(0.9 / spanX, 0.9 / spanY);
+                // Calculate scale to fit within 0-1 range with 10% padding
+                const spanX = maxX - minX;
+                const spanY = maxY - minY;
+                const scale = Math.min(0.9 / spanX, 0.9 / spanY);
 
-                    // Normalize and center
-                    processedStars = processedStars.map(star => {
+                // Normalize and center constellation stars
+                processedStars = processedStars.map(star => {
+                    const scaledX = (star.x - minX) * scale;
+                    const scaledY = (star.y - minY) * scale;
+                    const offsetX = (1 - spanX * scale) / 2;
+                    const offsetY = (1 - spanY * scale) / 2;
+                    return {
+                        ...star,
+                        x: scaledX + offsetX,
+                        y: scaledY + offsetY
+                    };
+                });
+
+                // Apply same normalization to background stars
+                if (backgroundStars && backgroundStars.length > 0) {
+                    processedBackgroundStars = processedBackgroundStars.map(star => {
                         const scaledX = (star.x - minX) * scale;
                         const scaledY = (star.y - minY) * scale;
                         const offsetX = (1 - spanX * scale) / 2;
@@ -1048,6 +1079,27 @@
                             x: scaledX + offsetX,
                             y: scaledY + offsetY
                         };
+                    });
+                }
+
+                // Draw background stars first (behind constellation)
+                if (processedBackgroundStars.length > 0) {
+                    processedBackgroundStars.forEach(star => {
+                        const mag = star.mag || 5;
+                        if (mag > maxMagnitude) return;
+
+                        const x = Math.round(star.x * (width - 1));
+                        const y = Math.round((1 - star.y) * (height - 1));
+
+                        let symbol;
+                        if (mag < 1.0) symbol = '⬤';
+                        else if (mag < 2.5) symbol = '●';
+                        else if (mag < 4.0) symbol = '○';
+                        else symbol = '∘';
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            grid[y][x] = symbol;
+                        }
                     });
                 }
 
