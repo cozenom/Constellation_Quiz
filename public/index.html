@@ -779,7 +779,7 @@
                                 </label>
                             </div>
 
-                            {showBackgroundStars && (
+                            {showBackgroundStars && renderMode === 'canvas' && (
                                 <div className="form-group">
                                     <label htmlFor="backgroundStarOpacity">
                                         Background Star Opacity: {backgroundStarOpacity}%
