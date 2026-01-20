@@ -393,14 +393,12 @@
 
             // Load star catalog when config changes
             useEffect(() => {
-                if (!config || config.backgroundStars === 'off') {
+                if (!config || !config.showBackgroundStars) {
                     setStarCatalogData(null);
                     return;
                 }
 
-                const filename = config.backgroundStars === 'visible'
-                    ? '../data/background_stars_visible.json'
-                    : '../data/background_stars_all.json';
+                const filename = '../data/background_stars_visible.json';
 
                 fetch(filename)
                     .then(response => {
@@ -529,7 +527,7 @@
 
         // Generate quiz questions based on config
         function generateQuestions(config, constellationData, starCatalogData) {
-            const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, backgroundStars, backgroundStarOpacity } = config;
+            const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity } = config;
 
             // Filter constellations
             let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
@@ -610,7 +608,7 @@
             const [showLines, setShowLines] = useState(initialConfig?.showLines ?? true);
             const [randomRotation, setRandomRotation] = useState(initialConfig?.randomRotation || false);
             const [maxMagnitude, setMaxMagnitude] = useState(initialConfig?.maxMagnitude || 6);
-            const [backgroundStars, setBackgroundStars] = useState(initialConfig?.backgroundStars || 'off');
+            const [showBackgroundStars, setShowBackgroundStars] = useState(initialConfig?.showBackgroundStars ?? true);
             const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 50);
 
             const handleStart = () => {
@@ -624,7 +622,7 @@
                     showLines,
                     randomRotation,
                     maxMagnitude,
-                    backgroundStars,
+                    showBackgroundStars,
                     backgroundStarOpacity
                 });
             };
@@ -745,7 +743,7 @@
                                     id="maxMagnitude"
                                     list="magnitude-presets"
                                     min="0"
-                                    max="6"
+                                    max="14"
                                     step="0.5"
                                     value={maxMagnitude}
                                     onChange={(e) => setMaxMagnitude(parseFloat(e.target.value))}
@@ -756,29 +754,32 @@
                                     <option value="4.0" label="Suburban"></option>
                                     <option value="5.0" label="Rural"></option>
                                     <option value="6.0" label="Dark Sky"></option>
+                                    <option value="10.0" label="Binoculars"></option>
+                                    <option value="14.0" label="Telescope"></option>
                                 </datalist>
-                                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center'}}>
+                                <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center'}}>
                                     <span>Bright City<br/>(2.5)</span>
                                     <span>Suburban<br/>(4.0)</span>
                                     <span>Rural<br/>(5.0)</span>
                                     <span>Dark Sky<br/>(6.0)</span>
+                                    <span>Binoculars<br/>(10.0)</span>
+                                    <span>Telescope<br/>(14.0)</span>
                                 </div>
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="backgroundStars">Background Stars</label>
-                                <select
-                                    id="backgroundStars"
-                                    value={backgroundStars}
-                                    onChange={(e) => setBackgroundStars(e.target.value)}
-                                >
-                                    <option value="off">Off</option>
-                                    <option value="visible">Visible (9k stars)</option>
-                                    <option value="all">All (118k stars)</option>
-                                </select>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="showBackgroundStars"
+                                        checked={showBackgroundStars}
+                                        onChange={(e) => setShowBackgroundStars(e.target.checked)}
+                                    />
+                                    {' '}Show Background Stars
+                                </label>
                             </div>
 
-                            {backgroundStars !== 'off' && (
+                            {showBackgroundStars && (
                                 <div className="form-group">
                                     <label htmlFor="backgroundStarOpacity">
                                         Background Star Opacity: {backgroundStarOpacity}%
@@ -833,24 +834,28 @@
                         const x = star.x * width;
                         const y = (1 - star.y) * height;
 
-                        // Same magnitude-to-size logic as constellation stars
-                        const baseSize = mag < 1 ? 8 : mag < 2 ? 6 : mag < 3 ? 4 : mag < 4 ? 3 : 2;
-                        const glowSize = baseSize * 2;
+                        // Skip stars outside visible canvas area
+                        if (x < -10 || x > width + 10 || y < -10 || y > height + 10) return;
 
-                        // Draw glow
-                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
-                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-                        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-                        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                        ctx.fillStyle = gradient;
-                        ctx.beginPath();
-                        ctx.arc(x, y, glowSize, 0, Math.PI * 2);
-                        ctx.fill();
+                        // Logarithmic size based on magnitude (more astronomically accurate)
+                        const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
+
+                        // Glow effect for bright stars (mag < 2.5)
+                        if (mag < 2.5) {
+                            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+                            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                            ctx.fillStyle = gradient;
+                            ctx.beginPath();
+                            ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
 
                         // Draw star
                         ctx.fillStyle = '#ffffff';
                         ctx.beginPath();
-                        ctx.arc(x, y, baseSize, 0, Math.PI * 2);
+                        ctx.arc(x, y, radius, 0, Math.PI * 2);
                         ctx.fill();
                     });
 
@@ -939,12 +944,8 @@
                     const x = star.x * width;
                     const y = (1 - star.y) * height;
 
-                    // Size based on magnitude (lower magnitude = brighter = bigger)
-                    let radius;
-                    if (mag < 1.0) radius = 5;
-                    else if (mag < 2.5) radius = 4;
-                    else if (mag < 4.0) radius = 3;
-                    else radius = 2;
+                    // Logarithmic size based on magnitude (more astronomically accurate)
+                    const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
 
                     // Glow effect for bright stars
                     if (mag < 2.5) {

@@ -97,43 +97,138 @@ def polar_stereographic_projection(ra: float, dec: float, pole: str = 'north') -
     return -x, y
 
 
-def normalize_coordinates(coords: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
-    """Normalize projected coordinates to 0-1 range with 10% padding."""
-    if not coords:
-        return []
+def angular_distance(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+    """
+    Calculate angular distance in degrees between two celestial coordinates using haversine formula.
 
-    xs = [x for x, y in coords]
-    ys = [y for x, y in coords]
+    Args:
+        ra1, dec1: First coordinate (RA in hours, Dec in degrees)
+        ra2, dec2: Second coordinate (RA in hours, Dec in degrees)
 
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
+    Returns:
+        Angular distance in degrees
+    """
+    ra1_rad = math.radians(ra1 * 15)  # Convert RA hours to degrees then radians
+    dec1_rad = math.radians(dec1)
+    ra2_rad = math.radians(ra2 * 15)
+    dec2_rad = math.radians(dec2)
 
-    x_range = x_max - x_min
-    y_range = y_max - y_min
+    dlat = dec2_rad - dec1_rad
+    dlon = ra2_rad - ra1_rad
 
-    if x_range < 0.001:
-        x_range = 0.01
-        x_min -= 0.005
-        x_max += 0.005
-    if y_range < 0.001:
-        y_range = 0.01
-        y_min -= 0.005
-        y_max += 0.005
+    a = math.sin(dlat/2)**2 + math.cos(dec1_rad) * math.cos(dec2_rad) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a))
 
-    x_padding = x_range * 0.1
-    y_padding = y_range * 0.1
-    x_min -= x_padding
-    x_max += x_padding
-    y_min -= y_padding
-    y_max += y_padding
+    return math.degrees(c)
 
+
+def normalize_circular_region(
+    constellation_stars: Dict,
+    projection_type: str,
+    ra_center: float,
+    dec_center: float
+) -> Tuple[List[Tuple[float, float]], Dict]:
+    """
+    Normalize constellation stars using circular region approach.
+
+    This creates a symmetric coordinate system centered at (0.5, 0.5) where:
+    - Constellation center is at (0.5, 0.5)
+    - Max radius (furthest star) maps to ~0.4 canvas units
+    - Padding of 100% (2x radius) ensures background stars fit evenly
+
+    Args:
+        constellation_stars: Dict of {hip_id: star_data} with 'ra', 'dec', 'x_proj', 'y_proj'
+        projection_type: 'stereographic', 'polar_north', or 'polar_south'
+        ra_center: RA center for stereographic projection (hours)
+        dec_center: Dec center for stereographic projection (degrees)
+
+    Returns:
+        Tuple of (normalized_coords, normalization_params)
+        - normalized_coords: List of (norm_x, norm_y) tuples
+        - normalization_params: Dict with center, radius, scale for reuse
+    """
+    if not constellation_stars:
+        return [], {}
+
+    # 1. Calculate constellation center (mean RA/Dec)
+    ras = [star['ra'] for star in constellation_stars.values()]
+    decs = [star['dec'] for star in constellation_stars.values()]
+    center_ra = sum(ras) / len(ras)
+    center_dec = sum(decs) / len(decs)
+
+    # 2. Find max radius from center to furthest constellation star
+    max_radius = 0.0
+    for star in constellation_stars.values():
+        dist = angular_distance(center_ra, center_dec, star['ra'], star['dec'])
+        max_radius = max(max_radius, dist)
+
+    # 3. Add 100% padding (2x radius) for background star region
+    padded_radius = max_radius * 2.0
+
+    # 4. Project center point
+    if projection_type == 'polar_north':
+        center_x_proj, center_y_proj = polar_stereographic_projection(center_ra, center_dec, pole='north')
+    elif projection_type == 'polar_south':
+        center_x_proj, center_y_proj = polar_stereographic_projection(center_ra, center_dec, pole='south')
+    else:  # stereographic
+        center_x_proj, center_y_proj = stereographic_projection(center_ra, center_dec, ra_center, dec_center)
+
+    # 5. Calculate scale factor: map max_radius degrees to ~0.4 canvas units
+    # This makes constellation fill ~80% of canvas (0.4 * 2 = 0.8)
+    # Background stars (at padded_radius = 2x max_radius) extend beyond canvas edges
+    # This "square inside circle" approach allows rotation without losing background stars
+    if projection_type in ['polar_north', 'polar_south']:
+        # Polar projections: radius ~= 2 * tan(0.5 * angular_dist)
+        projected_max_radius = 2.0 * math.tan(math.radians(max_radius / 2.0))
+    else:
+        # Stereographic: radius ~= 2 * tan(0.5 * angular_dist)
+        projected_max_radius = 2.0 * math.tan(math.radians(max_radius / 2.0))
+
+    scale = 0.4 / max(projected_max_radius, 0.1)  # Map to 0.4 canvas units, min 0.1 to prevent division issues
+
+    # 6. Normalize all constellation stars
     normalized = []
-    for x, y in coords:
-        norm_x = (x - x_min) / (x_max - x_min)
-        norm_y = (y - y_min) / (y_max - y_min)
+    for star in constellation_stars.values():
+        norm_x, norm_y = apply_circular_normalization(
+            star['x_proj'], star['y_proj'], center_x_proj, center_y_proj, scale
+        )
         normalized.append((norm_x, norm_y))
 
-    return normalized
+    # Return normalization parameters for reuse in background stars
+    normalization_params = {
+        'center_ra': center_ra,
+        'center_dec': center_dec,
+        'max_radius': max_radius,
+        'padded_radius': padded_radius,
+        'center_x_proj': center_x_proj,
+        'center_y_proj': center_y_proj,
+        'scale': scale
+    }
+
+    return normalized, normalization_params
+
+
+def apply_circular_normalization(x_proj: float, y_proj: float, center_x_proj: float, center_y_proj: float, scale: float) -> Tuple[float, float]:
+    """
+    Apply circular normalization to a projected coordinate.
+
+    Args:
+        x_proj, y_proj: Projected coordinates
+        center_x_proj, center_y_proj: Projected center point
+        scale: Scale factor
+
+    Returns:
+        Tuple of (norm_x, norm_y) normalized coordinates
+    """
+    # Translate so center is at origin
+    dx = x_proj - center_x_proj
+    dy = y_proj - center_y_proj
+
+    # Scale and translate to center at (0.5, 0.5)
+    norm_x = 0.5 + dx * scale
+    norm_y = 0.5 + dy * scale
+
+    return norm_x, norm_y
 
 
 # ==================== RAW DATA PARSERS ====================
@@ -408,7 +503,6 @@ def build_quiz_data(output_path: str):
             is_south_circumpolar = dec_center < -60
 
             # Project all stars
-            projected_coords = []
             for hip_id, star in constellation_stars.items():
                 if is_north_circumpolar:
                     x_proj, y_proj = polar_stereographic_projection(star['ra'], star['dec'], pole='north')
@@ -422,10 +516,11 @@ def build_quiz_data(output_path: str):
 
                 star['x_proj'] = x_proj
                 star['y_proj'] = y_proj
-                projected_coords.append((x_proj, y_proj))
 
-            # Normalize coordinates
-            normalized_coords = normalize_coordinates(projected_coords)
+            # Normalize coordinates using circular region approach
+            normalized_coords, normalization_params = normalize_circular_region(
+                constellation_stars, projection_type, ra_center, dec_center
+            )
 
             for (hip_id, star), (norm_x, norm_y) in zip(constellation_stars.items(), normalized_coords):
                 star['x'] = round(norm_x, 6)
@@ -669,7 +764,8 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
         dec_center = const['dec_center']
         projection_type = const['projection_type']
 
-        # First, re-project constellation stars to get normalization bounds
+        # First, get RA/Dec coordinates of all constellation stars
+        const_ra_dec = []
         const_projected = []
         for star in const['stars']:
             hip_id = int(star['hip'])
@@ -681,7 +777,9 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
             if ra is None or dec is None:
                 continue
 
-            # Apply same projection as original
+            const_ra_dec.append((ra, dec))
+
+            # Also project for later use
             if projection_type == 'polar_north':
                 x_proj, y_proj = polar_stereographic_projection(ra, dec, pole='north')
             elif projection_type == 'polar_south':
@@ -689,48 +787,56 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
             else:  # stereographic
                 x_proj, y_proj = stereographic_projection(ra, dec, ra_center, dec_center)
 
-            const_projected.append((x_proj, y_proj))
+            const_projected.append((x_proj, y_proj, ra, dec))
 
-        if not const_projected:
+        if not const_ra_dec:
             print(f"⚠️  {abbrev:4s} - {name:25s} (no constellation stars to establish bounds)")
             background_visible[abbrev] = []
             background_all[abbrev] = []
             continue
 
-        # Get normalization bounds from constellation stars
-        xs = [x for x, y in const_projected]
-        ys = [y for x, y in const_projected]
-        x_min, x_max = min(xs), max(xs)
-        y_min, y_max = min(ys), max(ys)
+        # CIRCULAR REGION APPROACH:
+        # 1. Calculate constellation center (mean RA/Dec)
+        center_ra = sum(ra for ra, dec in const_ra_dec) / len(const_ra_dec)
+        center_dec = sum(dec for ra, dec in const_ra_dec) / len(const_ra_dec)
 
-        x_range = x_max - x_min
-        y_range = y_max - y_min
-        if x_range < 0.001:
-            x_range = 0.01
-            x_min -= 0.005
-            x_max += 0.005
-        if y_range < 0.001:
-            y_range = 0.01
-            y_min -= 0.005
-            y_max += 0.005
+        # 2. Find max radius from center to furthest constellation star
+        max_radius = 0.0
+        for ra, dec in const_ra_dec:
+            dist = angular_distance(center_ra, center_dec, ra, dec)
+            max_radius = max(max_radius, dist)
 
-        x_padding = x_range * 0.1
-        y_padding = y_range * 0.1
-        x_min -= x_padding
-        x_max += x_padding
-        y_min -= y_padding
-        y_max += y_padding
+        # 3. Add 100% padding (2x radius) for background star region
+        padded_radius = max_radius * 2.0
 
-        # Helper function to normalize using constellation bounds
-        def normalize_to_const_bounds(x_proj, y_proj):
-            norm_x = (x_proj - x_min) / (x_max - x_min)
-            norm_y = (y_proj - y_min) / (y_max - y_min)
-            return norm_x, norm_y
+        # 4. Set up normalization:
+        # - Project center point
+        if projection_type == 'polar_north':
+            center_x_proj, center_y_proj = polar_stereographic_projection(center_ra, center_dec, pole='north')
+        elif projection_type == 'polar_south':
+            center_x_proj, center_y_proj = polar_stereographic_projection(center_ra, center_dec, pole='south')
+        else:
+            center_x_proj, center_y_proj = stereographic_projection(center_ra, center_dec, ra_center, dec_center)
 
-        # Process background stars for both catalogs
+        # - Calculate scale factor: map max_radius degrees to ~0.4 canvas units
+        # This makes constellation fill ~80% of canvas (0.4 * 2 = 0.8)
+        # Background stars (at padded_radius = 2x max_radius) extend beyond canvas edges
+        # This "square inside circle" approach allows rotation without losing background stars
+        if projection_type in ['polar_north', 'polar_south']:
+            # Polar projections: radius ~= 2 * tan(0.5 * angular_dist)
+            projected_max_radius = 2.0 * math.tan(math.radians(max_radius / 2.0))
+        else:
+            # Stereographic: radius ~= 2 * tan(0.5 * angular_dist)
+            projected_max_radius = 2.0 * math.tan(math.radians(max_radius / 2.0))
+
+        scale = 0.4 / max(projected_max_radius, 0.1)  # Map to 0.4 canvas units, min 0.1 to prevent division issues
+
+        # Process background stars for visible catalog only
+        # DEPRECATED: All-stars mode commented out due to 97MB file size (too large for browsers)
+        # To re-enable: uncomment the ('all', stars_all_dict, background_all) line below
         for catalog_name, star_dict, output_dict in [
             ('visible', stars_visible_dict, background_visible),
-            ('all', stars_all_dict, background_all)
+            # ('all', stars_all_dict, background_all)  # DEPRECATED: 97MB too large
         ]:
             bg_stars = []
 
@@ -745,11 +851,10 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
                 if ra is None or dec is None or mag is None:
                     continue
 
-                # Filter: only stars within viewing region (±6h RA, ±60° Dec)
-                ra_diff = abs(ra - ra_center)
-                if ra_diff > 12:  # Wrap around 24h
-                    ra_diff = 24 - ra_diff
-                if ra_diff > 6 or abs(dec - dec_center) > 60:
+                # CIRCULAR REGION FILTERING:
+                # Only include stars within padded_radius from constellation center
+                dist_from_center = angular_distance(center_ra, center_dec, ra, dec)
+                if dist_from_center > padded_radius:
                     continue
 
                 # Project star using constellation's projection
@@ -760,8 +865,8 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
                 else:
                     x_proj, y_proj = stereographic_projection(ra, dec, ra_center, dec_center)
 
-                # Normalize using constellation bounds
-                norm_x, norm_y = normalize_to_const_bounds(x_proj, y_proj)
+                # Normalize using circular coordinates (same approach as constellation stars)
+                norm_x, norm_y = apply_circular_normalization(x_proj, y_proj, center_x_proj, center_y_proj, scale)
 
                 # Only include stars that fall within visible area (0-1 range with some tolerance)
                 if -0.1 <= norm_x <= 1.1 and -0.1 <= norm_y <= 1.1:
@@ -775,8 +880,7 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
             output_dict[abbrev] = bg_stars
 
         visible_count = len(background_visible[abbrev])
-        all_count = len(background_all[abbrev])
-        print(f"✅ {abbrev:4s} - {name:25s} ({visible_count} visible, {all_count} all)")
+        print(f"✅ {abbrev:4s} - {name:25s} ({visible_count} background stars)")
 
     # Write output files
     print(f"\n💾 Writing data/background_stars_visible.json...")
@@ -788,14 +892,15 @@ def generate_background_stars_for_constellations(constellation_data_path: str, s
     print(f"   Total background stars: {total_visible}")
     print(f"   File size: ~{len(json.dumps(background_visible)) / 1024:.0f} KB")
 
-    print(f"\n💾 Writing data/background_stars_all.json...")
-    with open("data/background_stars_all.json", 'w', encoding='utf-8') as f:
-        json.dump(background_all, f, indent=2, ensure_ascii=False)
-
-    total_all = sum(len(stars) for stars in background_all.values())
-    print(f"✅ Generated data/background_stars_all.json")
-    print(f"   Total background stars: {total_all}")
-    print(f"   File size: ~{len(json.dumps(background_all)) / 1024:.0f} KB")
+    # DEPRECATED: All-stars mode commented out due to 97MB file size
+    # print(f"\n💾 Writing data/background_stars_all.json...")
+    # with open("data/background_stars_all.json", 'w', encoding='utf-8') as f:
+    #     json.dump(background_all, f, indent=2, ensure_ascii=False)
+    #
+    # total_all = sum(len(stars) for stars in background_all.values())
+    # print(f"✅ Generated data/background_stars_all.json")
+    # print(f"   Total background stars: {total_all}")
+    # print(f"   File size: ~{len(json.dumps(background_all)) / 1024:.0f} KB")
 
     print("\n" + "=" * 70)
     print("✨ BACKGROUND STARS GENERATION COMPLETE!")
