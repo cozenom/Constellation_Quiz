@@ -367,6 +367,7 @@
         function App() {
             const [screen, setScreen] = useState('setup'); // 'setup', 'quiz', 'results'
             const [config, setConfig] = useState(null);
+            const [savedConfig, setSavedConfig] = useState(null); // Persist settings when returning to menu
             const [quizState, setQuizState] = useState(null);
             const [constellationData, setConstellationData] = useState(null);
             const [starCatalogData, setStarCatalogData] = useState(null);
@@ -420,6 +421,7 @@
 
             const startQuiz = (quizConfig) => {
                 setConfig(quizConfig);
+                setSavedConfig(quizConfig); // Save config for when user returns to menu
                 const questions = generateQuestions(quizConfig, constellationData, starCatalogData);
                 setQuizState({
                     questions,
@@ -504,7 +506,7 @@
 
             return (
                 <>
-                    {screen === 'setup' && <SetupScreen onStart={startQuiz} constellationData={constellationData} />}
+                    {screen === 'setup' && <SetupScreen onStart={startQuiz} constellationData={constellationData} initialConfig={savedConfig} />}
                     {screen === 'quiz' && (
                         <QuizScreen
                             config={config}
@@ -598,18 +600,18 @@
         }
 
         // Setup Screen Component
-        function SetupScreen({ onStart }) {
-            const [hemisphere, setHemisphere] = useState('both');
-            const [difficulty, setDifficulty] = useState('all');
-            const [season, setSeason] = useState('all');
-            const [numQuestions, setNumQuestions] = useState(10);
-            const [inputMode, setInputMode] = useState('multiple-choice');
-            const [renderMode, setRenderMode] = useState('canvas');
-            const [showLines, setShowLines] = useState(true);
-            const [randomRotation, setRandomRotation] = useState(false);
-            const [maxMagnitude, setMaxMagnitude] = useState(6);
-            const [backgroundStars, setBackgroundStars] = useState('off');
-            const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(50);
+        function SetupScreen({ onStart, initialConfig }) {
+            const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
+            const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
+            const [season, setSeason] = useState(initialConfig?.season || 'all');
+            const [numQuestions, setNumQuestions] = useState(initialConfig?.numQuestions || 10);
+            const [inputMode, setInputMode] = useState(initialConfig?.inputMode || 'multiple-choice');
+            const [renderMode, setRenderMode] = useState(initialConfig?.renderMode || 'canvas');
+            const [showLines, setShowLines] = useState(initialConfig?.showLines ?? true);
+            const [randomRotation, setRandomRotation] = useState(initialConfig?.randomRotation || false);
+            const [maxMagnitude, setMaxMagnitude] = useState(initialConfig?.maxMagnitude || 6);
+            const [backgroundStars, setBackgroundStars] = useState(initialConfig?.backgroundStars || 'off');
+            const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 50);
 
             const handleStart = () => {
                 onStart({
@@ -1132,6 +1134,7 @@
             const [textInput, setTextInput] = useState('');
             const [feedback, setFeedback] = useState(null);
             const [showNextButton, setShowNextButton] = useState(false);
+            const [currentShowLines, setCurrentShowLines] = useState(false);
 
             const currentQuestion = quizState.questions[quizState.currentIndex];
             const isTextMode = config.inputMode === 'text';
@@ -1142,13 +1145,19 @@
                 setTextInput('');
                 setFeedback(null);
                 setShowNextButton(false);
-            }, [quizState.currentIndex]);
+                setCurrentShowLines(currentQuestion.showLines);
+            }, [quizState.currentIndex, currentQuestion.showLines]);
 
             const handleMultipleChoiceAnswer = (choice) => {
                 if (feedback) return; // Already answered
 
                 setSelectedAnswer(choice);
                 const isCorrect = choice.correct;
+
+                // Reveal lines after guessing (if lines were originally off)
+                if (!currentQuestion.showLines) {
+                    setCurrentShowLines(true);
+                }
 
                 onAnswer(isCorrect, choice.name, currentQuestion.constellation.name);
                 setFeedback({
@@ -1170,6 +1179,11 @@
 
                 // Check if answer matches name or abbreviation
                 const isCorrect = userAnswer === correctAnswer || userAnswer === correctAbbrev;
+
+                // Reveal lines after guessing (if lines were originally off)
+                if (!currentQuestion.showLines) {
+                    setCurrentShowLines(true);
+                }
 
                 onAnswer(isCorrect, textInput, currentQuestion.constellation.name);
                 setFeedback({
@@ -1209,7 +1223,7 @@
                                 {currentQuestion.renderMode === 'ascii' ? (
                                     <ASCIIConstellation
                                         constellation={currentQuestion.constellation}
-                                        showLines={currentQuestion.showLines}
+                                        showLines={currentShowLines}
                                         maxMagnitude={currentQuestion.maxMagnitude}
                                         rotationAngle={currentQuestion.rotationAngle}
                                         backgroundStars={currentQuestion.backgroundStars}
@@ -1217,7 +1231,7 @@
                                 ) : (
                                     <ConstellationCanvas
                                         constellation={currentQuestion.constellation}
-                                        showLines={currentQuestion.showLines}
+                                        showLines={currentShowLines}
                                         maxMagnitude={currentQuestion.maxMagnitude}
                                         rotationAngle={currentQuestion.rotationAngle}
                                         backgroundStars={currentQuestion.backgroundStars}
