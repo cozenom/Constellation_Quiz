@@ -1249,6 +1249,13 @@
             };
 
             const handleNext = () => {
+                // Reset currentShowLines to match the NEXT question's setting before advancing
+                // This prevents flickering where lines briefly appear before being hidden
+                const nextIndex = quizState.currentIndex + 1;
+                if (nextIndex < quizState.questions.length) {
+                    const nextQuestion = quizState.questions[nextIndex];
+                    setCurrentShowLines(nextQuestion.showLines);
+                }
                 onNext();
             };
 
