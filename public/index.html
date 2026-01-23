@@ -399,13 +399,8 @@
                     });
             }, []);
 
-            // Load star catalog when config changes
+            // Load star catalog on mount (preload so it's ready when quiz starts)
             useEffect(() => {
-                if (!config || !config.showBackgroundStars) {
-                    setStarCatalogData(null);
-                    return;
-                }
-
                 const filename = '../data/background_stars_visible.json';
 
                 fetch(filename)
@@ -423,7 +418,7 @@
                         // Don't block quiz if star catalog fails to load
                         setStarCatalogData(null);
                     });
-            }, [config]);
+            }, []);
 
             const startQuiz = (quizConfig) => {
                 setConfig(quizConfig);
@@ -620,7 +615,7 @@
             const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
             const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
             const [season, setSeason] = useState(initialConfig?.season || 'all');
-            const [numQuestions, setNumQuestions] = useState(initialConfig?.numQuestions || 10);
+            const [numQuestions, setNumQuestions] = useState(initialConfig?.numQuestions || 'endless');
             const [inputMode, setInputMode] = useState(initialConfig?.inputMode || 'multiple-choice');
             const [renderMode, setRenderMode] = useState(initialConfig?.renderMode || 'canvas');
             const [showLines, setShowLines] = useState(initialConfig?.showLines ?? true);
