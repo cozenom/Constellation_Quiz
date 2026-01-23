@@ -8,12 +8,15 @@ Input:
 - data/raw/IAU_Star_Catalog.csv (Star proper names)
 - data/raw/constellationship.fab (Constellation line connections)
 - data/raw/constellation_abbreviations.json (Constellation names)
-- Hipparcos catalog (via Skyfield)
+- data/raw/constellation_english.json (English translations)
+- data/raw/bound_in_20.txt (IAU constellation boundaries)
+- Hipparcos catalog (via Skyfield, cached at data/raw/hip_main.dat)
 
 Output:
 - data/constellation_data.json (Complete quiz-ready data with metadata)
 - data/stars_visible.json (Naked-eye visible stars, mag ≤ 6.5)
 - data/stars_all.json (All Hipparcos stars, ~118k stars)
+- data/background_stars_visible.json (Pre-projected background stars per constellation)
 """
 
 import json
@@ -233,6 +236,55 @@ def apply_circular_normalization(x_proj: float, y_proj: float, center_x_proj: fl
 
 # ==================== RAW DATA PARSERS ====================
 
+def parse_constellation_boundaries(filepath: str) -> Dict[str, List[List[float]]]:
+    """
+    Parse IAU constellation boundary file (J2000.0 coordinates).
+
+    Format: RA(hours) Dec(degrees) ABBREV
+
+    Returns:
+        Dict mapping constellation abbreviation to list of [ra, dec] vertices
+    """
+    print(f"📖 Reading constellation boundaries from {filepath}...")
+
+    boundaries = {}
+    current_abbrev = None
+    current_vertices = []
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split()
+            if len(parts) != 3:
+                continue
+
+            ra = float(parts[0])
+            dec = float(parts[1])
+            abbrev = parts[2].upper()
+
+            # If we've moved to a new constellation, save the previous one
+            if abbrev != current_abbrev:
+                if current_abbrev and current_vertices:
+                    boundaries[current_abbrev] = current_vertices
+                current_abbrev = abbrev
+                current_vertices = []
+
+            current_vertices.append([round(ra, 6), round(dec, 6)])
+
+        # Save the last constellation
+        if current_abbrev and current_vertices:
+            boundaries[current_abbrev] = current_vertices
+
+    print(f"✅ Loaded boundaries for {len(boundaries)} constellations")
+    total_vertices = sum(len(v) for v in boundaries.values())
+    print(f"   Total vertices: {total_vertices}")
+
+    return boundaries
+
+
 def parse_name_fab(filepath: str) -> Dict[int, List[str]]:
     """Parse name.fab file to extract star designations."""
     print(f"📖 Reading {filepath}...")
@@ -441,6 +493,7 @@ def build_quiz_data(output_path: str):
     constellation_names = load_constellation_names("data/raw/constellation_abbreviations.json")
     english_names = load_english_names("data/raw/constellation_english.json")
     hipparcos_data = load_hipparcos_data()
+    boundaries = parse_constellation_boundaries("data/raw/bound_in_20.txt")
 
     # Manual constellation line fixes
     # Hydra: Missing connection between α Crt (HIP 53740) and β Crt (HIP 54682)
@@ -535,6 +588,8 @@ def build_quiz_data(output_path: str):
                     'hip': str(hip_id),
                     'x': star['x'],
                     'y': star['y'],
+                    'ra': round(star['ra'], 4),    # Global RA in hours (for sky view)
+                    'dec': round(star['dec'], 4),  # Global Dec in degrees (for sky view)
                     'magnitude': star['magnitude'] if star['magnitude'] != 99 else None
                 }
 
@@ -564,6 +619,9 @@ def build_quiz_data(output_path: str):
             difficulty = DIFFICULTY_MAP.get(abbrev, "medium")  # Default to medium if not in curated list
 
             # Build final constellation data
+            # Get IAU boundary polygon for this constellation
+            boundary = boundaries.get(abbrev.upper(), [])
+
             quiz_data[abbrev] = {
                 'name': name,
                 'name_english': english_names.get(name, name),  # English translation/meaning
@@ -575,7 +633,8 @@ def build_quiz_data(output_path: str):
                 'dec_center': round(dec_center, 2),
                 'projection_type': projection_type,
                 'stars': star_array,
-                'lines': line_indices
+                'lines': line_indices,
+                'boundary': boundary  # IAU boundary polygon [[ra, dec], ...]
             }
 
             print(f"✅ {abbrev:4s} - {name:25s} ({hemisphere:5s}, {difficulty:6s}, {len(star_array)} stars, {projection_type})")
