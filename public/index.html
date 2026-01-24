@@ -544,7 +544,7 @@
 
             // Filter constellations
             let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
-                const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere;
+                const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
                 const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
                 const matchesSeason = season === 'all' || data.seasons.includes(season);
                 return matchesHemisphere && matchesDifficulty && matchesSeason;
@@ -622,7 +622,7 @@
             const [randomRotation, setRandomRotation] = useState(initialConfig?.randomRotation || false);
             const [maxMagnitude, setMaxMagnitude] = useState(initialConfig?.maxMagnitude || 6);
             const [showBackgroundStars, setShowBackgroundStars] = useState(initialConfig?.showBackgroundStars ?? true);
-            const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 50);
+            const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 100);
 
             const handleStart = () => {
                 onStart({
