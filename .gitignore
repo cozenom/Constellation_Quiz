@@ -13,6 +13,15 @@ data/raw/hip_main.dat
 # Deprecated/old data files (kept as backup)
 data/deprecated/
 
+# Node/npm
+node_modules/
+dist/
+package-lock.json
+*.backup
+
+# Public data (copied from data/ for Vite to serve)
+public/data/*.json
+
 # Python
 __pycache__/
 *.py[cod]
