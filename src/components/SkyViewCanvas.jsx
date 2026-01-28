@@ -23,7 +23,7 @@ function SkyViewCanvas({
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const hemisphereSize = 700;  // Each hemisphere circle size
+    const hemisphereSize = 800;  // Each hemisphere circle size
     const showBothHemispheres = hemisphereFilter === 'both';
 
     // Layout changes based on mobile/desktop and number of hemispheres

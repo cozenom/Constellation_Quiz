@@ -87,7 +87,7 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                 </div>
 
                 {/* Star Brightness Slider */}
-                <div className="form-group">
+                <div className="form-group full-width">
                     <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
                     <input
                         type="range"
@@ -113,7 +113,7 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
 
                 {/* Background Star Opacity (conditional) */}
                 {config.showBackgroundStars && (
-                    <div className="form-group">
+                    <div className="form-group full-width">
                         <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
                         <input
                             type="range"

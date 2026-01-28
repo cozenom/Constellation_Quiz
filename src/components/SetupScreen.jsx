@@ -140,7 +140,7 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                         <label htmlFor="randomRotation">Random rotation (harder!)</label>
                     </div>
 
-                    <div className="form-group">
+                    <div className="form-group full-width">
                         <label htmlFor="maxMagnitude">
                             Star Brightness Filter (Mag ≤ {maxMagnitude.toFixed(1)})
                         </label>
@@ -186,7 +186,7 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                     </div>
 
                     {showBackgroundStars && renderMode === 'canvas' && (
-                        <div className="form-group">
+                        <div className="form-group full-width">
                             <label htmlFor="backgroundStarOpacity">
                                 Background Star Opacity: {backgroundStarOpacity}%
                             </label>
