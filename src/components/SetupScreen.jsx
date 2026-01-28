@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function SetupScreen({ onStart, onStartSkyView, initialConfig }) {
+function SetupScreen({ onStart, onBack, initialConfig }) {
     const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
     const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
     const [season, setSeason] = useState(initialConfig?.season || 'all');
@@ -203,8 +203,8 @@ function SetupScreen({ onStart, onStartSkyView, initialConfig }) {
                     Start Quiz
                 </button>
 
-                <button className="button-secondary" onClick={onStartSkyView} style={{marginTop: '0.5rem', width: '100%'}}>
-                    Sky View Mode (Beta)
+                <button className="button-secondary" onClick={onBack} style={{marginTop: '0.5rem', width: '100%'}}>
+                    Back
                 </button>
             </div>
         </div>

@@ -2,10 +2,13 @@ import React, { useEffect, useRef } from 'react';
 
 function SkyViewCanvas({
     constellations,           // All constellation data
+    filteredConstellations,   // Array of constellation abbrevs to show
     highlightedAbbrev,        // Which constellation to highlight
     showBoundaries,           // Show boundary polygons
     showLines,                // Show constellation lines
     maxMagnitude,             // Star brightness filter
+    backgroundStars = [],     // Background stars from Hipparcos catalog
+    backgroundStarOpacity = 100, // Background star opacity (0-100)
     onClick                   // Click handler: (abbrev, x, y) => void
 }) {
     const canvasRef = useRef(null);
@@ -109,7 +112,11 @@ function SkyViewCanvas({
         // Clear stored paths and rebuild
         boundaryPathsRef.current.clear();
 
+        // Always render all constellations visually
         const allConstellations = Object.entries(constellations);
+
+        // Create a Set for quick lookup of filtered constellations
+        const filteredSet = new Set(filteredConstellations || []);
 
         // Draw each hemisphere
         for (const hemisphere of ['north', 'south']) {
@@ -125,6 +132,27 @@ function SkyViewCanvas({
             // Fill with background
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(centerX - hemisphereSize / 2, centerY - hemisphereSize / 2, hemisphereSize, hemisphereSize);
+
+            // Draw background stars with opacity
+            if (backgroundStars && backgroundStars.length > 0 && backgroundStarOpacity > 0) {
+                ctx.globalAlpha = backgroundStarOpacity / 100;
+                for (const star of backgroundStars) {
+                    const mag = star.magnitude || 5;
+                    if (mag > maxMagnitude) continue;
+
+                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere);
+                    if (!pt.visible) continue;
+
+                    const { x, y } = pt;
+                    const radius = Math.max(0.3, 2.0 * Math.pow(10, -(mag + 1.5) / 6.5));
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0; // Reset
+            }
 
             // Build Path2D for constellations in this hemisphere
             for (const [abbrev, data] of allConstellations) {
@@ -148,8 +176,10 @@ function SkyViewCanvas({
                 }
                 path.closePath();
 
-                // Store for hit testing
-                boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
+                // Store for hit testing ONLY if constellation is in filtered set
+                if (filteredSet.size === 0 || filteredSet.has(abbrev)) {
+                    boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
+                }
 
                 // Draw the path (only if showBoundaries)
                 if (showBoundaries) {
@@ -240,7 +270,7 @@ function SkyViewCanvas({
             ctx.stroke();
         }
 
-    }, [constellations, highlightedAbbrev, showBoundaries, showLines, maxMagnitude]);
+    }, [constellations, filteredConstellations, highlightedAbbrev, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity]);
 
     return (
         <canvas

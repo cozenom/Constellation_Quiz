@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import TitleScreen from './components/TitleScreen';
 import SetupScreen from './components/SetupScreen';
+import SkyViewSetupScreen from './components/SkyViewSetupScreen';
 import QuizScreen from './components/QuizScreen';
 import ResultsScreen from './components/ResultsScreen';
 import SkyViewScreen from './components/SkyViewScreen';
 import { generateQuestions } from './utils/quizHelpers';
 
 function App() {
-    const [screen, setScreen] = useState('setup'); // 'setup', 'quiz', 'results', 'skyview'
+    const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview'
     const [config, setConfig] = useState(null);
     const [savedConfig, setSavedConfig] = useState(null); // Persist settings when returning to menu
+    const [skyViewConfig, setSkyViewConfig] = useState({
+        hemisphere: 'both',
+        difficulty: 'all',
+        season: 'all',
+        showLines: true,
+        maxMagnitude: 6,
+        showBackgroundStars: true,
+        backgroundStarOpacity: 100,
+    });
+    const [savedSkyViewConfig, setSavedSkyViewConfig] = useState(null);
     const [quizState, setQuizState] = useState(null);
     const [constellationData, setConstellationData] = useState(null);
     const [starCatalogData, setStarCatalogData] = useState(null);
@@ -98,13 +110,27 @@ function App() {
     };
 
     const newQuiz = () => {
-        setScreen('setup');
+        setScreen('title');
         setConfig(null);
         setQuizState(null);
     };
 
     const backToSetup = () => {
+        setScreen('title');
+    };
+
+    const goToSetup = () => {
         setScreen('setup');
+    };
+
+    const goToSkyViewSetup = () => {
+        setScreen('skyview-setup');
+    };
+
+    const backToTitle = () => {
+        setScreen('title');
+        setSavedConfig(config);
+        setSavedSkyViewConfig(skyViewConfig);
     };
 
     // Show loading state
@@ -138,13 +164,35 @@ function App() {
         );
     }
 
-    const startSkyView = () => {
+    const startSkyView = (newConfig) => {
+        setSkyViewConfig(newConfig);
+        setSavedSkyViewConfig(newConfig);
         setScreen('skyview');
     };
 
     return (
         <>
-            {screen === 'setup' && <SetupScreen onStart={startQuiz} onStartSkyView={startSkyView} constellationData={constellationData} initialConfig={savedConfig} />}
+            {screen === 'title' && (
+                <TitleScreen
+                    onSelectRegularQuiz={goToSetup}
+                    onSelectSkyView={goToSkyViewSetup}
+                />
+            )}
+            {screen === 'setup' && (
+                <SetupScreen
+                    onStart={startQuiz}
+                    onBack={backToTitle}
+                    constellationData={constellationData}
+                    initialConfig={savedConfig}
+                />
+            )}
+            {screen === 'skyview-setup' && (
+                <SkyViewSetupScreen
+                    onStart={startSkyView}
+                    onBack={backToTitle}
+                    initialConfig={savedSkyViewConfig}
+                />
+            )}
             {screen === 'quiz' && (
                 <QuizScreen
                     config={config}
@@ -164,7 +212,9 @@ function App() {
             {screen === 'skyview' && (
                 <SkyViewScreen
                     constellationData={constellationData}
-                    onBack={backToSetup}
+                    starCatalogData={starCatalogData}
+                    config={skyViewConfig}
+                    onBack={backToTitle}
                 />
             )}
         </>

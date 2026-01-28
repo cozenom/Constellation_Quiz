@@ -1,35 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SkyViewCanvas from './SkyViewCanvas';
 
-function SkyViewScreen({ constellationData, onBack }) {
+function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     const [targetAbbrev, setTargetAbbrev] = useState(null);
     const [score, setScore] = useState({ correct: 0, total: 0 });
     const [feedback, setFeedback] = useState(null);
 
-    // Pick a random constellation
-    const pickNewTarget = () => {
-        if (!constellationData) return;
+    // Filter constellations by hemisphere, difficulty, season
+    const filteredConstellations = useMemo(() => {
+        if (!constellationData) return [];
 
         const allAbbrevs = Object.keys(constellationData);
-        // Pick random one, different from current if possible
-        let candidates = allAbbrevs.filter(a => a !== targetAbbrev);
-        if (candidates.length === 0) candidates = allAbbrevs;
 
-        const newTarget = candidates[Math.floor(Math.random() * candidates.length)];
-        setTargetAbbrev(newTarget);
+        // Filter by hemisphere
+        let filtered = allAbbrevs.filter(abbrev => {
+            const constellation = constellationData[abbrev];
+            if (config.hemisphere === 'both') return true;
+            return constellation.hemisphere.toLowerCase() === config.hemisphere;
+        });
+
+        // Filter by difficulty
+        if (config.difficulty !== 'all') {
+            filtered = filtered.filter(abbrev => {
+                const constellation = constellationData[abbrev];
+                return constellation.difficulty === config.difficulty;
+            });
+        }
+
+        // Filter by season
+        if (config.season !== 'all') {
+            filtered = filtered.filter(abbrev => {
+                const constellation = constellationData[abbrev];
+                return constellation.season && constellation.season.toLowerCase().includes(config.season);
+            });
+        }
+
+        return filtered;
+    }, [constellationData, config.hemisphere, config.difficulty, config.season]);
+
+    // Pick a random constellation
+    const pickNewTarget = useCallback(() => {
+        if (filteredConstellations.length === 0) {
+            setTargetAbbrev(null);
+            return;
+        }
+
+        // Pick random one, different from current if possible
+        // Use functional update to avoid dependency on targetAbbrev
+        setTargetAbbrev(prev => {
+            let candidates = filteredConstellations.filter(a => a !== prev);
+            if (candidates.length === 0) candidates = filteredConstellations;
+            return candidates[Math.floor(Math.random() * candidates.length)];
+        });
         setFeedback(null);
-    };
+    }, [filteredConstellations]);
 
     // Initialize on first load
     useEffect(() => {
         pickNewTarget();
-    }, [constellationData]);
-
-    // Get total constellation count (all are visible in dual-hemisphere view)
-    const getTotalConstellations = () => {
-        if (!constellationData) return 0;
-        return Object.keys(constellationData).length;
-    };
+    }, [pickNewTarget]);
 
     // Handle tap on constellation
     const handleTap = (tappedAbbrev, x, y) => {
@@ -60,6 +89,28 @@ function SkyViewScreen({ constellationData, onBack }) {
         return <div className="loading">Loading constellation data...</div>;
     }
 
+    // Handle empty filter results
+    if (filteredConstellations.length === 0) {
+        return (
+            <div className="sky-view-screen">
+                <div className="quiz-header">
+                    <button className="back-button" onClick={onBack}>
+                        ← Back to Menu
+                    </button>
+                </div>
+                <div className="card">
+                    <div className="no-results">
+                        <p>No constellations match your filters.</p>
+                        <p>Try adjusting your hemisphere, difficulty, or season settings.</p>
+                        <button className="button-primary" onClick={onBack}>
+                            Back to Setup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const targetData = targetAbbrev ? constellationData[targetAbbrev] : null;
     const targetName = targetData?.name || '...';
     const targetHemisphere = targetData?.dec_center >= 0 ? 'Northern' : 'Southern';
@@ -86,10 +137,13 @@ function SkyViewScreen({ constellationData, onBack }) {
 
                 <SkyViewCanvas
                     constellations={constellationData}
+                    filteredConstellations={filteredConstellations}
                     highlightedAbbrev={feedback ? targetAbbrev : null}
                     showBoundaries={true}
-                    showLines={true}
-                    maxMagnitude={5}
+                    showLines={config.showLines}
+                    maxMagnitude={config.maxMagnitude}
+                    backgroundStars={starCatalogData || []}
+                    backgroundStarOpacity={config.showBackgroundStars ? config.backgroundStarOpacity : 0}
                     onClick={handleTap}
                 />
 
@@ -110,7 +164,7 @@ function SkyViewScreen({ constellationData, onBack }) {
                 )}
 
                 <div style={{marginTop: '1rem', fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center'}}>
-                    Total constellations: {getTotalConstellations()}
+                    Total constellations: {filteredConstellations.length}
                 </div>
             </div>
         </div>
