@@ -382,3 +382,36 @@ canvas {
     color: #94a3b8;
     font-size: 0.9rem;
 }
+
+/* Sky View Mobile Optimizations */
+@media (max-width: 768px) {
+    /* Remove padding on mobile for sky view to maximize canvas space */
+    body:has(.sky-view-screen) {
+        padding: 0.5rem;
+    }
+
+    .sky-view-screen .card {
+        padding: 0.75rem;
+    }
+
+    /* Make canvas fill width on mobile */
+    .sky-view-screen canvas {
+        width: 100% !important;
+        max-width: none !important;
+        height: auto;
+        touch-action: pan-x pan-y pinch-zoom;
+    }
+
+    /* Adjust header for mobile */
+    .sky-view-screen .quiz-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .sky-view-screen h2 {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+}

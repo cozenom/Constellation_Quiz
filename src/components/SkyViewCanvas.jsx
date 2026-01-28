@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 function SkyViewCanvas({
     constellations,           // All constellation data
@@ -9,12 +9,31 @@ function SkyViewCanvas({
     maxMagnitude,             // Star brightness filter
     backgroundStars = [],     // Background stars from Hipparcos catalog
     backgroundStarOpacity = 100, // Background star opacity (0-100)
+    hemisphereFilter = 'both', // Which hemisphere(s) to show: 'north', 'south', or 'both'
     onClick                   // Click handler: (abbrev, x, y) => void
 }) {
     const canvasRef = useRef(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Detect mobile viewport
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     const hemisphereSize = 700;  // Each hemisphere circle size
-    const canvasWidth = hemisphereSize * 2 + 40;  // Two hemispheres + gap
-    const canvasHeight = hemisphereSize + 60;  // Plus labels
+    const showBothHemispheres = hemisphereFilter === 'both';
+
+    // Layout changes based on mobile/desktop and number of hemispheres
+    const canvasWidth = showBothHemispheres
+        ? (isMobile ? hemisphereSize + 20 : hemisphereSize * 2 + 40)
+        : hemisphereSize + 20;  // Single hemisphere: always same width
+
+    const canvasHeight = showBothHemispheres
+        ? (isMobile ? hemisphereSize * 2 + 100 : hemisphereSize + 60)
+        : hemisphereSize + 60;  // Single hemisphere: height for one circle
 
     // Convert RA hours to radians
     const raToRad = (raHours) => raHours * 15 * Math.PI / 180;
@@ -22,7 +41,8 @@ function SkyViewCanvas({
 
     // Stereographic projection for a specific hemisphere
     // hemisphere: 'north' (Dec +90 center) or 'south' (Dec -90 center)
-    const projectToHemisphere = (ra, dec, hemisphere) => {
+    // centerX, centerY: canvas coordinates for the hemisphere center
+    const projectToHemisphere = (ra, dec, hemisphere, centerX, centerY) => {
         const centerDec = hemisphere === 'north' ? 90 : -90;
         const centerDecRad = decToRad(centerDec);
         const raRad = raToRad(ra);
@@ -46,10 +66,6 @@ function SkyViewCanvas({
 
         const projX = r * Math.sin(posAngle) * scale;
         const projY = r * Math.cos(posAngle) * scale;
-
-        // Calculate canvas position based on hemisphere
-        const centerX = hemisphere === 'north' ? hemisphereSize / 2 + 10 : hemisphereSize * 1.5 + 30;
-        const centerY = hemisphereSize / 2 + 40;
 
         return {
             x: centerX + projX,
@@ -102,12 +118,26 @@ function SkyViewCanvas({
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        // Draw hemisphere labels
+        // Draw hemisphere labels (positioned based on layout)
         ctx.fillStyle = '#94a3b8';
         ctx.font = '14px -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + 10, 25);
-        ctx.fillText('Southern Hemisphere', hemisphereSize * 1.5 + 30, 25);
+
+        if (showBothHemispheres) {
+            if (isMobile) {
+                // Vertical layout - labels above each hemisphere
+                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + 10, 25);
+                ctx.fillText('Southern Hemisphere', hemisphereSize / 2 + 10, hemisphereSize + 75);
+            } else {
+                // Horizontal layout - labels above each hemisphere
+                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + 10, 25);
+                ctx.fillText('Southern Hemisphere', hemisphereSize * 1.5 + 30, 25);
+            }
+        } else {
+            // Single hemisphere - centered label
+            const label = hemisphereFilter === 'north' ? 'Northern Hemisphere' : 'Southern Hemisphere';
+            ctx.fillText(label, hemisphereSize / 2 + 10, 25);
+        }
 
         // Clear stored paths and rebuild
         boundaryPathsRef.current.clear();
@@ -118,10 +148,30 @@ function SkyViewCanvas({
         // Create a Set for quick lookup of filtered constellations
         const filteredSet = new Set(filteredConstellations || []);
 
+        // Determine which hemisphere(s) to render
+        const hemispheresToShow = showBothHemispheres
+            ? ['north', 'south']
+            : [hemisphereFilter];
+
         // Draw each hemisphere
-        for (const hemisphere of ['north', 'south']) {
-            const centerX = hemisphere === 'north' ? hemisphereSize / 2 + 10 : hemisphereSize * 1.5 + 30;
-            const centerY = hemisphereSize / 2 + 40;
+        for (const hemisphere of hemispheresToShow) {
+            // Calculate center position based on number of hemispheres and layout
+            let centerX, centerY;
+
+            if (showBothHemispheres) {
+                // Two hemispheres: position based on mobile/desktop
+                centerX = isMobile
+                    ? hemisphereSize / 2 + 10  // Both centered horizontally
+                    : (hemisphere === 'north' ? hemisphereSize / 2 + 10 : hemisphereSize * 1.5 + 30);
+
+                centerY = isMobile
+                    ? (hemisphere === 'north' ? hemisphereSize / 2 + 40 : hemisphereSize * 1.5 + 90)  // Stack vertically
+                    : hemisphereSize / 2 + 40;  // Both at same vertical position
+            } else {
+                // Single hemisphere: always centered
+                centerX = hemisphereSize / 2 + 10;
+                centerY = hemisphereSize / 2 + 40;
+            }
 
             // Apply circular clipping for this hemisphere
             ctx.save();
@@ -140,7 +190,7 @@ function SkyViewCanvas({
                     const mag = star.magnitude || 5;
                     if (mag > maxMagnitude) continue;
 
-                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere);
+                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere, centerX, centerY);
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
@@ -160,18 +210,18 @@ function SkyViewCanvas({
 
                 // Check if any boundary point is visible in this hemisphere
                 const anyVisible = data.boundary.some(([ra, dec]) => {
-                    const pt = projectToHemisphere(ra, dec, hemisphere);
+                    const pt = projectToHemisphere(ra, dec, hemisphere, centerX, centerY);
                     return pt.visible;
                 });
                 if (!anyVisible) continue;
 
                 // Create Path2D for this constellation in this hemisphere
                 const path = new Path2D();
-                const first = projectToHemisphere(data.boundary[0][0], data.boundary[0][1], hemisphere);
+                const first = projectToHemisphere(data.boundary[0][0], data.boundary[0][1], hemisphere, centerX, centerY);
                 path.moveTo(first.x, first.y);
 
                 for (let i = 1; i < data.boundary.length; i++) {
-                    const pt = projectToHemisphere(data.boundary[i][0], data.boundary[i][1], hemisphere);
+                    const pt = projectToHemisphere(data.boundary[i][0], data.boundary[i][1], hemisphere, centerX, centerY);
                     path.lineTo(pt.x, pt.y);
                 }
                 path.closePath();
@@ -211,8 +261,8 @@ function SkyViewCanvas({
                             const star1 = stars[idx1];
                             const star2 = stars[idx2];
 
-                            const p1 = projectToHemisphere(star1.ra, star1.dec, hemisphere);
-                            const p2 = projectToHemisphere(star2.ra, star2.dec, hemisphere);
+                            const p1 = projectToHemisphere(star1.ra, star1.dec, hemisphere, centerX, centerY);
+                            const p2 = projectToHemisphere(star2.ra, star2.dec, hemisphere, centerX, centerY);
 
                             // Draw if at least one point is visible (clipping handles the rest)
                             if (p1.visible || p2.visible) {
@@ -234,7 +284,7 @@ function SkyViewCanvas({
                     const mag = star.magnitude || 5;
                     if (mag > maxMagnitude) continue;
 
-                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere);
+                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere, centerX, centerY);
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
@@ -270,7 +320,7 @@ function SkyViewCanvas({
             ctx.stroke();
         }
 
-    }, [constellations, filteredConstellations, highlightedAbbrev, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity]);
+    }, [constellations, filteredConstellations, highlightedAbbrev, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity, isMobile, hemisphereFilter]);
 
     return (
         <canvas

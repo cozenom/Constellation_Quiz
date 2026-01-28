@@ -144,6 +144,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                     maxMagnitude={config.maxMagnitude}
                     backgroundStars={starCatalogData || []}
                     backgroundStarOpacity={config.showBackgroundStars ? config.backgroundStarOpacity : 0}
+                    hemisphereFilter={config.hemisphere}
                     onClick={handleTap}
                 />
 
