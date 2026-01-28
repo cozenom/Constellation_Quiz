@@ -85,19 +85,19 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
 
     return (
         <div>
-            <div className="quiz-header">
-                <button className="back-button" onClick={onBack}>
-                    ← Back to Menu
-                </button>
-                <div className="question-number">
-                    Question {progress} of {total}
-                </div>
-                <div className="score">
-                    Score: {quizState.score}/{progress} ({percentage}%)
-                </div>
-            </div>
+            <button className="back-button" onClick={onBack}>
+                ← Back
+            </button>
 
             <div className="card">
+                <div className="quiz-header">
+                    <div className="question-number">
+                        Question {progress} of {total}
+                    </div>
+                    <div className="score">
+                        Score: {quizState.score}/{progress} ({percentage}%)
+                    </div>
+                </div>
                 <div className="quiz-desktop-grid">
                     <div className="quiz-constellation-col">
                         {currentQuestion.renderMode === 'ascii' ? (

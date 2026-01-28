@@ -116,7 +116,7 @@ function App() {
     };
 
     const backToSetup = () => {
-        setScreen('title');
+        setScreen('setup');
     };
 
     const goToSetup = () => {
@@ -131,6 +131,10 @@ function App() {
         setScreen('title');
         setSavedConfig(config);
         setSavedSkyViewConfig(skyViewConfig);
+    };
+
+    const backToSkyViewSetup = () => {
+        setScreen('skyview-setup');
     };
 
     // Show loading state
@@ -214,7 +218,7 @@ function App() {
                     constellationData={constellationData}
                     starCatalogData={starCatalogData}
                     config={skyViewConfig}
-                    onBack={backToTitle}
+                    onBack={backToSkyViewSetup}
                 />
             )}
         </>

@@ -34,6 +34,10 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
             <h1>🌟 Constellation Quiz</h1>
             <p className="subtitle">Learn to identify all 88 constellations by their star patterns</p>
 
+            <button className="back-button" onClick={onBack}>
+                ← Back
+            </button>
+
             <div className="card">
                 <div className="setup-grid">
                     <div className="form-group">
@@ -201,10 +205,6 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
 
                 <button className="button-primary" onClick={handleStart}>
                     Start Quiz
-                </button>
-
-                <button className="button-secondary" onClick={onBack} style={{marginTop: '0.5rem', width: '100%'}}>
-                    Back
                 </button>
             </div>
         </div>

@@ -3,6 +3,11 @@ import React from 'react';
 function TitleScreen({ onSelectRegularQuiz, onSelectSkyView }) {
     return (
         <div className="card">
+            {/* Empty header for consistent spacing with other screens */}
+            <div className="quiz-header" style={{visibility: 'hidden'}}>
+                <button className="back-button">← Back</button>
+            </div>
+
             <h1>Constellation Quiz</h1>
             <p className="subtitle">Learn to identify all 88 constellations</p>
 

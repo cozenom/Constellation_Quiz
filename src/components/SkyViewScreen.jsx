@@ -93,11 +93,9 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     if (filteredConstellations.length === 0) {
         return (
             <div className="sky-view-screen">
-                <div className="quiz-header">
-                    <button className="back-button" onClick={onBack}>
-                        ← Back to Menu
-                    </button>
-                </div>
+                <button className="back-button" onClick={onBack}>
+                    ← Back
+                </button>
                 <div className="card">
                     <div className="no-results">
                         <p>No constellations match your filters.</p>
@@ -118,21 +116,22 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
 
     return (
         <div className="sky-view-screen">
-            <div className="quiz-header">
-                <button className="back-button" onClick={onBack}>
-                    ← Back to Menu
-                </button>
-                <div className="score">
-                    Score: {score.correct}/{score.total} ({percentage}%)
-                </div>
-            </div>
-
+            <button className="back-button" onClick={onBack}>
+                ← Back
+            </button>
             <div className="card">
-                <h2 style={{textAlign: 'center', marginBottom: '0.5rem'}}>
-                    Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
-                </h2>
-                <div style={{textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem', color: '#64748b'}}>
-                    ({targetHemisphere} Hemisphere)
+                <div className="quiz-header" style={{justifyContent: 'space-between', alignItems: 'center'}}>
+                    <div className="score">
+                        Score: {score.correct}/{score.total} ({percentage}%)
+                    </div>
+                    <div style={{textAlign: 'center', flex: 1}}>
+                        <div style={{fontSize: '1.25rem', fontWeight: '500'}}>
+                            Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
+                        </div>
+                        <div style={{fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem'}}>
+                            ({targetHemisphere} Hemisphere)
+                        </div>
+                    </div>
                 </div>
 
                 <SkyViewCanvas
@@ -163,10 +162,6 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                         Next Constellation →
                     </button>
                 )}
-
-                <div style={{marginTop: '1rem', fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center'}}>
-                    Total constellations: {filteredConstellations.length}
-                </div>
             </div>
         </div>
     );

@@ -23,10 +23,15 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
     };
 
     return (
-        <div className="card">
-            <h2>Sky View Mode Setup</h2>
+        <div>
+            <button className="back-button" onClick={onBack}>
+                ← Back
+            </button>
 
-            <div className="setup-grid">
+            <div className="card">
+                <h2>Sky View Mode Setup</h2>
+
+                <div className="setup-grid">
                 {/* Hemisphere Filter */}
                 <div className="form-group">
                     <label>Hemisphere</label>
@@ -119,14 +124,12 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                         />
                     </div>
                 )}
-            </div>
+                </div>
 
-            <button className="button-primary" onClick={handleStart}>
-                Start Sky View
-            </button>
-            <button className="button-secondary" onClick={onBack}>
-                Back
-            </button>
+                <button className="button-primary" onClick={handleStart}>
+                    Start Sky View
+                </button>
+            </div>
         </div>
     );
 }

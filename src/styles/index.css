@@ -22,6 +22,31 @@ body {
     max-width: 1500px;
 }
 
+/* Position all back buttons at same absolute position */
+.back-button {
+    position: absolute;
+    top: 2%;
+    left: 2%;
+    z-index: 1000;
+}
+
+/* Reset positioning on mobile */
+@media (max-width: 767px) {
+    .back-button {
+        position: static;
+    }
+}
+
+/* Add relative positioning to containers that have back buttons */
+body {
+    position: relative;
+}
+
+/* Sky view: add top margin to prevent overlap with back button */
+.sky-view-screen .card {
+    margin-top: 3.5rem;
+}
+
 .sky-view-screen .card {
     max-width: 1450px;
 }
@@ -53,6 +78,7 @@ h2 {
     margin-bottom: 1.5rem;
     border: 1px solid rgba(148, 163, 184, 0.1);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    min-height: 400px;
 }
 
 .setup-grid {
@@ -151,6 +177,7 @@ input[type="checkbox"] {
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
     gap: 1rem;
+    min-height: 44px;
 }
 
 .score {
@@ -321,6 +348,7 @@ canvas {
 .back-button:hover {
     background: #475569;
 }
+
 
 @media (min-width: 768px) {
     .ascii-art {
