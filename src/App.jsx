@@ -5,7 +5,7 @@ import SkyViewSetupScreen from './components/SkyViewSetupScreen';
 import QuizScreen from './components/QuizScreen';
 import ResultsScreen from './components/ResultsScreen';
 import SkyViewScreen from './components/SkyViewScreen';
-import { generateQuestions } from './utils/quizHelpers';
+import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
 function App() {
     const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview'
@@ -101,7 +101,24 @@ function App() {
                 ...quizState,
                 currentIndex: quizState.currentIndex + 1
             });
+        } else if (config.mode === 'endless') {
+            // Endless mode: generate new question, avoiding last 3 asked
+            const recentAbbrevs = quizState.answers.slice(-3).map(a => {
+                // Find the abbrev from the constellation name
+                const q = quizState.questions.find(q =>
+                    q.constellation.displayName === a.constellation || q.constellation.name === a.constellation
+                );
+                return q ? q.constellation.abbrev : null;
+            }).filter(Boolean);
+
+            const newQuestion = generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs);
+            setQuizState({
+                ...quizState,
+                questions: [...quizState.questions, newQuestion],
+                currentIndex: quizState.currentIndex + 1
+            });
         } else {
+            // Single mode: go to results
             setScreen('results');
         }
     };

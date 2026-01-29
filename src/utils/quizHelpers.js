@@ -1,6 +1,6 @@
 // Generate quiz questions based on config
 export function generateQuestions(config, constellationData, starCatalogData) {
-    const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
+    const { hemisphere, difficulty, season, mode, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -18,10 +18,8 @@ export function generateQuestions(config, constellationData, starCatalogData) {
         return matchesHemisphere && matchesDifficulty && matchesSeason;
     });
 
-    // Shuffle and limit
+    // Shuffle - use all filtered constellations for both modes
     pool = shuffleArray(pool);
-    const count = numQuestions === 'endless' ? pool.length : Math.min(numQuestions, pool.length);
-    pool = pool.slice(0, count);
 
     // Generate questions with multiple choice options
     return pool.map(([abbrev, data]) => {
@@ -80,4 +78,57 @@ export function shuffleArray(array) {
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
+}
+
+// Generate a single new question for endless mode, avoiding recently asked
+export function generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs = []) {
+    const { hemisphere, difficulty, season, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames } = config;
+
+    // Helper to format constellation names
+    const formatName = (data) => {
+        if (showEnglishNames && data.name_english) {
+            return `${data.name} (${data.name_english})`;
+        }
+        return data.name;
+    };
+
+    // Filter constellations
+    let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
+        const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
+        const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
+        const matchesSeason = season === 'all' || data.seasons.includes(season);
+        return matchesHemisphere && matchesDifficulty && matchesSeason;
+    });
+
+    // Exclude recently asked (last 3)
+    let candidates = pool.filter(([abbrev]) => !recentAbbrevs.includes(abbrev));
+    if (candidates.length === 0) candidates = pool;
+
+    // Pick random constellation
+    const [abbrev, data] = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Generate wrong answers
+    const wrongAnswers = generateWrongAnswers(abbrev, data, pool, 3);
+    const allChoices = shuffleArray([
+        { abbrev, name: formatName(data), correct: true },
+        ...wrongAnswers.map(w => ({ abbrev: w[0], name: formatName(w[1]), correct: false }))
+    ]);
+
+    // Generate random rotation angle if enabled
+    const rotationAngle = randomRotation ? Math.random() * 360 : 0;
+
+    return {
+        constellation: {
+            abbrev,
+            ...data,
+            displayName: formatName(data)
+        },
+        choices: allChoices,
+        showLines,
+        renderMode,
+        maxMagnitude,
+        rotationAngle,
+        backgroundStars: (starCatalogData && starCatalogData[abbrev]) || [],
+        backgroundStarOpacity
+    };
 }

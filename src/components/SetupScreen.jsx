@@ -4,7 +4,7 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
     const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
     const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
     const [season, setSeason] = useState(initialConfig?.season || 'all');
-    const [numQuestions, setNumQuestions] = useState(initialConfig?.numQuestions || 'endless');
+    const [mode, setMode] = useState(initialConfig?.mode || 'single');
     const [inputMode, setInputMode] = useState(initialConfig?.inputMode || 'multiple-choice');
     const [renderMode, setRenderMode] = useState(initialConfig?.renderMode || 'canvas');
     const [showLines, setShowLines] = useState(initialConfig?.showLines ?? true);
@@ -19,7 +19,7 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
             hemisphere,
             difficulty,
             season,
-            numQuestions,
+            mode,
             inputMode,
             renderMode,
             showLines,
@@ -85,16 +85,14 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="numQuestions">Number of Questions</label>
+                        <label htmlFor="mode">Mode</label>
                         <select
-                            id="numQuestions"
-                            value={numQuestions}
-                            onChange={(e) => setNumQuestions(e.target.value === 'endless' ? 'endless' : parseInt(e.target.value))}
+                            id="mode"
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value)}
                         >
-                            <option value="10">10 Questions</option>
-                            <option value="20">20 Questions</option>
-                            <option value="50">50 Questions</option>
-                            <option value="endless">All Available</option>
+                            <option value="single">Single (each once)</option>
+                            <option value="endless">Endless</option>
                         </select>
                     </div>
 

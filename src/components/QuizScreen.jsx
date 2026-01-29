@@ -81,7 +81,8 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
 
     const progress = quizState.currentIndex + 1;
     const total = quizState.questions.length;
-    const percentage = Math.round((quizState.score / progress) * 100);
+    const percentage = progress > 0 ? Math.round((quizState.score / progress) * 100) : 0;
+    const isEndless = config.mode === 'endless';
 
     return (
         <div>
@@ -92,7 +93,11 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
             <div className="card">
                 <div className="quiz-header">
                     <div className="question-number">
-                        Question {progress} of {total}
+                        {isEndless ? (
+                            <>Question #{progress}</>
+                        ) : (
+                            <>Question {progress} of {total}</>
+                        )}
                     </div>
                     <div className="score">
                         Score: {quizState.score}/{progress} ({percentage}%)
@@ -174,7 +179,7 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
                                 onClick={handleNext}
                                 style={{marginTop: '1rem'}}
                             >
-                                {progress < total ? 'Next Question →' : 'See Results'}
+                                {isEndless || progress < total ? 'Next Question →' : 'See Results'}
                             </button>
                         )}
                     </div>

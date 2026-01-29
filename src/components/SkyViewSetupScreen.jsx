@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
     const [config, setConfig] = useState({
+        mode: 'single',
         hemisphere: 'both',
         difficulty: 'all',
         season: 'all',
@@ -72,6 +73,18 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                         <option value="spring">Spring</option>
                         <option value="summer">Summer</option>
                         <option value="autumn">Autumn</option>
+                    </select>
+                </div>
+
+                {/* Quiz Mode */}
+                <div className="form-group">
+                    <label>Mode</label>
+                    <select
+                        value={config.mode}
+                        onChange={(e) => setConfig({...config, mode: e.target.value})}
+                    >
+                        <option value="single">Single (each once)</option>
+                        <option value="endless">Endless</option>
                     </select>
                 </div>
 

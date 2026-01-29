@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SkyViewCanvas from './SkyViewCanvas';
+import { shuffleArray } from '../utils/quizHelpers';
 
 function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     const [targetAbbrev, setTargetAbbrev] = useState(null);
     const [score, setScore] = useState({ correct: 0, total: 0 });
     const [feedback, setFeedback] = useState(null);
+    const [questionQueue, setQuestionQueue] = useState([]);  // For single mode
+    const [recentlyAsked, setRecentlyAsked] = useState([]);  // For endless mode
+    const [isComplete, setIsComplete] = useState(false);     // For single mode completion
 
     // Helper to format constellation names
     const formatConstellationName = (constellation) => {
@@ -46,27 +50,50 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         return filtered;
     }, [constellationData, config.hemisphere, config.difficulty, config.season]);
 
-    // Pick a random constellation
-    const pickNewTarget = useCallback(() => {
+    // Pick a new target based on mode
+    const pickNewTarget = useCallback((isInitial = false) => {
         if (filteredConstellations.length === 0) {
             setTargetAbbrev(null);
             return;
         }
 
-        // Pick random one, different from current if possible
-        // Use functional update to avoid dependency on targetAbbrev
-        setTargetAbbrev(prev => {
-            let candidates = filteredConstellations.filter(a => a !== prev);
-            if (candidates.length === 0) candidates = filteredConstellations;
-            return candidates[Math.floor(Math.random() * candidates.length)];
-        });
+        if (config.mode === 'endless') {
+            // Endless: Random pick, exclude last 3 to reduce immediate repeats
+            setRecentlyAsked(prev => {
+                let candidates = filteredConstellations.filter(a => !prev.includes(a));
+                if (candidates.length === 0) candidates = filteredConstellations;
+                const next = candidates[Math.floor(Math.random() * candidates.length)];
+                setTargetAbbrev(next);
+                return [...prev.slice(-2), next];  // Keep last 3 (including new one)
+            });
+        } else {
+            // Single: Go through shuffled queue once
+            if (isInitial) {
+                // Initialize queue on first load
+                const shuffled = shuffleArray([...filteredConstellations]);
+                setQuestionQueue(shuffled);
+                setTargetAbbrev(shuffled[0]);
+            } else {
+                // Pop from queue
+                setQuestionQueue(prev => {
+                    const remaining = prev.slice(1);
+                    if (remaining.length === 0) {
+                        setIsComplete(true);
+                        setTargetAbbrev(null);
+                    } else {
+                        setTargetAbbrev(remaining[0]);
+                    }
+                    return remaining;
+                });
+            }
+        }
         setFeedback(null);
-    }, [filteredConstellations]);
+    }, [filteredConstellations, config.mode]);
 
     // Initialize on first load
     useEffect(() => {
-        pickNewTarget();
-    }, [pickNewTarget]);
+        pickNewTarget(true);  // isInitial = true
+    }, []);  // Only run once on mount
 
     // Handle tap on constellation
     const handleTap = (tappedAbbrev, x, y) => {
@@ -91,7 +118,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     };
 
     const handleNext = () => {
-        pickNewTarget();
+        pickNewTarget(false);  // Not initial
     };
 
     if (!constellationData) {
@@ -118,10 +145,47 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         );
     }
 
+    // Handle single mode completion
+    if (isComplete) {
+        const percentage = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
+        return (
+            <div className="sky-view-screen">
+                <button className="back-button" onClick={onBack}>
+                    ← Back
+                </button>
+                <div className="card">
+                    <div className="results-screen">
+                        <h2>Quiz Complete!</h2>
+                        <div className="final-score">
+                            <span className="score-number">{score.correct}</span>
+                            <span className="score-divider">/</span>
+                            <span className="score-total">{score.total}</span>
+                        </div>
+                        <div className="score-percentage">{percentage}%</div>
+                        <div className="results-actions">
+                            <button className="button-primary" onClick={() => {
+                                setScore({ correct: 0, total: 0 });
+                                setIsComplete(false);
+                                setFeedback(null);
+                                pickNewTarget(true);
+                            }}>
+                                Play Again
+                            </button>
+                            <button className="button-secondary" onClick={onBack}>
+                                Back to Setup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const targetData = targetAbbrev ? constellationData[targetAbbrev] : null;
     const targetName = targetData ? formatConstellationName(targetData) : '...';
-    const targetHemisphere = targetData?.dec_center >= 0 ? 'Northern' : 'Southern';
     const percentage = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
+    const totalQuestions = filteredConstellations.length;
+    const currentQuestion = config.mode === 'single' ? (totalQuestions - questionQueue.length + 1) : null;
 
     return (
         <div className="sky-view-screen">
@@ -131,7 +195,11 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
             <div className="card">
                 <div className="quiz-header" style={{justifyContent: 'space-between', alignItems: 'center'}}>
                     <div className="score">
-                        Score: {score.correct}/{score.total} ({percentage}%)
+                        {config.mode === 'single' ? (
+                            <>Question {currentQuestion}/{totalQuestions} · {score.correct} correct</>
+                        ) : (
+                            <>Score: {score.correct}/{score.total} ({percentage}%)</>
+                        )}
                     </div>
 
                     {!feedback ? (
