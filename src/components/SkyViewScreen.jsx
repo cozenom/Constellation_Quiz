@@ -132,14 +132,26 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                     <div className="score">
                         Score: {score.correct}/{score.total} ({percentage}%)
                     </div>
-                    <div style={{textAlign: 'center', flex: 1}}>
-                        <div style={{fontSize: '1.25rem', fontWeight: '500'}}>
-                            Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
+
+                    {!feedback ? (
+                        <div style={{textAlign: 'center', flex: 1}}>
+                            <div style={{fontSize: '1.25rem', fontWeight: '500'}}>
+                                Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
+                            </div>
+                            <div style={{fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem'}}>
+                                ({targetHemisphere} Hemisphere)
+                            </div>
                         </div>
-                        <div style={{fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem'}}>
-                            ({targetHemisphere} Hemisphere)
+                    ) : (
+                        <div className="header-feedback">
+                            <span className={feedback.correct ? 'correct' : 'incorrect'}>
+                                {feedback.correct ? '✓' : '✗'} {feedback.message}
+                            </span>
+                            <button className="button-primary" onClick={handleNext}>
+                                Next →
+                            </button>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <SkyViewCanvas
@@ -154,22 +166,6 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                     hemisphereFilter={config.hemisphere}
                     onClick={handleTap}
                 />
-
-                {feedback && (
-                    <div className={`feedback ${feedback.correct ? 'correct' : 'incorrect'}`}>
-                        {feedback.message}
-                    </div>
-                )}
-
-                {feedback && (
-                    <button
-                        className="button-primary"
-                        onClick={handleNext}
-                        style={{marginTop: '1rem'}}
-                    >
-                        Next Constellation →
-                    </button>
-                )}
             </div>
         </div>
     );

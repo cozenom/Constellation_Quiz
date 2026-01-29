@@ -68,6 +68,33 @@ body {
     }
 }
 
+/* Header feedback - inline feedback + button in header */
+.header-feedback {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.header-feedback .correct {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.header-feedback .incorrect {
+    color: #ef4444;
+    font-weight: 500;
+}
+
+.header-feedback button {
+    width: auto;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
 h1 {
     font-size: 1.75rem;
     margin-bottom: 0.5rem;
