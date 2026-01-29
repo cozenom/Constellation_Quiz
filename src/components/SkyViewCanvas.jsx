@@ -227,10 +227,8 @@ function SkyViewCanvas({
                 }
                 path.closePath();
 
-                // Store for hit testing ONLY if constellation is in filtered set
-                if (filteredSet.size === 0 || filteredSet.has(abbrev)) {
-                    boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
-                }
+                // Store ALL boundaries for hit testing (so we can identify what was tapped)
+                boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
 
                 // Draw the path (only if showBoundaries)
                 if (showBoundaries) {

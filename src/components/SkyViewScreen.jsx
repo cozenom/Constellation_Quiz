@@ -100,20 +100,26 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         if (feedback) return; // Already answered
 
         const isCorrect = tappedAbbrev === targetAbbrev;
-        const tappedName = tappedAbbrev ? formatConstellationName(constellationData[tappedAbbrev]) : 'empty space';
         const targetName = formatConstellationName(constellationData[targetAbbrev]);
+
+        // Determine what was tapped
+        const tappedName = tappedAbbrev
+            ? formatConstellationName(constellationData[tappedAbbrev])
+            : 'empty space';
 
         setScore(prev => ({
             correct: prev.correct + (isCorrect ? 1 : 0),
             total: prev.total + 1
         }));
 
+        const message = isCorrect
+            ? `Correct! That's ${targetName}`
+            : `Incorrect. You tapped ${tappedName}. ${targetName} is highlighted.`;
+
         setFeedback({
             correct: isCorrect,
             tappedAbbrev: tappedAbbrev,
-            message: isCorrect
-                ? `Correct! That's ${targetName}`
-                : `Incorrect. You tapped ${tappedName}. ${targetName} is highlighted.`
+            message
         });
     };
 
