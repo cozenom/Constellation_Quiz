@@ -16,6 +16,7 @@ A mobile-friendly web quiz application for practicing constellation identificati
   - Star brightness filter: Simulate city lights to dark sky conditions
   - Background stars: Authentic Hipparcos catalog star field
   - Random rotation: Increase difficulty
+  - English names: Show constellation meanings (e.g., "Ursa Major (Big bear)")
 
 - **Mobile-Optimized**
   - Clean, responsive UI
@@ -73,7 +74,9 @@ constellation-quiz/
 │   ├── main.jsx                  # Entry point
 │   ├── App.jsx                   # Main app component
 │   ├── components/               # React components
+│   │   ├── TitleScreen.jsx
 │   │   ├── SetupScreen.jsx
+│   │   ├── SkyViewSetupScreen.jsx
 │   │   ├── QuizScreen.jsx
 │   │   ├── ResultsScreen.jsx
 │   │   ├── SkyViewScreen.jsx
