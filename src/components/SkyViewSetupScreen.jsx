@@ -9,6 +9,7 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
         maxMagnitude: 6,
         showBackgroundStars: true,
         backgroundStarOpacity: 100,
+        showEnglishNames: true,
     });
 
     // Restore saved config if provided
@@ -83,6 +84,18 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                             onChange={(e) => setConfig({...config, showLines: e.target.checked})}
                         />
                         Show constellation lines
+                    </label>
+                </div>
+
+                {/* Show English Names */}
+                <div className="form-group">
+                    <label>
+                        <input
+                            type="checkbox"
+                            checked={config.showEnglishNames}
+                            onChange={(e) => setConfig({...config, showEnglishNames: e.target.checked})}
+                        />
+                        Show English names
                     </label>
                 </div>
 

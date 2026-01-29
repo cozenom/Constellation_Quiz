@@ -32,12 +32,12 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
             setCurrentShowLines(true);
         }
 
-        onAnswer(isCorrect, choice.name, currentQuestion.constellation.name);
+        onAnswer(isCorrect, choice.name, currentQuestion.constellation.displayName || currentQuestion.constellation.name);
         setFeedback({
             correct: isCorrect,
             message: isCorrect
                 ? '✓ Correct!'
-                : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.name}`
+                : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.displayName || currentQuestion.constellation.name}`
         });
         setShowNextButton(true);
     };
@@ -58,12 +58,12 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
             setCurrentShowLines(true);
         }
 
-        onAnswer(isCorrect, textInput, currentQuestion.constellation.name);
+        onAnswer(isCorrect, textInput, currentQuestion.constellation.displayName || currentQuestion.constellation.name);
         setFeedback({
             correct: isCorrect,
             message: isCorrect
                 ? '✓ Correct!'
-                : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.name}`
+                : `✗ Incorrect. The correct answer is ${currentQuestion.constellation.displayName || currentQuestion.constellation.name}`
         });
         setShowNextButton(true);
     };

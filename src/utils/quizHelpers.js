@@ -1,6 +1,14 @@
 // Generate quiz questions based on config
 export function generateQuestions(config, constellationData, starCatalogData) {
-    const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity } = config;
+    const { hemisphere, difficulty, season, numQuestions, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
+
+    // Helper to format constellation names
+    const formatName = (data) => {
+        if (showEnglishNames && data.name_english) {
+            return `${data.name} (${data.name_english})`;
+        }
+        return data.name;
+    };
 
     // Filter constellations
     let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
@@ -19,15 +27,19 @@ export function generateQuestions(config, constellationData, starCatalogData) {
     return pool.map(([abbrev, data]) => {
         const wrongAnswers = generateWrongAnswers(abbrev, data, pool, 3);
         const allChoices = shuffleArray([
-            { abbrev, name: data.name, correct: true },
-            ...wrongAnswers.map(w => ({ abbrev: w[0], name: w[1].name, correct: false }))
+            { abbrev, name: formatName(data), correct: true },
+            ...wrongAnswers.map(w => ({ abbrev: w[0], name: formatName(w[1]), correct: false }))
         ]);
 
         // Generate random rotation angle (0-360 degrees) if rotation is enabled
         const rotationAngle = randomRotation ? Math.random() * 360 : 0;
 
         return {
-            constellation: { abbrev, ...data },
+            constellation: {
+                abbrev,
+                ...data,
+                displayName: formatName(data)
+            },
             choices: allChoices,
             showLines,
             renderMode,

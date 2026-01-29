@@ -19,6 +19,7 @@ function App() {
         maxMagnitude: 6,
         showBackgroundStars: true,
         backgroundStarOpacity: 100,
+        showEnglishNames: true,
     });
     const [savedSkyViewConfig, setSavedSkyViewConfig] = useState(null);
     const [quizState, setQuizState] = useState(null);

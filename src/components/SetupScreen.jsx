@@ -12,6 +12,7 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
     const [maxMagnitude, setMaxMagnitude] = useState(initialConfig?.maxMagnitude || 6);
     const [showBackgroundStars, setShowBackgroundStars] = useState(initialConfig?.showBackgroundStars ?? true);
     const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 100);
+    const [showEnglishNames, setShowEnglishNames] = useState(initialConfig?.showEnglishNames ?? true);
 
     const handleStart = () => {
         onStart({
@@ -25,7 +26,8 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
             randomRotation,
             maxMagnitude,
             showBackgroundStars,
-            backgroundStarOpacity
+            backgroundStarOpacity,
+            showEnglishNames
         });
     };
 
@@ -138,6 +140,16 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                             onChange={(e) => setRandomRotation(e.target.checked)}
                         />
                         <label htmlFor="randomRotation">Random rotation (harder!)</label>
+                    </div>
+
+                    <div className="checkbox-group">
+                        <input
+                            type="checkbox"
+                            id="showEnglishNames"
+                            checked={showEnglishNames}
+                            onChange={(e) => setShowEnglishNames(e.target.checked)}
+                        />
+                        <label htmlFor="showEnglishNames">Show English names</label>
                     </div>
 
                     <div className="form-group full-width">

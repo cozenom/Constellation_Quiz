@@ -6,6 +6,14 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     const [score, setScore] = useState({ correct: 0, total: 0 });
     const [feedback, setFeedback] = useState(null);
 
+    // Helper to format constellation names
+    const formatConstellationName = (constellation) => {
+        if (config.showEnglishNames && constellation.name_english) {
+            return `${constellation.name} (${constellation.name_english})`;
+        }
+        return constellation.name;
+    };
+
     // Filter constellations by hemisphere, difficulty, season
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
@@ -65,8 +73,8 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         if (feedback) return; // Already answered
 
         const isCorrect = tappedAbbrev === targetAbbrev;
-        const tappedName = tappedAbbrev ? constellationData[tappedAbbrev]?.name : 'empty space';
-        const targetName = constellationData[targetAbbrev]?.name;
+        const tappedName = tappedAbbrev ? formatConstellationName(constellationData[tappedAbbrev]) : 'empty space';
+        const targetName = formatConstellationName(constellationData[targetAbbrev]);
 
         setScore(prev => ({
             correct: prev.correct + (isCorrect ? 1 : 0),
@@ -110,7 +118,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     }
 
     const targetData = targetAbbrev ? constellationData[targetAbbrev] : null;
-    const targetName = targetData?.name || '...';
+    const targetName = targetData ? formatConstellationName(targetData) : '...';
     const targetHemisphere = targetData?.dec_center >= 0 ? 'Northern' : 'Southern';
     const percentage = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
 
