@@ -3,7 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 function SkyViewCanvas({
     constellations,           // All constellation data
     filteredConstellations,   // Array of constellation abbrevs to show
-    highlightedAbbrev,        // Which constellation to highlight
+    highlightedAbbrev,        // Which constellation to highlight (correct answer)
+    tappedFeedback,           // { abbrev, correct } - what was tapped and if correct
     showBoundaries,           // Show boundary polygons
     showLines,                // Show constellation lines
     maxMagnitude,             // Star brightness filter
@@ -234,7 +235,17 @@ function SkyViewCanvas({
                 // Draw the path (only if showBoundaries)
                 if (showBoundaries) {
                     const isHighlighted = abbrev === highlightedAbbrev;
-                    if (isHighlighted) {
+                    const isTapped = tappedFeedback && abbrev === tappedFeedback.abbrev;
+
+                    if (isTapped) {
+                        // Green if correct, red if wrong
+                        const color = tappedFeedback.correct ? 'rgba(16, 185, 129' : 'rgba(239, 68, 68';
+                        ctx.fillStyle = color + ', 0.15)';
+                        ctx.strokeStyle = color + ', 0.8)';
+                        ctx.lineWidth = 2;
+                        ctx.fill(path);
+                    } else if (isHighlighted && !tappedFeedback?.correct) {
+                        // Blue for correct answer (only show when wrong click)
                         ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
                         ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
                         ctx.lineWidth = 2;
@@ -320,7 +331,7 @@ function SkyViewCanvas({
             ctx.stroke();
         }
 
-    }, [constellations, filteredConstellations, highlightedAbbrev, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity, isMobile, hemisphereFilter]);
+    }, [constellations, filteredConstellations, highlightedAbbrev, tappedFeedback, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity, isMobile, hemisphereFilter]);
 
     return (
         <canvas

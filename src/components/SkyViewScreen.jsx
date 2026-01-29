@@ -83,6 +83,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
 
         setFeedback({
             correct: isCorrect,
+            tappedAbbrev: tappedAbbrev,
             message: isCorrect
                 ? `Correct! That's ${targetName}`
                 : `Incorrect. You tapped ${tappedName}. ${targetName} is highlighted.`
@@ -155,6 +156,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                     constellations={constellationData}
                     filteredConstellations={filteredConstellations}
                     highlightedAbbrev={feedback ? targetAbbrev : null}
+                    tappedFeedback={feedback ? { abbrev: feedback.tappedAbbrev, correct: feedback.correct } : null}
                     showBoundaries={true}
                     showLines={config.showLines}
                     maxMagnitude={config.maxMagnitude}
