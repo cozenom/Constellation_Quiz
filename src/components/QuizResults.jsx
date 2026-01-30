@@ -1,6 +1,6 @@
 import React from 'react';
 
-function ResultsScreen({ quizState, onRestart, onNewQuiz }) {
+function QuizResults({ quizState, onRestart, onNewQuiz }) {
     const total = quizState.questions.length;
     const score = quizState.score;
     const percentage = Math.round((score / total) * 100);
@@ -51,4 +51,4 @@ function ResultsScreen({ quizState, onRestart, onNewQuiz }) {
     );
 }
 
-export default ResultsScreen;
+export default QuizResults;

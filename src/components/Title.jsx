@@ -1,6 +1,6 @@
 import React from 'react';
 
-function TitleScreen({ onSelectRegularQuiz, onSelectSkyView }) {
+function Title({ onSelectRegularQuiz, onSelectSkyView }) {
     return (
         <div className="card">
             {/* Empty header for consistent spacing with other screens */}
@@ -23,4 +23,4 @@ function TitleScreen({ onSelectRegularQuiz, onSelectSkyView }) {
     );
 }
 
-export default TitleScreen;
+export default Title;

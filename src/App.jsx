@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import TitleScreen from './components/TitleScreen';
-import SetupScreen from './components/SetupScreen';
-import SkyViewSetupScreen from './components/SkyViewSetupScreen';
-import QuizScreen from './components/QuizScreen';
-import ResultsScreen from './components/ResultsScreen';
-import SkyViewScreen from './components/SkyViewScreen';
+import Title from './components/Title';
+import QuizSetup from './components/QuizSetup';
+import SkyViewSetup from './components/SkyViewSetup';
+import Quiz from './components/Quiz';
+import QuizResults from './components/QuizResults';
+import SkyView from './components/SkyView';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
 function App() {
@@ -194,13 +194,13 @@ function App() {
     return (
         <>
             {screen === 'title' && (
-                <TitleScreen
+                <Title
                     onSelectRegularQuiz={goToSetup}
                     onSelectSkyView={goToSkyViewSetup}
                 />
             )}
             {screen === 'setup' && (
-                <SetupScreen
+                <QuizSetup
                     onStart={startQuiz}
                     onBack={backToTitle}
                     constellationData={constellationData}
@@ -208,7 +208,7 @@ function App() {
                 />
             )}
             {screen === 'skyview-setup' && (
-                <SkyViewSetupScreen
+                <SkyViewSetup
                     onStart={startSkyView}
                     onBack={backToTitle}
                     constellationData={constellationData}
@@ -216,7 +216,7 @@ function App() {
                 />
             )}
             {screen === 'quiz' && (
-                <QuizScreen
+                <Quiz
                     config={config}
                     quizState={quizState}
                     onAnswer={handleAnswer}
@@ -225,14 +225,14 @@ function App() {
                 />
             )}
             {screen === 'results' && (
-                <ResultsScreen
+                <QuizResults
                     quizState={quizState}
                     onRestart={restartQuiz}
                     onNewQuiz={newQuiz}
                 />
             )}
             {screen === 'skyview' && (
-                <SkyViewScreen
+                <SkyView
                     constellationData={constellationData}
                     starCatalogData={starCatalogData}
                     config={skyViewConfig}

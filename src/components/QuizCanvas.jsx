@@ -1,13 +1,21 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 
-function ASCIIConstellation({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [] }) {
-    const ascii = useMemo(() => {
+function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [], backgroundStarOpacity = 100 }) {
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        if (!canvasRef.current) return;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = 500;
+        const height = canvas.height = 500;
+
+        // Clear canvas
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, height);
+
         const { stars, lines } = constellation;
-        const width = 70;
-        const height = 45;
-
-        // Create character grid
-        const grid = Array(height).fill().map(() => Array(width).fill(' '));
 
         // Process coordinates with rotation and bounds fitting (ALWAYS for consistent scaling)
         let processedStars = stars.map(s => ({ ...s }));
@@ -87,101 +95,99 @@ function ASCIIConstellation({ constellation, showLines, maxMagnitude = 6, rotati
 
         // Draw background stars first (behind constellation)
         if (processedBackgroundStars.length > 0) {
+            ctx.globalAlpha = backgroundStarOpacity / 100;
+
             processedBackgroundStars.forEach(star => {
                 const mag = star.mag || 5;
                 if (mag > maxMagnitude) return;
 
-                const x = Math.round(star.x * (width - 1));
-                const y = Math.round((1 - star.y) * (height - 1));
+                const x = star.x * width;
+                const y = (1 - star.y) * height;
 
-                let symbol;
-                if (mag < 1.0) symbol = '⬤';
-                else if (mag < 2.5) symbol = '●';
-                else if (mag < 4.0) symbol = '○';
-                else symbol = '∘';
+                // Skip stars outside visible canvas area
+                if (x < -10 || x > width + 10 || y < -10 || y > height + 10) return;
 
-                if (x >= 0 && x < width && y >= 0 && y < height) {
-                    grid[y][x] = symbol;
+                const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
+
+                // Glow effect for bright stars
+                if (mag < 2.5) {
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                    ctx.fill();
                 }
+
+                // Draw star
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
             });
+
+            ctx.globalAlpha = 1.0;
         }
-
-        // Bresenham line drawing algorithm
-        const drawLine = (x1, y1, x2, y2) => {
-            const dx = Math.abs(x2 - x1);
-            const dy = Math.abs(y2 - y1);
-            const sx = x1 < x2 ? 1 : -1;
-            const sy = y1 < y2 ? 1 : -1;
-            let err = dx - dy;
-
-            while (true) {
-                if (x1 >= 0 && x1 < width && y1 >= 0 && y1 < height) {
-                    if (grid[y1][x1] === ' ') {
-                        grid[y1][x1] = '·';
-                    }
-                }
-
-                if (x1 === x2 && y1 === y2) break;
-
-                const e2 = 2 * err;
-                if (e2 > -dy) {
-                    err -= dy;
-                    x1 += sx;
-                }
-                if (e2 < dx) {
-                    err += dx;
-                    y1 += sy;
-                }
-            }
-        };
 
         // Draw lines first (if enabled)
         if (showLines && lines) {
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.5;
+
             lines.forEach(([idx1, idx2]) => {
                 if (idx1 < processedStars.length && idx2 < processedStars.length) {
                     const star1 = processedStars[idx1];
                     const star2 = processedStars[idx2];
+                    const x1 = star1.x * width;
+                    const y1 = (1 - star1.y) * height;
+                    const x2 = star2.x * width;
+                    const y2 = (1 - star2.y) * height;
 
-                    const x1 = Math.round(star1.x * (width - 1));
-                    const y1 = Math.round((1 - star1.y) * (height - 1));
-                    const x2 = Math.round(star2.x * (width - 1));
-                    const y2 = Math.round((1 - star2.y) * (height - 1));
-                    drawLine(x1, y1, x2, y2);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
                 }
             });
         }
 
-        // Draw stars on top (filtered by magnitude)
+        // Draw stars (filtered by magnitude)
         processedStars.forEach(star => {
             const mag = star.magnitude || 5;
 
             // Skip stars dimmer than the filter threshold
             if (mag > maxMagnitude) return;
 
-            const x = Math.round(star.x * (width - 1));
-            const y = Math.round((1 - star.y) * (height - 1));
+            const x = star.x * width;
+            const y = (1 - star.y) * height;
 
-            // Symbol based on magnitude
-            let symbol;
-            if (mag < 1.0) symbol = '⬤';
-            else if (mag < 2.5) symbol = '●';
-            else if (mag < 4.0) symbol = '○';
-            else symbol = '∘';
+            // Logarithmic size based on magnitude (more astronomically accurate)
+            const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
 
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                grid[y][x] = symbol;
+            // Glow effect for bright stars
+            if (mag < 2.5) {
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                gradient.addColorStop(0.5, 'rgba(147, 197, 253, 0.3)');
+                gradient.addColorStop(1, 'rgba(147, 197, 253, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+                ctx.fill();
             }
+
+            // Star itself
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
         });
 
-        // Convert grid to string
-        return grid.map(row => row.join('')).join('\n');
-    }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars]);
+    }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars, backgroundStarOpacity]);
 
-    return (
-        <div className="ascii-container">
-            <div className="ascii-art">{ascii}</div>
-        </div>
-    );
+    return <canvas ref={canvasRef} width="500" height="500" />;
 }
 
-export default ASCIIConstellation;
+export default QuizCanvas;

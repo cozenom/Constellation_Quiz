@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
-function SetupScreen({ onStart, onBack, constellationData, initialConfig }) {
+function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -228,4 +228,4 @@ function SetupScreen({ onStart, onBack, constellationData, initialConfig }) {
     );
 }
 
-export default SetupScreen;
+export default QuizSetup;

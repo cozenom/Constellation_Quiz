@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-function SkyViewSetupScreen({ onStart, onBack, constellationData, initialConfig }) {
+function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
         mode: 'single',
         hemisphere: 'both',
@@ -169,4 +169,4 @@ function SkyViewSetupScreen({ onStart, onBack, constellationData, initialConfig 
     );
 }
 
-export default SkyViewSetupScreen;
+export default SkyViewSetup;

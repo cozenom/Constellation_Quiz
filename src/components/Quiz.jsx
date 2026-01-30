@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import ConstellationCanvas from './ConstellationCanvas';
-import ASCIIConstellation from './ASCIIConstellation';
+import QuizCanvas from './QuizCanvas';
+import QuizASCII from './QuizASCII';
 
-function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
+function Quiz({ config, quizState, onAnswer, onNext, onBack }) {
     const [selectedAnswer, setSelectedAnswer] = useState(null);
     const [textInput, setTextInput] = useState('');
     const [feedback, setFeedback] = useState(null);
@@ -135,7 +135,7 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
                 <div className="quiz-desktop-grid">
                     <div className="quiz-constellation-col">
                         {currentQuestion.renderMode === 'ascii' ? (
-                            <ASCIIConstellation
+                            <QuizASCII
                                 constellation={currentQuestion.constellation}
                                 showLines={currentShowLines}
                                 maxMagnitude={currentQuestion.maxMagnitude}
@@ -143,7 +143,7 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
                                 backgroundStars={currentQuestion.backgroundStars}
                             />
                         ) : (
-                            <ConstellationCanvas
+                            <QuizCanvas
                                 constellation={currentQuestion.constellation}
                                 showLines={currentShowLines}
                                 maxMagnitude={currentQuestion.maxMagnitude}
@@ -218,4 +218,4 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
     );
 }
 
-export default QuizScreen;
+export default Quiz;

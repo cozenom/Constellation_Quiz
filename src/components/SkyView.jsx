@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SkyViewCanvas from './SkyViewCanvas';
+import SkyViewResults from './SkyViewResults';
 import { shuffleArray } from '../utils/quizHelpers';
 
-function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
+function SkyView({ constellationData, starCatalogData, config, onBack }) {
     const [targetAbbrev, setTargetAbbrev] = useState(null);
     const [score, setScore] = useState({ correct: 0, total: 0 });
     const [feedback, setFeedback] = useState(null);
     const [questionQueue, setQuestionQueue] = useState([]);  // For single mode
     const [recentlyAsked, setRecentlyAsked] = useState([]);  // For endless mode
     const [isComplete, setIsComplete] = useState(false);     // For single mode completion
+    const [missedAnswers, setMissedAnswers] = useState([]);  // Track missed for results
 
     // Helper to format constellation names
     const formatConstellationName = (constellation) => {
@@ -124,6 +126,14 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
             total: prev.total + 1
         }));
 
+        // Track missed answers for results screen
+        if (!isCorrect) {
+            setMissedAnswers(prev => [...prev, {
+                target: targetName,
+                tapped: tappedName
+            }]);
+        }
+
         const message = isCorrect
             ? `Correct! That's ${targetName}`
             : `Incorrect. You tapped ${tappedName}. ${targetName} is highlighted.`;
@@ -165,37 +175,19 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
 
     // Handle single mode completion
     if (isComplete) {
-        const percentage = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
         return (
-            <div className="sky-view-screen">
-                <button className="back-button" onClick={onBack}>
-                    ← Back
-                </button>
-                <div className="card">
-                    <div className="results-screen">
-                        <h2>Quiz Complete!</h2>
-                        <div className="final-score">
-                            <span className="score-number">{score.correct}</span>
-                            <span className="score-divider">/</span>
-                            <span className="score-total">{score.total}</span>
-                        </div>
-                        <div className="score-percentage">{percentage}%</div>
-                        <div className="results-actions">
-                            <button className="button-primary" onClick={() => {
-                                setScore({ correct: 0, total: 0 });
-                                setIsComplete(false);
-                                setFeedback(null);
-                                pickNewTarget(true);
-                            }}>
-                                Play Again
-                            </button>
-                            <button className="button-secondary" onClick={onBack}>
-                                Back to Setup
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <SkyViewResults
+                score={score}
+                missedAnswers={missedAnswers}
+                onPlayAgain={() => {
+                    setScore({ correct: 0, total: 0 });
+                    setIsComplete(false);
+                    setFeedback(null);
+                    setMissedAnswers([]);
+                    pickNewTarget(true);
+                }}
+                onBack={onBack}
+            />
         );
     }
 
@@ -254,4 +246,4 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
     );
 }
 
-export default SkyViewScreen;
+export default SkyView;
