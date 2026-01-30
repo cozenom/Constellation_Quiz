@@ -21,6 +21,35 @@ function QuizScreen({ config, quizState, onAnswer, onNext, onBack }) {
         setCurrentShowLines(currentQuestion.showLines);
     }, [quizState.currentIndex, currentQuestion.showLines]);
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Escape → Go back
+            if (e.code === 'Escape') {
+                onBack();
+                return;
+            }
+
+            // Space or Enter → Next question (when answered)
+            if ((e.code === 'Space' || e.code === 'Enter') && showNextButton) {
+                e.preventDefault();
+                handleNext();
+                return;
+            }
+
+            // 1-4 → Select answer (multiple choice only, when not answered)
+            if (!isTextMode && !feedback) {
+                const num = parseInt(e.key);
+                if (num >= 1 && num <= 4 && currentQuestion.choices[num - 1]) {
+                    handleMultipleChoiceAnswer(currentQuestion.choices[num - 1]);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [showNextButton, feedback, isTextMode, currentQuestion.choices, onBack]);
+
     const handleMultipleChoiceAnswer = (choice) => {
         if (feedback) return; // Already answered
 

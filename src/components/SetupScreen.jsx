@@ -1,6 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 function SetupScreen({ onStart, onBack, constellationData, initialConfig }) {
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.code === 'Escape') {
+                onBack();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onBack]);
     const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
     const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
     const [mode, setMode] = useState(initialConfig?.mode || 'single');

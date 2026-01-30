@@ -87,6 +87,26 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         pickNewTarget(true);  // isInitial = true
     }, []);  // Only run once on mount
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Escape → Go back
+            if (e.code === 'Escape') {
+                onBack();
+                return;
+            }
+
+            // Space or Enter → Next question (when feedback showing)
+            if ((e.code === 'Space' || e.code === 'Enter') && feedback) {
+                e.preventDefault();
+                handleNext();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [feedback, onBack]);
+
     // Handle tap on constellation
     const handleTap = (tappedAbbrev, x, y) => {
         if (feedback) return; // Already answered

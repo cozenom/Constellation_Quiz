@@ -19,6 +19,17 @@ function SkyViewSetupScreen({ onStart, onBack, constellationData, initialConfig 
         }
     }, [initialConfig]);
 
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.code === 'Escape') {
+                onBack();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onBack]);
+
     // Calculate filtered constellation count
     const filteredCount = useMemo(() => {
         if (!constellationData) return 0;
