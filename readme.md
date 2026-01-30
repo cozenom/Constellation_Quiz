@@ -11,12 +11,16 @@ A mobile-friendly web quiz application for practicing constellation identificati
 - **Customizable Options**
   - Difficulty levels: Easy (20), Medium (36), Hard (32), or All (88) constellations
   - Hemisphere filter: Northern, Southern, or Both
-  - Season visibility: Filter by season (Winter, Spring, Summer, Autumn)
   - Rendering modes: Canvas (graphical) or ASCII art
   - Star brightness filter: Simulate city lights to dark sky conditions
   - Background stars: Authentic Hipparcos catalog star field
   - Random rotation: Increase difficulty
   - English names: Show constellation meanings (e.g., "Ursa Major (Big bear)")
+
+- **Keyboard Shortcuts**
+  - Space/Enter: Advance to next question
+  - 1, 2, 3, 4: Select answer in multiple choice
+  - Escape: Go back to previous screen
 
 - **Mobile-Optimized**
   - Clean, responsive UI
