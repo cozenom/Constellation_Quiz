@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
-function SetupScreen({ onStart, onBack, initialConfig }) {
+function SetupScreen({ onStart, onBack, constellationData, initialConfig }) {
     const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
     const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
-    const [season, setSeason] = useState(initialConfig?.season || 'all');
     const [mode, setMode] = useState(initialConfig?.mode || 'single');
     const [inputMode, setInputMode] = useState(initialConfig?.inputMode || 'multiple-choice');
     const [renderMode, setRenderMode] = useState(initialConfig?.renderMode || 'canvas');
@@ -14,11 +13,20 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
     const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 100);
     const [showEnglishNames, setShowEnglishNames] = useState(initialConfig?.showEnglishNames ?? true);
 
+    // Calculate filtered constellation count
+    const filteredCount = useMemo(() => {
+        if (!constellationData) return 0;
+        return Object.entries(constellationData).filter(([abbrev, data]) => {
+            const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
+            const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
+            return matchesHemisphere && matchesDifficulty;
+        }).length;
+    }, [constellationData, hemisphere, difficulty]);
+
     const handleStart = () => {
         onStart({
             hemisphere,
             difficulty,
-            season,
             mode,
             inputMode,
             renderMode,
@@ -63,24 +71,9 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                             onChange={(e) => setDifficulty(e.target.value)}
                         >
                             <option value="all">All Difficulties</option>
-                            <option value="easy">Easy (20 constellations)</option>
-                            <option value="medium">Medium (36 constellations)</option>
-                            <option value="hard">Hard (32 constellations)</option>
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="season">Season Visibility</label>
-                        <select
-                            id="season"
-                            value={season}
-                            onChange={(e) => setSeason(e.target.value)}
-                        >
-                            <option value="all">All Seasons</option>
-                            <option value="winter">Winter</option>
-                            <option value="spring">Spring</option>
-                            <option value="summer">Summer</option>
-                            <option value="autumn">Autumn</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
                         </select>
                     </div>
 
@@ -213,7 +206,11 @@ function SetupScreen({ onStart, onBack, initialConfig }) {
                     )}
                 </div>
 
-                <button className="button-primary" onClick={handleStart}>
+                <div className="filter-count">
+                    {filteredCount} constellation{filteredCount !== 1 ? 's' : ''} match your filters
+                </div>
+
+                <button className="button-primary" onClick={handleStart} disabled={filteredCount === 0}>
                     Start Quiz
                 </button>
             </div>

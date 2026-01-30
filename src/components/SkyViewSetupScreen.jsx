@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
+function SkyViewSetupScreen({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
         mode: 'single',
         hemisphere: 'both',
         difficulty: 'all',
-        season: 'all',
         showLines: true,
         maxMagnitude: 6,
         showBackgroundStars: true,
@@ -19,6 +18,16 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
             setConfig(initialConfig);
         }
     }, [initialConfig]);
+
+    // Calculate filtered constellation count
+    const filteredCount = useMemo(() => {
+        if (!constellationData) return 0;
+        return Object.entries(constellationData).filter(([abbrev, data]) => {
+            const matchesHemisphere = config.hemisphere === 'both' || data.hemisphere === config.hemisphere || data.hemisphere === 'both';
+            const matchesDifficulty = config.difficulty === 'all' || data.difficulty === config.difficulty;
+            return matchesHemisphere && matchesDifficulty;
+        }).length;
+    }, [constellationData, config.hemisphere, config.difficulty]);
 
     const handleStart = () => {
         onStart(config);
@@ -54,25 +63,10 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                         value={config.difficulty}
                         onChange={(e) => setConfig({...config, difficulty: e.target.value})}
                     >
-                        <option value="all">All (88 constellations)</option>
-                        <option value="easy">Easy (20 constellations)</option>
-                        <option value="medium">Medium (36 constellations)</option>
-                        <option value="hard">Hard (32 constellations)</option>
-                    </select>
-                </div>
-
-                {/* Season Filter */}
-                <div className="form-group">
-                    <label>Season</label>
-                    <select
-                        value={config.season}
-                        onChange={(e) => setConfig({...config, season: e.target.value})}
-                    >
-                        <option value="all">All Seasons</option>
-                        <option value="winter">Winter</option>
-                        <option value="spring">Spring</option>
-                        <option value="summer">Summer</option>
-                        <option value="autumn">Autumn</option>
+                        <option value="all">All Difficulties</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
                     </select>
                 </div>
 
@@ -152,7 +146,11 @@ function SkyViewSetupScreen({ onStart, onBack, initialConfig }) {
                 )}
                 </div>
 
-                <button className="button-primary" onClick={handleStart}>
+                <div className="filter-count">
+                    {filteredCount} constellation{filteredCount !== 1 ? 's' : ''} match your filters
+                </div>
+
+                <button className="button-primary" onClick={handleStart} disabled={filteredCount === 0}>
                     Start Sky View
                 </button>
             </div>

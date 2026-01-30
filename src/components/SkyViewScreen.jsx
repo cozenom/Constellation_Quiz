@@ -18,7 +18,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
         return constellation.name;
     };
 
-    // Filter constellations by hemisphere, difficulty, season
+    // Filter constellations by hemisphere and difficulty
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
 
@@ -39,16 +39,8 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
             });
         }
 
-        // Filter by season
-        if (config.season !== 'all') {
-            filtered = filtered.filter(abbrev => {
-                const constellation = constellationData[abbrev];
-                return constellation.season && constellation.season.toLowerCase().includes(config.season);
-            });
-        }
-
         return filtered;
-    }, [constellationData, config.hemisphere, config.difficulty, config.season]);
+    }, [constellationData, config.hemisphere, config.difficulty]);
 
     // Pick a new target based on mode
     const pickNewTarget = useCallback((isInitial = false) => {
@@ -141,7 +133,7 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                 <div className="card">
                     <div className="no-results">
                         <p>No constellations match your filters.</p>
-                        <p>Try adjusting your hemisphere, difficulty, or season settings.</p>
+                        <p>Try adjusting your hemisphere or difficulty settings.</p>
                         <button className="button-primary" onClick={onBack}>
                             Back to Setup
                         </button>

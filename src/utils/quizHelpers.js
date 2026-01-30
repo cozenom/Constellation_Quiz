@@ -1,6 +1,6 @@
 // Generate quiz questions based on config
 export function generateQuestions(config, constellationData, starCatalogData) {
-    const { hemisphere, difficulty, season, mode, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
+    const { hemisphere, difficulty, mode, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -14,8 +14,7 @@ export function generateQuestions(config, constellationData, starCatalogData) {
     let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
         const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
         const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
-        const matchesSeason = season === 'all' || data.seasons.includes(season);
-        return matchesHemisphere && matchesDifficulty && matchesSeason;
+        return matchesHemisphere && matchesDifficulty;
     });
 
     // Shuffle - use all filtered constellations for both modes
@@ -82,7 +81,7 @@ export function shuffleArray(array) {
 
 // Generate a single new question for endless mode, avoiding recently asked
 export function generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs = []) {
-    const { hemisphere, difficulty, season, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames } = config;
+    const { hemisphere, difficulty, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -96,8 +95,7 @@ export function generateSingleQuestion(config, constellationData, starCatalogDat
     let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
         const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
         const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
-        const matchesSeason = season === 'all' || data.seasons.includes(season);
-        return matchesHemisphere && matchesDifficulty && matchesSeason;
+        return matchesHemisphere && matchesDifficulty;
     });
 
     // Exclude recently asked (last 3)

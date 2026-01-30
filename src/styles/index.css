@@ -244,6 +244,16 @@ button:disabled {
     background: #475569;
 }
 
+.filter-count {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background: rgba(71, 85, 105, 0.3);
+    border-radius: 0.5rem;
+}
+
 .checkbox-group {
     display: flex;
     align-items: center;

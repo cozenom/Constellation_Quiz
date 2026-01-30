@@ -14,7 +14,6 @@ function App() {
     const [skyViewConfig, setSkyViewConfig] = useState({
         hemisphere: 'both',
         difficulty: 'all',
-        season: 'all',
         showLines: true,
         maxMagnitude: 6,
         showBackgroundStars: true,
@@ -212,6 +211,7 @@ function App() {
                 <SkyViewSetupScreen
                     onStart={startSkyView}
                     onBack={backToTitle}
+                    constellationData={constellationData}
                     initialConfig={savedSkyViewConfig}
                 />
             )}
