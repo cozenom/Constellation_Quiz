@@ -233,7 +233,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
                     filteredConstellations={filteredConstellations}
                     highlightedAbbrev={feedback ? targetAbbrev : null}
                     tappedFeedback={feedback ? { abbrev: feedback.tappedAbbrev, correct: feedback.correct } : null}
-                    showBoundaries={true}
+                    showBoundaries={config.showBoundaries}
                     showLines={config.showLines}
                     maxMagnitude={config.maxMagnitude}
                     backgroundStars={starCatalogData || []}

@@ -236,11 +236,13 @@ function SkyViewCanvas({
                 // Store ALL boundaries for hit testing (so we can identify what was tapped)
                 boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
 
-                // Draw the path (only if showBoundaries)
-                if (showBoundaries) {
-                    const isHighlighted = abbrev === highlightedAbbrev;
-                    const isTapped = tappedFeedback && abbrev === tappedFeedback.abbrev;
+                // Draw the path
+                const isHighlighted = abbrev === highlightedAbbrev;
+                const isTapped = tappedFeedback && abbrev === tappedFeedback.abbrev;
+                const isFeedbackTarget = isHighlighted || isTapped;
 
+                // Always show boundaries for feedback targets, otherwise respect showBoundaries setting
+                if (showBoundaries || isFeedbackTarget) {
                     if (isTapped) {
                         // Green if correct, red if wrong
                         const color = tappedFeedback.correct ? 'rgba(16, 185, 129' : 'rgba(239, 68, 68';
@@ -254,38 +256,54 @@ function SkyViewCanvas({
                         ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
                         ctx.lineWidth = 2;
                         ctx.fill(path);
-                    } else {
+                    } else if (showBoundaries) {
+                        // Only show neutral boundaries if toggle is on
                         ctx.strokeStyle = 'rgba(71, 85, 105, 0.3)';
                         ctx.lineWidth = 1;
                     }
-                    ctx.stroke(path);
+                    if (isFeedbackTarget || showBoundaries) {
+                        ctx.stroke(path);
+                    }
                 }
             }
 
             // Draw constellation lines
-            if (showLines) {
-                for (const [abbrev, data] of allConstellations) {
-                    const isHighlighted = abbrev === highlightedAbbrev;
-                    ctx.strokeStyle = isHighlighted ? '#60a5fa' : '#475569';
-                    ctx.lineWidth = isHighlighted ? 2 : 1;
+            for (const [abbrev, data] of allConstellations) {
+                const isHighlighted = abbrev === highlightedAbbrev;
+                const isTapped = tappedFeedback && abbrev === tappedFeedback.abbrev;
+                const isFeedbackTarget = isHighlighted || isTapped;
 
-                    const stars = data.stars;
+                // Always show lines for feedback targets, otherwise respect showLines setting
+                if (!showLines && !isFeedbackTarget) continue;
 
-                    for (const [idx1, idx2] of data.lines) {
-                        if (idx1 < stars.length && idx2 < stars.length) {
-                            const star1 = stars[idx1];
-                            const star2 = stars[idx2];
+                // Color based on feedback state
+                if (isTapped) {
+                    ctx.strokeStyle = tappedFeedback.correct ? '#10b981' : '#ef4444';
+                    ctx.lineWidth = 2;
+                } else if (isHighlighted) {
+                    ctx.strokeStyle = '#60a5fa';
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.strokeStyle = '#475569';
+                    ctx.lineWidth = 1;
+                }
 
-                            const p1 = projectToHemisphere(star1.ra, star1.dec, hemisphere, centerX, centerY);
-                            const p2 = projectToHemisphere(star2.ra, star2.dec, hemisphere, centerX, centerY);
+                const stars = data.stars;
 
-                            // Draw if at least one point is visible (clipping handles the rest)
-                            if (p1.visible || p2.visible) {
-                                ctx.beginPath();
-                                ctx.moveTo(p1.x, p1.y);
-                                ctx.lineTo(p2.x, p2.y);
-                                ctx.stroke();
-                            }
+                for (const [idx1, idx2] of data.lines) {
+                    if (idx1 < stars.length && idx2 < stars.length) {
+                        const star1 = stars[idx1];
+                        const star2 = stars[idx2];
+
+                        const p1 = projectToHemisphere(star1.ra, star1.dec, hemisphere, centerX, centerY);
+                        const p2 = projectToHemisphere(star2.ra, star2.dec, hemisphere, centerX, centerY);
+
+                        // Draw if at least one point is visible (clipping handles the rest)
+                        if (p1.visible || p2.visible) {
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
                         }
                     }
                 }

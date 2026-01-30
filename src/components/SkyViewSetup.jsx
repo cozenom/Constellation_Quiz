@@ -6,6 +6,7 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         hemisphere: 'both',
         difficulty: 'all',
         showLines: true,
+        showBoundaries: true,
         maxMagnitude: 6,
         showBackgroundStars: true,
         backgroundStarOpacity: 100,
@@ -102,6 +103,18 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                             onChange={(e) => setConfig({...config, showLines: e.target.checked})}
                         />
                         Show constellation lines
+                    </label>
+                </div>
+
+                {/* Show Boundaries */}
+                <div className="form-group">
+                    <label>
+                        <input
+                            type="checkbox"
+                            checked={config.showBoundaries}
+                            onChange={(e) => setConfig({...config, showBoundaries: e.target.checked})}
+                        />
+                        Show constellation boundaries
                     </label>
                 </div>
 
