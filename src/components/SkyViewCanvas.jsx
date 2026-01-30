@@ -24,17 +24,21 @@ function SkyViewCanvas({
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const hemisphereSize = 800;  // Each hemisphere circle size
+    const hemisphereSize = 750;  // Each hemisphere circle size (sized so both hemispheres fit in 1500px container)
     const showBothHemispheres = hemisphereFilter === 'both';
+    const edgePadding = 1;      // Padding on outer edges
+    const gapBetween = 1;       // Gap between hemispheres
 
     // Layout changes based on mobile/desktop and number of hemispheres
+    const bothWidth = hemisphereSize * 2 + edgePadding * 2 + gapBetween;
     const canvasWidth = showBothHemispheres
-        ? (isMobile ? hemisphereSize + 20 : hemisphereSize * 2 + 40)
-        : hemisphereSize + 20;  // Single hemisphere: always same width
+        ? (isMobile ? hemisphereSize + edgePadding * 2 : bothWidth)
+        : hemisphereSize + edgePadding * 2;  // Single hemisphere
 
     const canvasHeight = showBothHemispheres
-        ? (isMobile ? hemisphereSize * 2 + 100 : hemisphereSize + 60)
-        : hemisphereSize + 60;  // Single hemisphere: height for one circle
+        ? (isMobile ? hemisphereSize * 2 + 80 : hemisphereSize + 50)
+        : hemisphereSize + 50;  // Single hemisphere
+    const singleHeight = hemisphereSize + 50;  // Height for consistent scaling
 
     // Convert RA hours to radians
     const raToRad = (raHours) => raHours * 15 * Math.PI / 180;
@@ -127,17 +131,17 @@ function SkyViewCanvas({
         if (showBothHemispheres) {
             if (isMobile) {
                 // Vertical layout - labels above each hemisphere
-                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + 10, 25);
-                ctx.fillText('Southern Hemisphere', hemisphereSize / 2 + 10, hemisphereSize + 75);
+                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + edgePadding, 20);
+                ctx.fillText('Southern Hemisphere', hemisphereSize / 2 + edgePadding, hemisphereSize + 60);
             } else {
                 // Horizontal layout - labels above each hemisphere
-                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + 10, 25);
-                ctx.fillText('Southern Hemisphere', hemisphereSize * 1.5 + 30, 25);
+                ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + edgePadding, 20);
+                ctx.fillText('Southern Hemisphere', edgePadding + hemisphereSize + gapBetween + hemisphereSize / 2, 20);
             }
         } else {
             // Single hemisphere - centered label
             const label = hemisphereFilter === 'north' ? 'Northern Hemisphere' : 'Southern Hemisphere';
-            ctx.fillText(label, hemisphereSize / 2 + 10, 25);
+            ctx.fillText(label, hemisphereSize / 2 + edgePadding, 20);
         }
 
         // Clear stored paths and rebuild
@@ -162,16 +166,18 @@ function SkyViewCanvas({
             if (showBothHemispheres) {
                 // Two hemispheres: position based on mobile/desktop
                 centerX = isMobile
-                    ? hemisphereSize / 2 + 10  // Both centered horizontally
-                    : (hemisphere === 'north' ? hemisphereSize / 2 + 10 : hemisphereSize * 1.5 + 30);
+                    ? hemisphereSize / 2 + edgePadding  // Both centered horizontally
+                    : (hemisphere === 'north'
+                        ? hemisphereSize / 2 + edgePadding
+                        : edgePadding + hemisphereSize + gapBetween + hemisphereSize / 2);
 
                 centerY = isMobile
-                    ? (hemisphere === 'north' ? hemisphereSize / 2 + 40 : hemisphereSize * 1.5 + 90)  // Stack vertically
-                    : hemisphereSize / 2 + 40;  // Both at same vertical position
+                    ? (hemisphere === 'north' ? hemisphereSize / 2 + 30 : hemisphereSize * 1.5 + 70)  // Stack vertically
+                    : hemisphereSize / 2 + 30;  // Both at same vertical position
             } else {
                 // Single hemisphere: always centered
-                centerX = hemisphereSize / 2 + 10;
-                centerY = hemisphereSize / 2 + 40;
+                centerX = hemisphereSize / 2 + edgePadding;
+                centerY = hemisphereSize / 2 + 30;
             }
 
             // Apply circular clipping for this hemisphere
@@ -339,8 +345,9 @@ function SkyViewCanvas({
             onClick={handleClick}
             style={{
                 cursor: onClick ? 'crosshair' : 'default',
-                width: '100%',
-                maxWidth: `${canvasWidth}px`,
+                maxHeight: `${singleHeight}px`,
+                maxWidth: '100%',
+                width: 'auto',
                 height: 'auto',
                 border: 'none'
             }}

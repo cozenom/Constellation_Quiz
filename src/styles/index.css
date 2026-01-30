@@ -95,6 +95,51 @@ body {
     margin: 0;
 }
 
+/* Sky View header layout */
+.sky-view-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+
+.sky-view-score {
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+
+.sky-view-prompt {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.sky-view-feedback {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.sky-view-feedback .correct {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.sky-view-feedback .incorrect {
+    color: #ef4444;
+    font-weight: 500;
+}
+
+.sky-view-feedback button {
+    width: auto;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
 h1 {
     font-size: 1.75rem;
     margin-bottom: 0.5rem;

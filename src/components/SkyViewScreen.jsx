@@ -191,8 +191,8 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                 ← Back
             </button>
             <div className="card">
-                <div className="quiz-header" style={{justifyContent: 'space-between', alignItems: 'center'}}>
-                    <div className="score">
+                <div className="sky-view-header">
+                    <div className="sky-view-score">
                         {config.mode === 'single' ? (
                             <>Question {currentQuestion}/{totalQuestions} · {score.correct} correct</>
                         ) : (
@@ -201,13 +201,11 @@ function SkyViewScreen({ constellationData, starCatalogData, config, onBack }) {
                     </div>
 
                     {!feedback ? (
-                        <div style={{textAlign: 'center', flex: 1}}>
-                            <div style={{fontSize: '1.25rem', fontWeight: '500'}}>
-                                Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
-                            </div>
+                        <div className="sky-view-prompt">
+                            Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
                         </div>
                     ) : (
-                        <div className="header-feedback">
+                        <div className="sky-view-feedback">
                             <span className={feedback.correct ? 'correct' : 'incorrect'}>
                                 {feedback.correct ? '✓' : '✗'} {feedback.message}
                             </span>
