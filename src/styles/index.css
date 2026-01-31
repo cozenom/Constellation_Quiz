@@ -215,6 +215,21 @@ h2 {
     }
 }
 
+/* Section headers for setup screens */
+.section-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.section-header:first-child {
+    margin-top: 0;
+}
+
 .form-group {
     display: flex;
     flex-direction: column;

@@ -60,6 +60,33 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
 
             <div className="card">
                 <div className="setup-grid">
+                    {/* Section: Quiz Settings */}
+                    <div className="section-header full-width">Quiz Settings</div>
+
+                    <div className="form-group">
+                        <label htmlFor="mode">Mode</label>
+                        <select
+                            id="mode"
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value)}
+                        >
+                            <option value="single">Single (each once)</option>
+                            <option value="endless">Endless</option>
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="inputMode">Input Mode</label>
+                        <select
+                            id="inputMode"
+                            value={inputMode}
+                            onChange={(e) => setInputMode(e.target.value)}
+                        >
+                            <option value="multiple-choice">Multiple Choice (4 options)</option>
+                            <option value="text">Text Input</option>
+                        </select>
+                    </div>
+
                     <div className="form-group">
                         <label htmlFor="hemisphere">Hemisphere</label>
                         <select
@@ -87,29 +114,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         </select>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="mode">Mode</label>
-                        <select
-                            id="mode"
-                            value={mode}
-                            onChange={(e) => setMode(e.target.value)}
-                        >
-                            <option value="single">Single (each once)</option>
-                            <option value="endless">Endless</option>
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="inputMode">Input Mode</label>
-                        <select
-                            id="inputMode"
-                            value={inputMode}
-                            onChange={(e) => setInputMode(e.target.value)}
-                        >
-                            <option value="multiple-choice">Multiple Choice (4 options)</option>
-                            <option value="text">Text Input</option>
-                        </select>
-                    </div>
+                    {/* Section: Visual Aids */}
+                    <div className="section-header full-width">Visual Aids</div>
 
                     <div className="form-group">
                         <label htmlFor="renderMode">Rendering Mode</label>
@@ -153,6 +159,9 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="showEnglishNames">Show English names</label>
                     </div>
 
+                    {/* Section: Star Visibility */}
+                    <div className="section-header full-width">Star Visibility</div>
+
                     <div className="form-group full-width">
                         <label htmlFor="maxMagnitude">
                             Star Brightness Filter (Mag ≤ {maxMagnitude.toFixed(1)})
@@ -194,14 +203,14 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                                 checked={showBackgroundStars}
                                 onChange={(e) => setShowBackgroundStars(e.target.checked)}
                             />
-                            {' '}Show Background Stars
+                            {' '}Show background stars
                         </label>
                     </div>
 
                     {showBackgroundStars && renderMode === 'canvas' && (
                         <div className="form-group full-width">
                             <label htmlFor="backgroundStarOpacity">
-                                Background Star Opacity: {backgroundStarOpacity}%
+                                Background star opacity: {backgroundStarOpacity}%
                             </label>
                             <input
                                 type="range"

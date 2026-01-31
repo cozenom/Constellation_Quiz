@@ -55,7 +55,20 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                 <h2>Sky View Mode Setup</h2>
 
                 <div className="setup-grid">
-                {/* Hemisphere Filter */}
+                {/* Section: Quiz Settings */}
+                <div className="section-header full-width">Quiz Settings</div>
+
+                <div className="form-group">
+                    <label>Mode</label>
+                    <select
+                        value={config.mode}
+                        onChange={(e) => setConfig({...config, mode: e.target.value})}
+                    >
+                        <option value="single">Single (each once)</option>
+                        <option value="endless">Endless</option>
+                    </select>
+                </div>
+
                 <div className="form-group">
                     <label>Hemisphere</label>
                     <select
@@ -68,7 +81,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </select>
                 </div>
 
-                {/* Difficulty Filter */}
                 <div className="form-group">
                     <label>Difficulty</label>
                     <select
@@ -82,19 +94,9 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </select>
                 </div>
 
-                {/* Quiz Mode */}
-                <div className="form-group">
-                    <label>Mode</label>
-                    <select
-                        value={config.mode}
-                        onChange={(e) => setConfig({...config, mode: e.target.value})}
-                    >
-                        <option value="single">Single (each once)</option>
-                        <option value="endless">Endless</option>
-                    </select>
-                </div>
+                {/* Section: Visual Aids */}
+                <div className="section-header full-width">Visual Aids</div>
 
-                {/* Show Constellation Lines */}
                 <div className="form-group">
                     <label>
                         <input
@@ -106,7 +108,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </label>
                 </div>
 
-                {/* Show Boundaries */}
                 <div className="form-group">
                     <label>
                         <input
@@ -118,7 +119,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </label>
                 </div>
 
-                {/* Show English Names */}
                 <div className="form-group">
                     <label>
                         <input
@@ -130,7 +130,9 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </label>
                 </div>
 
-                {/* Star Brightness Slider */}
+                {/* Section: Star Visibility */}
+                <div className="section-header full-width">Star Visibility</div>
+
                 <div className="form-group full-width">
                     <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
                     <input
@@ -143,7 +145,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     />
                 </div>
 
-                {/* Background Stars */}
                 <div className="form-group">
                     <label>
                         <input
@@ -155,7 +156,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </label>
                 </div>
 
-                {/* Background Star Opacity (conditional) */}
                 {config.showBackgroundStars && (
                     <div className="form-group full-width">
                         <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
