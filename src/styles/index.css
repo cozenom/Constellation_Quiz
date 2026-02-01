@@ -29,12 +29,19 @@ body {
     }
 }
 
-/* Position all back buttons at same absolute position */
+/* Back button - positioned absolutely on desktop */
 .back-button {
     position: absolute;
     top: 2%;
     left: 2%;
     z-index: 1000;
+    background: #64748b;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.back-button:hover {
+    background: #475569;
 }
 
 /* Reset positioning on mobile */
@@ -66,33 +73,6 @@ body {
     .sky-view-screen canvas {
         margin-bottom: 0.75rem !important;
     }
-}
-
-/* Header feedback - inline feedback + button in header */
-.header-feedback {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex: 1;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.header-feedback .correct {
-    color: #10b981;
-    font-weight: 500;
-}
-
-.header-feedback .incorrect {
-    color: #ef4444;
-    font-weight: 500;
-}
-
-.header-feedback button {
-    width: auto;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.9rem;
-    margin: 0;
 }
 
 /* Sky View header layout */
@@ -495,17 +475,6 @@ canvas {
     text-align: left;
 }
 
-.back-button {
-    background: #64748b;
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-}
-
-.back-button:hover {
-    background: #475569;
-}
-
-
 @media (min-width: 768px) {
     .ascii-art {
         font-size: 0.7rem;
@@ -552,19 +521,6 @@ canvas {
 
 .no-results .button-primary {
     margin-top: 1.5rem;
-}
-
-/* Hemisphere Hint */
-.hemisphere-hint {
-    color: #94a3b8;
-    font-size: 0.9rem;
-    margin-left: 0.5rem;
-}
-
-/* Total Count Display */
-.total-count {
-    color: #94a3b8;
-    font-size: 0.9rem;
 }
 
 /* Sky View Mobile Optimizations */

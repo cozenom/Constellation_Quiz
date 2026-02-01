@@ -11,42 +11,40 @@ function SkyViewResults({ score, missedAnswers, onPlayAgain, onBack }) {
     else performanceMessage = 'Keep Practicing! 📚';
 
     return (
-        <div className="sky-view-screen">
+        <div>
+            <h1>Quiz Complete!</h1>
+
             <button className="back-button" onClick={onBack}>
                 ← Back
             </button>
+
             <div className="card">
-                <div className="results-screen">
-                    <h2>Quiz Complete!</h2>
-                    <div className="final-score">
-                        <span className="score-number">{score.correct}</span>
-                        <span className="score-divider">/</span>
-                        <span className="score-total">{score.total}</span>
-                    </div>
-                    <div className="score-percentage">{percentage}%</div>
+                <div className="results-summary">
+                    <div className="score-big">{score.correct}/{score.total}</div>
+                    <div className="percentage">{percentage}% Correct</div>
                     <p style={{marginTop: '1rem', fontSize: '1.25rem'}}>{performanceMessage}</p>
+                </div>
 
-                    {missedAnswers.length > 0 && (
-                        <div style={{marginTop: '2rem'}}>
-                            <h3>Missed ({missedAnswers.length})</h3>
-                            <ul className="missed-list">
-                                {missedAnswers.map((m, idx) => (
-                                    <li key={idx}>
-                                        <strong>{m.target}</strong> — You tapped: {m.tapped}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    <div className="results-actions">
-                        <button className="button-primary" onClick={onPlayAgain}>
-                            Try Again (Same Settings)
-                        </button>
-                        <button className="button-secondary" onClick={onBack}>
-                            New Quiz (Different Settings)
-                        </button>
+                {missedAnswers.length > 0 && (
+                    <div style={{marginTop: '2rem'}}>
+                        <h2>Missed ({missedAnswers.length})</h2>
+                        <ul className="missed-list">
+                            {missedAnswers.map((m, idx) => (
+                                <li key={idx}>
+                                    <strong>{m.target}</strong> — You tapped: {m.tapped}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
+                )}
+
+                <div className="button-group">
+                    <button className="button-primary" onClick={onPlayAgain}>
+                        Try Again (Same Settings)
+                    </button>
+                    <button className="button-secondary" onClick={onBack}>
+                        New Quiz (Different Settings)
+                    </button>
                 </div>
             </div>
         </div>
