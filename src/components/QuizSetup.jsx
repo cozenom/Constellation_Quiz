@@ -1,6 +1,27 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
 function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
+    const [config, setConfig] = useState({
+        hemisphere: 'both',
+        difficulty: 'all',
+        mode: 'single',
+        inputMode: 'multiple-choice',
+        renderMode: 'canvas',
+        showLines: true,
+        randomRotation: false,
+        maxMagnitude: 6,
+        showBackgroundStars: true,
+        backgroundStarOpacity: 100,
+        showEnglishNames: true,
+    });
+
+    // Restore from initialConfig when provided
+    useEffect(() => {
+        if (initialConfig) {
+            setConfig(prev => ({ ...prev, ...initialConfig }));
+        }
+    }, [initialConfig]);
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -11,42 +32,19 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onBack]);
-    const [hemisphere, setHemisphere] = useState(initialConfig?.hemisphere || 'both');
-    const [difficulty, setDifficulty] = useState(initialConfig?.difficulty || 'all');
-    const [mode, setMode] = useState(initialConfig?.mode || 'single');
-    const [inputMode, setInputMode] = useState(initialConfig?.inputMode || 'multiple-choice');
-    const [renderMode, setRenderMode] = useState(initialConfig?.renderMode || 'canvas');
-    const [showLines, setShowLines] = useState(initialConfig?.showLines ?? true);
-    const [randomRotation, setRandomRotation] = useState(initialConfig?.randomRotation || false);
-    const [maxMagnitude, setMaxMagnitude] = useState(initialConfig?.maxMagnitude || 6);
-    const [showBackgroundStars, setShowBackgroundStars] = useState(initialConfig?.showBackgroundStars ?? true);
-    const [backgroundStarOpacity, setBackgroundStarOpacity] = useState(initialConfig?.backgroundStarOpacity || 100);
-    const [showEnglishNames, setShowEnglishNames] = useState(initialConfig?.showEnglishNames ?? true);
 
     // Calculate filtered constellation count
     const filteredCount = useMemo(() => {
         if (!constellationData) return 0;
         return Object.entries(constellationData).filter(([abbrev, data]) => {
-            const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
-            const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
+            const matchesHemisphere = config.hemisphere === 'both' || data.hemisphere === config.hemisphere || data.hemisphere === 'both';
+            const matchesDifficulty = config.difficulty === 'all' || data.difficulty === config.difficulty;
             return matchesHemisphere && matchesDifficulty;
         }).length;
-    }, [constellationData, hemisphere, difficulty]);
+    }, [constellationData, config.hemisphere, config.difficulty]);
 
     const handleStart = () => {
-        onStart({
-            hemisphere,
-            difficulty,
-            mode,
-            inputMode,
-            renderMode,
-            showLines,
-            randomRotation,
-            maxMagnitude,
-            showBackgroundStars,
-            backgroundStarOpacity,
-            showEnglishNames
-        });
+        onStart(config);
     };
 
     return (
@@ -67,8 +65,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="mode">Mode</label>
                         <select
                             id="mode"
-                            value={mode}
-                            onChange={(e) => setMode(e.target.value)}
+                            value={config.mode}
+                            onChange={(e) => setConfig({ ...config, mode: e.target.value })}
                         >
                             <option value="single">Single (each once)</option>
                             <option value="endless">Endless</option>
@@ -79,8 +77,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="inputMode">Input Mode</label>
                         <select
                             id="inputMode"
-                            value={inputMode}
-                            onChange={(e) => setInputMode(e.target.value)}
+                            value={config.inputMode}
+                            onChange={(e) => setConfig({ ...config, inputMode: e.target.value })}
                         >
                             <option value="multiple-choice">Multiple Choice (4 options)</option>
                             <option value="text">Text Input</option>
@@ -91,8 +89,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="hemisphere">Hemisphere</label>
                         <select
                             id="hemisphere"
-                            value={hemisphere}
-                            onChange={(e) => setHemisphere(e.target.value)}
+                            value={config.hemisphere}
+                            onChange={(e) => setConfig({ ...config, hemisphere: e.target.value })}
                         >
                             <option value="both">Both Hemispheres</option>
                             <option value="north">Northern Only</option>
@@ -104,8 +102,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="difficulty">Difficulty</label>
                         <select
                             id="difficulty"
-                            value={difficulty}
-                            onChange={(e) => setDifficulty(e.target.value)}
+                            value={config.difficulty}
+                            onChange={(e) => setConfig({ ...config, difficulty: e.target.value })}
                         >
                             <option value="all">All Difficulties</option>
                             <option value="easy">Easy</option>
@@ -121,8 +119,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="renderMode">Rendering Mode</label>
                         <select
                             id="renderMode"
-                            value={renderMode}
-                            onChange={(e) => setRenderMode(e.target.value)}
+                            value={config.renderMode}
+                            onChange={(e) => setConfig({ ...config, renderMode: e.target.value })}
                         >
                             <option value="canvas">Canvas (Graphical)</option>
                             <option value="ascii">ASCII Art</option>
@@ -133,8 +131,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <input
                             type="checkbox"
                             id="showLines"
-                            checked={showLines}
-                            onChange={(e) => setShowLines(e.target.checked)}
+                            checked={config.showLines}
+                            onChange={(e) => setConfig({ ...config, showLines: e.target.checked })}
                         />
                         <label htmlFor="showLines">Show constellation lines</label>
                     </div>
@@ -143,8 +141,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <input
                             type="checkbox"
                             id="randomRotation"
-                            checked={randomRotation}
-                            onChange={(e) => setRandomRotation(e.target.checked)}
+                            checked={config.randomRotation}
+                            onChange={(e) => setConfig({ ...config, randomRotation: e.target.checked })}
                         />
                         <label htmlFor="randomRotation">Random rotation (harder!)</label>
                     </div>
@@ -153,8 +151,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <input
                             type="checkbox"
                             id="showEnglishNames"
-                            checked={showEnglishNames}
-                            onChange={(e) => setShowEnglishNames(e.target.checked)}
+                            checked={config.showEnglishNames}
+                            onChange={(e) => setConfig({ ...config, showEnglishNames: e.target.checked })}
                         />
                         <label htmlFor="showEnglishNames">Show English names</label>
                     </div>
@@ -164,7 +162,7 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
 
                     <div className="form-group full-width">
                         <label htmlFor="maxMagnitude">
-                            Star Brightness Filter (Mag ≤ {maxMagnitude.toFixed(1)})
+                            Star Brightness Filter (Mag ≤ {config.maxMagnitude.toFixed(1)})
                         </label>
                         <input
                             type="range"
@@ -173,8 +171,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                             min="0"
                             max="14"
                             step="0.5"
-                            value={maxMagnitude}
-                            onChange={(e) => setMaxMagnitude(parseFloat(e.target.value))}
+                            value={config.maxMagnitude}
+                            onChange={(e) => setConfig({ ...config, maxMagnitude: parseFloat(e.target.value) })}
                             style={{width: '100%'}}
                         />
                         <datalist id="magnitude-presets">
@@ -200,17 +198,17 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                             <input
                                 type="checkbox"
                                 id="showBackgroundStars"
-                                checked={showBackgroundStars}
-                                onChange={(e) => setShowBackgroundStars(e.target.checked)}
+                                checked={config.showBackgroundStars}
+                                onChange={(e) => setConfig({ ...config, showBackgroundStars: e.target.checked })}
                             />
                             {' '}Show background stars
                         </label>
                     </div>
 
-                    {showBackgroundStars && renderMode === 'canvas' && (
+                    {config.showBackgroundStars && config.renderMode === 'canvas' && (
                         <div className="form-group full-width">
                             <label htmlFor="backgroundStarOpacity">
-                                Background star opacity: {backgroundStarOpacity}%
+                                Background star opacity: {config.backgroundStarOpacity}%
                             </label>
                             <input
                                 type="range"
@@ -218,8 +216,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                                 min="0"
                                 max="100"
                                 step="5"
-                                value={backgroundStarOpacity}
-                                onChange={(e) => setBackgroundStarOpacity(Number(e.target.value))}
+                                value={config.backgroundStarOpacity}
+                                onChange={(e) => setConfig({ ...config, backgroundStarOpacity: Number(e.target.value) })}
                             />
                         </div>
                     )}
