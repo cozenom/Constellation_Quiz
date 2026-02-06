@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
-function QuizResults({ quizState, onRestart, onNewQuiz }) {
+function QuizResults({ quizState, onRestart, onNewQuiz, onBackToSetup }) {
     const total = quizState.questions.length;
     const score = quizState.score;
     const percentage = Math.round((score / total) * 100);
@@ -12,6 +12,19 @@ function QuizResults({ quizState, onRestart, onNewQuiz }) {
     else if (percentage >= 75) performanceMessage = 'Great Job! ⭐';
     else if (percentage >= 60) performanceMessage = 'Good Effort! 👍';
     else performanceMessage = 'Keep Practicing! 📚';
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Escape → Go back to setup
+            if (e.code === 'Escape') {
+                onBackToSetup();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onBackToSetup]);
 
     return (
         <div>

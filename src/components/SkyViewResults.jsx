@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 function SkyViewResults({ score, missedAnswers, onPlayAgain, onBack }) {
     const percentage = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
@@ -9,6 +9,19 @@ function SkyViewResults({ score, missedAnswers, onPlayAgain, onBack }) {
     else if (percentage >= 75) performanceMessage = 'Great Job! ⭐';
     else if (percentage >= 60) performanceMessage = 'Good Effort! 👍';
     else performanceMessage = 'Keep Practicing! 📚';
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Escape → Go back to setup
+            if (e.code === 'Escape') {
+                onBack();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onBack]);
 
     return (
         <div>

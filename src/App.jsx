@@ -229,6 +229,7 @@ function App() {
                     quizState={quizState}
                     onRestart={restartQuiz}
                     onNewQuiz={newQuiz}
+                    onBackToSetup={backToSetup}
                 />
             )}
             {screen === 'skyview' && (
