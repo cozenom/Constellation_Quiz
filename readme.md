@@ -11,10 +11,11 @@ A mobile-friendly web quiz application for practicing constellation identificati
 - **Customizable Options**
   - Difficulty levels: Easy (20), Medium (36), Hard (32), or All (88) constellations
   - Hemisphere filter: Northern, Southern, or Both
+  - Custom constellation selection: Pick specific constellations to quiz on
   - Rendering modes: Canvas (graphical) or ASCII art
   - Star brightness filter: Simulate city lights to dark sky conditions
   - Background stars: Authentic Hipparcos catalog star field
-  - Random rotation: Increase difficulty
+  - Random rotation: Increase difficulty (Regular Quiz only)
   - English names: Show constellation meanings (e.g., "Ursa Major (Big bear)")
 
 - **Keyboard Shortcuts**
@@ -53,21 +54,18 @@ npm run preview
 ### Deploy to GitHub Pages
 
 ```bash
-# Build the app
-npm run build
+# One-time setup: Install gh-pages as dev dependency
+npm install -D gh-pages
 
-# Deploy dist/ directory to GitHub Pages
-# Option 1: Use gh-pages package
-npm install -g gh-pages
-gh-pages -d dist
+# Deploy to GitHub Pages (builds and pushes to gh-pages branch)
+npm run deploy
 
-# Option 2: Manual deployment
-git add dist/
-git commit -m "Deploy constellation quiz"
-git push
-# Then configure GitHub Pages to serve from the dist/ directory
+# First deployment: Enable GitHub Pages in repo settings
+# Settings → Pages → Source: gh-pages branch → Save
 
 # Access at: https://[username].github.io/Constellation_Quiz
+
+# Future deployments: Just run npm run deploy
 ```
 
 ## Project Structure
