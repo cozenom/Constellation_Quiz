@@ -11,15 +11,7 @@ function App() {
     const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview'
     const [config, setConfig] = useState(null);
     const [savedConfig, setSavedConfig] = useState(null); // Persist settings when returning to menu
-    const [skyViewConfig, setSkyViewConfig] = useState({
-        hemisphere: 'both',
-        difficulty: 'all',
-        showLines: true,
-        maxMagnitude: 6,
-        showBackgroundStars: true,
-        backgroundStarOpacity: 100,
-        showEnglishNames: true,
-    });
+    const [skyViewConfig, setSkyViewConfig] = useState(null);
     const [savedSkyViewConfig, setSavedSkyViewConfig] = useState(null);
     const [quizState, setQuizState] = useState(null);
     const [constellationData, setConstellationData] = useState(null);

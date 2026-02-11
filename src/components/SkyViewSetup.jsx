@@ -57,21 +57,13 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         return filteredConstellations.length;
     }, [config.customSelection, config.selectedConstellations.length, filteredConstellations.length]);
 
-    // When filters change, auto-select constellations that match filters
+    // When filters change OR custom selection is toggled, auto-select constellations that match filters
     useEffect(() => {
         if (config.customSelection) {
             const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
             setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
         }
-    }, [config.hemisphere, config.difficulty]);
-
-    // When custom selection is first enabled, auto-select based on current filters
-    useEffect(() => {
-        if (config.customSelection && config.selectedConstellations.length === 0) {
-            const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
-            setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
-        }
-    }, [config.customSelection]);
+    }, [config.hemisphere, config.difficulty, config.customSelection, filteredConstellations]);
 
     // Toggle individual constellation
     const handleToggleConstellation = (abbrev, checked) => {
