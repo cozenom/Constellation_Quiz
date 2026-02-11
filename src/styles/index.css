@@ -468,15 +468,18 @@ canvas {
     margin: 0 auto 1.5rem;
     max-width: 100%;
     overflow-x: auto;
+    text-align: center;
 }
 
 .ascii-art {
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.55rem;
-    line-height: 1.1;
+    line-height: 1.0;
     color: #e2e8f0;
     white-space: pre;
-    text-align: left;
+    text-align: center;
+    display: inline-block;
+    margin: 0 auto;
 }
 
 @media (min-width: 768px) {

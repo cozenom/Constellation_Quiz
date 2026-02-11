@@ -47,7 +47,7 @@ export function generateQuestions(config, constellationData, starCatalogData) {
             renderMode,
             maxMagnitude,
             rotationAngle,
-            backgroundStars: (starCatalogData && starCatalogData[abbrev]) || [],
+            backgroundStars: (showBackgroundStars && starCatalogData && starCatalogData[abbrev]) || [],
             backgroundStarOpacity
         };
     });
@@ -136,7 +136,7 @@ export function generateSingleQuestion(config, constellationData, starCatalogDat
         renderMode,
         maxMagnitude,
         rotationAngle,
-        backgroundStars: (starCatalogData && starCatalogData[abbrev]) || [],
+        backgroundStars: (config.showBackgroundStars && starCatalogData && starCatalogData[abbrev]) || [],
         backgroundStarOpacity
     };
 }

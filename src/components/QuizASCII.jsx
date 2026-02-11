@@ -3,8 +3,9 @@ import React, { useMemo } from 'react';
 function QuizASCII({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [] }) {
     const ascii = useMemo(() => {
         const { stars, lines } = constellation;
-        const width = 70;
-        const height = 45;
+        // Match canvas 500x500 visual size - char aspect ratio ~0.6 makes this appear square
+        const width = 75;
+        const height = 50;
 
         // Create character grid
         const grid = Array(height).fill().map(() => Array(width).fill(' '));
