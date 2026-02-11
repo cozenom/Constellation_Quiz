@@ -273,6 +273,39 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                     {/* Section: Star Visibility */}
                     <div className="section-header full-width">Star Visibility</div>
 
+                    <div className="form-group full-width">
+                        <label htmlFor="maxMagnitude">
+                            Star Brightness Filter (Mag ≤ {config.maxMagnitude.toFixed(1)})
+                        </label>
+                        <input
+                            type="range"
+                            id="maxMagnitude"
+                            list="magnitude-presets"
+                            min="0"
+                            max="14"
+                            step="0.5"
+                            value={config.maxMagnitude}
+                            onChange={(e) => setConfig({ ...config, maxMagnitude: parseFloat(e.target.value) })}
+                            style={{width: '100%'}}
+                        />
+                        <datalist id="magnitude-presets">
+                            <option value="2.5" label="City"></option>
+                            <option value="4.0" label="Suburban"></option>
+                            <option value="5.0" label="Rural"></option>
+                            <option value="6.0" label="Dark Sky"></option>
+                            <option value="10.0" label="Binoculars"></option>
+                            <option value="14.0" label="Telescope"></option>
+                        </datalist>
+                        <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center'}}>
+                            <span>Bright City<br/>(2.5)</span>
+                            <span>Suburban<br/>(4.0)</span>
+                            <span>Rural<br/>(5.0)</span>
+                            <span>Dark Sky<br/>(6.0)</span>
+                            <span>Binoculars<br/>(10.0)</span>
+                            <span>Telescope<br/>(14.0)</span>
+                        </div>
+                    </div>
+
                     <div className="checkbox-group">
                         <input
                             type="checkbox"
@@ -283,58 +316,21 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <label htmlFor="showBackgroundStars">Show background stars</label>
                     </div>
 
-                    {config.showBackgroundStars && (
-                        <>
-                            <div className="form-group full-width">
-                                <label htmlFor="maxMagnitude">
-                                    Star Brightness Filter (Mag ≤ {config.maxMagnitude.toFixed(1)})
-                                </label>
-                                <input
-                                    type="range"
-                                    id="maxMagnitude"
-                                    list="magnitude-presets"
-                                    min="0"
-                                    max="14"
-                                    step="0.5"
-                                    value={config.maxMagnitude}
-                                    onChange={(e) => setConfig({ ...config, maxMagnitude: parseFloat(e.target.value) })}
-                                    style={{width: '100%'}}
-                                />
-                                <datalist id="magnitude-presets">
-                                    <option value="2.5" label="City"></option>
-                                    <option value="4.0" label="Suburban"></option>
-                                    <option value="5.0" label="Rural"></option>
-                                    <option value="6.0" label="Dark Sky"></option>
-                                    <option value="10.0" label="Binoculars"></option>
-                                    <option value="14.0" label="Telescope"></option>
-                                </datalist>
-                                <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center'}}>
-                                    <span>Bright City<br/>(2.5)</span>
-                                    <span>Suburban<br/>(4.0)</span>
-                                    <span>Rural<br/>(5.0)</span>
-                                    <span>Dark Sky<br/>(6.0)</span>
-                                    <span>Binoculars<br/>(10.0)</span>
-                                    <span>Telescope<br/>(14.0)</span>
-                                </div>
-                            </div>
-
-                            {config.renderMode === 'canvas' && (
-                                <div className="form-group full-width">
-                                    <label htmlFor="backgroundStarOpacity">
-                                        Background star opacity: {config.backgroundStarOpacity}%
-                                    </label>
-                                    <input
-                                        type="range"
-                                        id="backgroundStarOpacity"
-                                        min="0"
-                                        max="100"
-                                        step="5"
-                                        value={config.backgroundStarOpacity}
-                                        onChange={(e) => setConfig({ ...config, backgroundStarOpacity: Number(e.target.value) })}
-                                    />
-                                </div>
-                            )}
-                        </>
+                    {config.showBackgroundStars && config.renderMode === 'canvas' && (
+                        <div className="form-group full-width">
+                            <label htmlFor="backgroundStarOpacity">
+                                Background star opacity: {config.backgroundStarOpacity}%
+                            </label>
+                            <input
+                                type="range"
+                                id="backgroundStarOpacity"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={config.backgroundStarOpacity}
+                                onChange={(e) => setConfig({ ...config, backgroundStarOpacity: Number(e.target.value) })}
+                            />
+                        </div>
                     )}
                 </div>
 

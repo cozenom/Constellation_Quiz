@@ -246,6 +246,18 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                 {/* Section: Star Visibility */}
                 <div className="section-header full-width">Star Visibility</div>
 
+                <div className="form-group full-width">
+                    <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
+                    <input
+                        type="range"
+                        min="0"
+                        max="14"
+                        step="0.1"
+                        value={config.maxMagnitude}
+                        onChange={(e) => setConfig({...config, maxMagnitude: parseFloat(e.target.value)})}
+                    />
+                </div>
+
                 <div className="form-group">
                     <label>
                         <input
@@ -258,30 +270,16 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                 </div>
 
                 {config.showBackgroundStars && (
-                    <>
-                        <div className="form-group full-width">
-                            <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="14"
-                                step="0.1"
-                                value={config.maxMagnitude}
-                                onChange={(e) => setConfig({...config, maxMagnitude: parseFloat(e.target.value)})}
-                            />
-                        </div>
-
-                        <div className="form-group full-width">
-                            <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={config.backgroundStarOpacity}
-                                onChange={(e) => setConfig({...config, backgroundStarOpacity: parseInt(e.target.value)})}
-                            />
-                        </div>
-                    </>
+                    <div className="form-group full-width">
+                        <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={config.backgroundStarOpacity}
+                            onChange={(e) => setConfig({...config, backgroundStarOpacity: parseInt(e.target.value)})}
+                        />
+                    </div>
                 )}
                 </div>
 
