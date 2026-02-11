@@ -1,6 +1,6 @@
 // Generate quiz questions based on config
 export function generateQuestions(config, constellationData, starCatalogData) {
-    const { hemisphere, difficulty, mode, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames } = config;
+    const { hemisphere, difficulty, mode, inputMode, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames, customSelection, selectedConstellations } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -12,6 +12,11 @@ export function generateQuestions(config, constellationData, starCatalogData) {
 
     // Filter constellations
     let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
+        // Custom selection mode: only include selected constellations
+        if (customSelection) {
+            return selectedConstellations.includes(abbrev);
+        }
+        // Normal mode: filter by hemisphere and difficulty
         const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
         const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
         return matchesHemisphere && matchesDifficulty;
@@ -81,7 +86,7 @@ export function shuffleArray(array) {
 
 // Generate a single new question for endless mode, avoiding recently asked
 export function generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs = []) {
-    const { hemisphere, difficulty, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames } = config;
+    const { hemisphere, difficulty, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames, customSelection, selectedConstellations } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -93,6 +98,11 @@ export function generateSingleQuestion(config, constellationData, starCatalogDat
 
     // Filter constellations
     let pool = Object.entries(constellationData).filter(([abbrev, data]) => {
+        // Custom selection mode: only include selected constellations
+        if (customSelection) {
+            return selectedConstellations.includes(abbrev);
+        }
+        // Normal mode: filter by hemisphere and difficulty
         const matchesHemisphere = hemisphere === 'both' || data.hemisphere === hemisphere || data.hemisphere === 'both';
         const matchesDifficulty = difficulty === 'all' || data.difficulty === difficulty;
         return matchesHemisphere && matchesDifficulty;
