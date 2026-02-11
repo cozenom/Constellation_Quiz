@@ -11,6 +11,8 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         showBackgroundStars: true,
         backgroundStarOpacity: 100,
         showEnglishNames: true,
+        customSelection: false,
+        selectedConstellations: [],
     });
 
     // Restore saved config if provided
@@ -31,15 +33,67 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onBack]);
 
-    // Calculate filtered constellation count
-    const filteredCount = useMemo(() => {
-        if (!constellationData) return 0;
+    // Get all constellations sorted alphabetically
+    const allConstellations = useMemo(() => {
+        if (!constellationData) return [];
+        return Object.entries(constellationData).sort((a, b) => a[1].name.localeCompare(b[1].name));
+    }, [constellationData]);
+
+    // Get filtered constellations (by hemisphere/difficulty) - used for auto-selection
+    const filteredConstellations = useMemo(() => {
+        if (!constellationData) return [];
         return Object.entries(constellationData).filter(([abbrev, data]) => {
             const matchesHemisphere = config.hemisphere === 'both' || data.hemisphere === config.hemisphere || data.hemisphere === 'both';
             const matchesDifficulty = config.difficulty === 'all' || data.difficulty === config.difficulty;
             return matchesHemisphere && matchesDifficulty;
-        }).length;
+        });
     }, [constellationData, config.hemisphere, config.difficulty]);
+
+    // Calculate final count (custom selection or all filtered)
+    const filteredCount = useMemo(() => {
+        if (config.customSelection) {
+            return config.selectedConstellations.length;
+        }
+        return filteredConstellations.length;
+    }, [config.customSelection, config.selectedConstellations.length, filteredConstellations.length]);
+
+    // When filters change, auto-select constellations that match filters
+    useEffect(() => {
+        if (config.customSelection) {
+            const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
+            setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
+        }
+    }, [config.hemisphere, config.difficulty]);
+
+    // When custom selection is first enabled, auto-select based on current filters
+    useEffect(() => {
+        if (config.customSelection && config.selectedConstellations.length === 0) {
+            const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
+            setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
+        }
+    }, [config.customSelection]);
+
+    // Toggle individual constellation
+    const handleToggleConstellation = (abbrev, checked) => {
+        setConfig(prev => ({
+            ...prev,
+            selectedConstellations: checked
+                ? [...prev.selectedConstellations, abbrev]
+                : prev.selectedConstellations.filter(a => a !== abbrev)
+        }));
+    };
+
+    // Select/Deselect all
+    const handleSelectAll = () => {
+        setConfig(prev => ({
+            ...prev,
+            selectedConstellations: allConstellations.map(([abbrev]) => abbrev)
+        }));
+    };
+
+    const handleDeselectAll = () => {
+        setConfig(prev => ({ ...prev, selectedConstellations: [] }));
+    };
 
     const handleStart = () => {
         onStart(config);
@@ -93,6 +147,65 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                         <option value="hard">Hard</option>
                     </select>
                 </div>
+
+                {/* Custom Constellation Selection */}
+                <div className="checkbox-group full-width">
+                    <input
+                        type="checkbox"
+                        id="customSelection"
+                        checked={config.customSelection}
+                        onChange={(e) => setConfig({ ...config, customSelection: e.target.checked, selectedConstellations: [] })}
+                    />
+                    <label htmlFor="customSelection">Custom constellation selection</label>
+                </div>
+
+                {config.customSelection && (
+                    <div className="full-width" style={{marginTop: '0.5rem'}}>
+                        <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
+                            <button
+                                type="button"
+                                className="button-secondary"
+                                onClick={handleSelectAll}
+                                style={{flex: 1, padding: '0.5rem'}}
+                            >
+                                Select All
+                            </button>
+                            <button
+                                type="button"
+                                className="button-secondary"
+                                onClick={handleDeselectAll}
+                                style={{flex: 1, padding: '0.5rem'}}
+                            >
+                                Deselect All
+                            </button>
+                        </div>
+                        <div style={{
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            border: '1px solid #475569',
+                            borderRadius: '8px',
+                            padding: '0.5rem',
+                            backgroundColor: '#1e293b'
+                        }}>
+                            {allConstellations.map(([abbrev, data]) => (
+                                <div key={abbrev} className="checkbox-group" style={{marginBottom: '0.25rem'}}>
+                                    <input
+                                        type="checkbox"
+                                        id={`const-${abbrev}`}
+                                        checked={config.selectedConstellations.includes(abbrev)}
+                                        onChange={(e) => handleToggleConstellation(abbrev, e.target.checked)}
+                                    />
+                                    <label htmlFor={`const-${abbrev}`}>
+                                        {config.showEnglishNames && data.name_english
+                                            ? `${data.name} (${data.name_english})`
+                                            : data.name
+                                        }
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Section: Visual Aids */}
                 <div className="section-header full-width">Visual Aids</div>
@@ -171,7 +284,10 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                 </div>
 
                 <div className="filter-count">
-                    {filteredCount} constellation{filteredCount !== 1 ? 's' : ''} match your filters
+                    {config.customSelection
+                        ? `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} selected`
+                        : `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} match your filters`
+                    }
                 </div>
 
                 <button className="button-primary" onClick={handleStart} disabled={filteredCount === 0}>

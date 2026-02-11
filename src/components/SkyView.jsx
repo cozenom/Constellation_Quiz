@@ -20,10 +20,16 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         return constellation.name;
     };
 
-    // Filter constellations by hemisphere and difficulty
+    // Filter constellations by hemisphere and difficulty (or custom selection)
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
 
+        // Custom selection mode: use selected constellations
+        if (config.customSelection) {
+            return config.selectedConstellations || [];
+        }
+
+        // Normal mode: filter by hemisphere and difficulty
         const allAbbrevs = Object.keys(constellationData);
 
         // Filter by hemisphere
@@ -42,7 +48,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         }
 
         return filtered;
-    }, [constellationData, config.hemisphere, config.difficulty]);
+    }, [constellationData, config.hemisphere, config.difficulty, config.customSelection, config.selectedConstellations]);
 
     // Pick a new target based on mode
     const pickNewTarget = useCallback((isInitial = false) => {
