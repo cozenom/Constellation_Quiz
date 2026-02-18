@@ -5,16 +5,18 @@ import SkyViewSetup from './components/SkyViewSetup';
 import Quiz from './components/Quiz';
 import QuizResults from './components/QuizResults';
 import SkyView from './components/SkyView';
+import StudyPage from './components/StudyPage';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
 function App() {
-    const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview'
+    const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview', 'study'
     const [config, setConfig] = useState(null);
     const [savedConfig, setSavedConfig] = useState(null); // Persist settings when returning to menu
     const [skyViewConfig, setSkyViewConfig] = useState(null);
     const [savedSkyViewConfig, setSavedSkyViewConfig] = useState(null);
     const [quizState, setQuizState] = useState(null);
     const [constellationData, setConstellationData] = useState(null);
+    const [constellationInfo, setConstellationInfo] = useState(null);
     const [starCatalogData, setStarCatalogData] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
@@ -33,6 +35,25 @@ function App() {
             .catch(error => {
                 console.error('Error loading constellation data:', error);
                 setLoadingError(error.message);
+            });
+    }, []);
+
+    // Load constellation info (Wikipedia data) from external JSON
+    useEffect(() => {
+        fetch(`${import.meta.env.BASE_URL}data/constellation_info.json`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load constellation info: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setConstellationInfo(data);
+            })
+            .catch(error => {
+                console.error('Error loading constellation info:', error);
+                // Don't block app if constellation info fails to load
+                setConstellationInfo(null);
             });
     }, []);
 
@@ -136,6 +157,10 @@ function App() {
         setScreen('skyview-setup');
     };
 
+    const goToStudy = () => {
+        setScreen('study');
+    };
+
     const backToTitle = () => {
         setScreen('title');
         setSavedConfig(config);
@@ -189,6 +214,7 @@ function App() {
                 <Title
                     onSelectRegularQuiz={goToSetup}
                     onSelectSkyView={goToSkyViewSetup}
+                    onSelectStudy={goToStudy}
                 />
             )}
             {screen === 'setup' && (
@@ -230,6 +256,13 @@ function App() {
                     starCatalogData={starCatalogData}
                     config={skyViewConfig}
                     onBack={backToSkyViewSetup}
+                />
+            )}
+            {screen === 'study' && (
+                <StudyPage
+                    onBack={backToTitle}
+                    constellationData={constellationData}
+                    constellationInfo={constellationInfo}
                 />
             )}
         </>

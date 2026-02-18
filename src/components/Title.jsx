@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Title({ onSelectRegularQuiz, onSelectSkyView }) {
+function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
     return (
         <div className="card">
             {/* Empty header for consistent spacing with other screens */}
@@ -17,6 +17,9 @@ function Title({ onSelectRegularQuiz, onSelectSkyView }) {
                 </button>
                 <button className="button-primary" onClick={onSelectSkyView}>
                     Sky View Mode
+                </button>
+                <button className="button-secondary" onClick={onSelectStudy}>
+                    Study Guide
                 </button>
             </div>
         </div>

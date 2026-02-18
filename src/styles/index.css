@@ -22,6 +22,10 @@ body {
     max-width: 1500px;
 }
 
+#root:has(.study-page) {
+    max-width: 95%;
+}
+
 /* Wider container for quiz screen with desktop layout */
 @media (min-width: 768px) {
     body:has(.quiz-desktop-grid) #root {
