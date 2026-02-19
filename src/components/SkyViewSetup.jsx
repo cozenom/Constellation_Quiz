@@ -98,7 +98,8 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
             </button>
 
             <div className="card">
-                <h2>Sky View Mode Setup</h2>
+                <h1>Sky View Mode Setup</h1>
+                <p className="subtitle">Configure your night sky identification settings</p>
 
                 <div className="setup-grid">
                 {/* Section: Quiz Settings */}

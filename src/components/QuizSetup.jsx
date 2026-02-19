@@ -95,14 +95,13 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
 
     return (
         <div>
-            <h1>🌟 Constellation Quiz</h1>
-            <p className="subtitle">Learn to identify all 88 constellations by their star patterns</p>
-
             <button className="back-button" onClick={onBack}>
                 ← Back
             </button>
 
             <div className="card">
+                <h1>Multiple Choice Quiz Setup</h1>
+                <p className="subtitle">Configure your quiz settings</p>
                 <div className="setup-grid">
                     {/* Section: Quiz Settings */}
                     <div className="section-header full-width">Quiz Settings</div>

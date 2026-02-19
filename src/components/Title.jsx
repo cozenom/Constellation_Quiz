@@ -1,7 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './Title.css';
 
+const FACTS = [
+    "The 88 constellations cover the entire celestial sphere with official boundaries adopted by the International Astronomical Union in 1928, ensuring every point in the sky belongs to exactly one constellation.",
+    "Ptolemy catalogued 48 constellations in 150 AD, based on earlier Greek and Mesopotamian astronomy. The remaining 40 were added centuries later by European explorers mapping the southern skies.",
+    "The 12 zodiac constellations lie along the ecliptic, the Sun's apparent path across the sky: Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius, and Pisces.",
+    "All 88 constellations have Latin names due to their Roman and European origins. In 1922, the IAU adopted three-letter abbreviations for each (like Ori for Orion, UMa for Ursa Major).",
+    "Argo Navis was one of Ptolemy's original 48 constellations. In the 1750s, French astronomer Nicolas Louis de Lacaille divided it into three separate constellations: Carina (the keel), Puppis (the stern), and Vela (the sails).",
+    "European astronomers proposed constellations for the southern sky and filled gaps between traditional ones. Eugène Joseph Delporte drew precise boundaries in 1928 so astronomers could specify exact celestial positions."
+];
+
 function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
+    const [currentFact, setCurrentFact] = useState('');
+
+    useEffect(() => {
+        // Pick a random fact on mount
+        const randomFact = FACTS[Math.floor(Math.random() * FACTS.length)];
+        setCurrentFact(randomFact);
+    }, []);
+
     return (
         <div className="card title-screen">
             {/* Empty header for consistent spacing with other screens */}
@@ -11,7 +28,12 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
 
             <div className="title-hero">
                 <h1>Constellation Quiz</h1>
-                <p className="subtitle">Learn to identify all 88 IAU (International Astronomical Union) constellations</p>
+                <p className="subtitle">Learn to identify all 88 International Astronomical Union constellations</p>
+                {currentFact && (
+                    <div className="fun-fact">
+                        {currentFact}
+                    </div>
+                )}
             </div>
 
             <div className="title-buttons">
