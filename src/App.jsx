@@ -175,8 +175,8 @@ function App() {
     if (!constellationData && !loadingError) {
         return (
             <div style={{textAlign: 'center', padding: '3rem'}}>
-                <h1>🌟 Constellation Quiz</h1>
-                <p style={{marginTop: '2rem', fontSize: '1.25rem'}}>Loading constellation data...</p>
+                <h1>Constellation Quiz</h1>
+                <p style={{marginTop: '2rem', fontSize: '1.25rem', color: '#94a3b8'}}>Loading constellation data...</p>
             </div>
         );
     }
@@ -185,7 +185,7 @@ function App() {
     if (loadingError) {
         return (
             <div style={{textAlign: 'center', padding: '3rem'}}>
-                <h1>❌ Error</h1>
+                <h1>Error Loading Data</h1>
                 <div className="card" style={{marginTop: '2rem'}}>
                     <p style={{color: '#dc2626', marginBottom: '1rem'}}>Failed to load constellation data:</p>
                     <p style={{fontFamily: 'monospace', background: '#1e293b', padding: '1rem', borderRadius: '0.5rem'}}>
