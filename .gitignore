@@ -1,36 +1,15 @@
 # AI Assistant working files
+.claude/
 claude/
 
-# Generated constellation data (can be regenerated from SnT source)
-data/raw/constellationship.fab
-
-# Large Hipparcos cache (Skyfield re-downloads automatically)
-data/raw/hip_main.dat
-
-# Generated ASCII gallery (can regenerate)
-/data/ascii_gallery
-
-# Deprecated/old data files (kept as backup)
-data/deprecated/
+# Data files (generated in separate repo)
+data/
 
 # Node/npm
 node_modules/
 dist/
 package-lock.json
 *.backup
-
-# Public data (copied from data/ for Vite to serve)
-public/data/*.json
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-*.egg-info/
 
 # OS files
 .DS_Store
@@ -46,4 +25,5 @@ Thumbs.db
 *.swp
 *.swo
 
+# Project notes
 /*.txt
