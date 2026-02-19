@@ -57,11 +57,16 @@ function App() {
             });
     }, []);
 
-    // Load star catalog on mount (preload so it's ready when quiz starts)
-    useEffect(() => {
+    // Lazy load star catalog only when needed (for quiz modes)
+    const loadStarCatalog = () => {
+        // Return early if already loaded or loading
+        if (starCatalogData !== null) {
+            return Promise.resolve(starCatalogData);
+        }
+
         const filename = `${import.meta.env.BASE_URL}data/background_stars_visible.json`;
 
-        fetch(filename)
+        return fetch(filename)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Failed to load star catalog: ${response.statusText}`);
@@ -70,18 +75,24 @@ function App() {
             })
             .then(data => {
                 setStarCatalogData(data);
+                return data;
             })
             .catch(error => {
                 console.error('Error loading star catalog:', error);
                 // Don't block quiz if star catalog fails to load
                 setStarCatalogData(null);
+                return null;
             });
-    }, []);
+    };
 
-    const startQuiz = (quizConfig) => {
+    const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
-        const questions = generateQuestions(quizConfig, constellationData, starCatalogData);
+
+        // Load star catalog if needed
+        const catalog = await loadStarCatalog();
+
+        const questions = generateQuestions(quizConfig, constellationData, catalog);
         setQuizState({
             questions,
             currentIndex: 0,
@@ -107,7 +118,7 @@ function App() {
         });
     };
 
-    const nextQuestion = () => {
+    const nextQuestion = async () => {
         if (quizState.currentIndex + 1 < quizState.questions.length) {
             setQuizState({
                 ...quizState,
@@ -123,7 +134,10 @@ function App() {
                 return q ? q.constellation.abbrev : null;
             }).filter(Boolean);
 
-            const newQuestion = generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs);
+            // Ensure star catalog is loaded (should already be loaded from startQuiz)
+            const catalog = await loadStarCatalog();
+
+            const newQuestion = generateSingleQuestion(config, constellationData, catalog, recentAbbrevs);
             setQuizState({
                 ...quizState,
                 questions: [...quizState.questions, newQuestion],
@@ -202,9 +216,13 @@ function App() {
         );
     }
 
-    const startSkyView = (newConfig) => {
+    const startSkyView = async (newConfig) => {
         setSkyViewConfig(newConfig);
         setSavedSkyViewConfig(newConfig);
+
+        // Load star catalog if needed
+        await loadStarCatalog();
+
         setScreen('skyview');
     };
 
