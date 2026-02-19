@@ -7,6 +7,7 @@ import {
   getFeaturesSummary,
   getCulturalSummary
 } from '../utils/studyDataUtils';
+import QuizCanvas from './QuizCanvas';
 import './StudyPage.css';
 
 function StudyPage({ onBack, constellationData, constellationInfo }) {
@@ -16,6 +17,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
   const [filterSeason, setFilterSeason] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [expandedRow, setExpandedRow] = useState(null);
+  const [expandAll, setExpandAll] = useState(false);
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -116,6 +118,11 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
     setExpandedRow(expandedRow === abbrev ? null : abbrev);
   };
 
+  const toggleExpandAll = () => {
+    setExpandAll(!expandAll);
+    setExpandedRow(null); // Clear individual selection
+  };
+
   const getSortIcon = (field) => {
     if (sortBy !== field) return '⇕';
     return sortDir === 'asc' ? '↑' : '↓';
@@ -160,6 +167,10 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
             <option value="hard">Hard</option>
           </select>
         </div>
+
+        <button className="expand-all-btn" onClick={toggleExpandAll}>
+          {expandAll ? 'Collapse All' : 'Expand All'}
+        </button>
 
         <div className="filter-stats">
           Showing {filteredAndSorted.length} of {studyData.length} constellations
@@ -214,56 +225,72 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                       onClick={() => toggleRow(constellation.abbrev)}
                       aria-label="Expand details"
                     >
-                      {expandedRow === constellation.abbrev ? '▼' : '▶'}
+                      {(expandAll || expandedRow === constellation.abbrev) ? '▼' : '▶'}
                     </button>
                   </td>
                 </tr>
 
-                {expandedRow === constellation.abbrev && (
+                {(expandAll || expandedRow === constellation.abbrev) && (
                   <tr className="details-row">
                     <td colSpan="8">
                       <div className="details-content">
-                        {constellation.intro && (
-                          <div className="detail-section">
-                            <h4>Description</h4>
-                            <p>{constellation.intro}</p>
+                        <div className="details-layout">
+                          <div className="constellation-visual">
+                            <QuizCanvas
+                              constellation={{
+                                stars: constellationData[constellation.abbrev].stars,
+                                lines: constellationData[constellation.abbrev].lines
+                              }}
+                              showLines={true}
+                              backgroundStars={[]}
+                              rotationAngle={0}
+                            />
                           </div>
-                        )}
 
-                        {constellation.mythology && (
-                          <div className="detail-section">
-                            <h4>Mythology</h4>
-                            <p>{constellation.mythology}</p>
-                          </div>
-                        )}
+                          <div className="details-text">
+                            {constellation.intro && (
+                              <div className="detail-section">
+                                <h4>Description</h4>
+                                <p>{constellation.intro}</p>
+                              </div>
+                            )}
 
-                        {constellation.history && (
-                          <div className="detail-section">
-                            <h4>History</h4>
-                            <p>{constellation.history}</p>
-                          </div>
-                        )}
+                            {constellation.mythology && (
+                              <div className="detail-section">
+                                <h4>Mythology</h4>
+                                <p>{constellation.mythology}</p>
+                              </div>
+                            )}
 
-                        {getFeaturesSummary(constellation.features) && (
-                          <div className="detail-section">
-                            <h4>Notable Features</h4>
-                            <p>{getFeaturesSummary(constellation.features)}</p>
-                          </div>
-                        )}
+                            {constellation.history && (
+                              <div className="detail-section">
+                                <h4>History</h4>
+                                <p>{constellation.history}</p>
+                              </div>
+                            )}
 
-                        {getCulturalSummary(constellation.cultural) && (
-                          <div className="detail-section">
-                            <h4>Cultural Significance</h4>
-                            <p>{getCulturalSummary(constellation.cultural)}</p>
-                          </div>
-                        )}
+                            {getFeaturesSummary(constellation.features) && (
+                              <div className="detail-section">
+                                <h4>Notable Features</h4>
+                                <p>{getFeaturesSummary(constellation.features)}</p>
+                              </div>
+                            )}
 
-                        {constellation.namedStars.length > 0 && (
-                          <div className="detail-section">
-                            <h4>Named Stars ({constellation.namedStars.length})</h4>
-                            <p>{constellation.namedStars.join(', ')}</p>
+                            {getCulturalSummary(constellation.cultural) && (
+                              <div className="detail-section">
+                                <h4>Cultural Significance</h4>
+                                <p>{getCulturalSummary(constellation.cultural)}</p>
+                              </div>
+                            )}
+
+                            {constellation.namedStars.length > 0 && (
+                              <div className="detail-section">
+                                <h4>Named Stars ({constellation.namedStars.length})</h4>
+                                <p>{constellation.namedStars.join(', ')}</p>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </td>
                   </tr>

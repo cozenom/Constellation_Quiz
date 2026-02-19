@@ -71,6 +71,22 @@
   border-color: #888;
 }
 
+.expand-all-btn {
+  padding: 6px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.expand-all-btn:hover {
+  background: #2980b9;
+}
+
 .filter-stats {
   margin-left: auto;
   font-weight: 600;
@@ -199,6 +215,28 @@
 
 .details-content {
   padding: 20px;
+}
+
+.details-layout {
+  display: flex;
+  gap: 30px;
+  align-items: flex-start;
+}
+
+.constellation-visual {
+  flex-shrink: 0;
+  width: 300px;
+}
+
+.constellation-visual canvas {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.details-text {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -258,5 +296,16 @@
   .study-table .name-english,
   .study-table .stars {
     display: none;
+  }
+
+  /* Stack constellation image and text on mobile */
+  .details-layout {
+    flex-direction: column;
+  }
+
+  .constellation-visual {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
   }
 }
