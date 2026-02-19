@@ -20,6 +20,30 @@
   margin: 0;
 }
 
+.fact-box {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  text-align: left;
+}
+
+.fact-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #60a5fa;
+  margin-bottom: 0.75rem;
+}
+
+.fact-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
 .title-buttons {
   display: flex;
   flex-direction: column;
@@ -79,6 +103,14 @@
 
   .title-hero .subtitle {
     font-size: 1rem;
+  }
+
+  .fact-box {
+    padding: 1.25rem;
+  }
+
+  .fact-content {
+    font-size: 0.9rem;
   }
 
   .mode-button {

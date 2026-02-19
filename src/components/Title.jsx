@@ -29,12 +29,14 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
             <div className="title-hero">
                 <h1>Constellation Quiz</h1>
                 <p className="subtitle">Learn to identify all 88 International Astronomical Union constellations</p>
-                {currentFact && (
-                    <div className="fun-fact">
-                        {currentFact}
-                    </div>
-                )}
             </div>
+
+            {currentFact && (
+                <div className="fact-box">
+                    <div className="fact-label">Did You Know?</div>
+                    <div className="fact-content">{currentFact}</div>
+                </div>
+            )}
 
             <div className="title-buttons">
                 <button className="mode-button" onClick={onSelectRegularQuiz}>
