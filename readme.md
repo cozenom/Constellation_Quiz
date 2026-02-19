@@ -5,8 +5,9 @@ A mobile-friendly web quiz application for practicing constellation identificati
 ## Features
 
 - **Multiple Quiz Modes**
-  - Regular Quiz: Identify constellation from star pattern (multiple choice or text input)
-  - Sky View Mode: Click to identify constellations in dual-hemisphere view
+  - Multiple Choice Quiz: Identify constellations from star patterns with 4 answer choices
+  - Sky View Mode: Click to identify constellations in a realistic dual-hemisphere night sky
+  - Study Guide: Complete reference table with mythology, history, features, and visualizations
 
 - **Customizable Options**
   - Difficulty levels: Easy (20), Medium (36), Hard (32), or All (88) constellations
@@ -15,7 +16,7 @@ A mobile-friendly web quiz application for practicing constellation identificati
   - Rendering modes: Canvas (graphical) or ASCII art
   - Star brightness filter: Simulate city lights to dark sky conditions
   - Background stars: Authentic Hipparcos catalog star field
-  - Random rotation: Increase difficulty (Regular Quiz only)
+  - Random rotation: Increase difficulty (Multiple Choice Quiz only)
   - English names: Show constellation meanings (e.g., "Ursa Major (Big bear)")
 
 - **Keyboard Shortcuts**
@@ -37,7 +38,7 @@ A mobile-friendly web quiz application for practicing constellation identificati
 npm install
 
 # Copy data files to public/ (needed for Vite to serve them)
-cp data/constellation_data.json data/background_stars_visible.json public/data/
+cp data/constellation_data.json data/constellation_info.json data/background_stars_visible.json public/data/
 
 # Run development server with hot reload
 npm run dev
@@ -76,23 +77,32 @@ constellation-quiz/
 │   ├── main.jsx                  # Entry point
 │   ├── App.jsx                   # Main app component
 │   ├── components/               # React components
-│   │   ├── TitleScreen.jsx
-│   │   ├── SetupScreen.jsx
-│   │   ├── SkyViewSetupScreen.jsx
-│   │   ├── QuizScreen.jsx
-│   │   ├── ResultsScreen.jsx
-│   │   ├── SkyViewScreen.jsx
-│   │   ├── ConstellationCanvas.jsx
-│   │   ├── ASCIIConstellation.jsx
-│   │   └── SkyViewCanvas.jsx
+│   │   ├── Title.jsx             # Home screen with mode selection
+│   │   ├── QuizSetup.jsx         # Multiple choice quiz configuration
+│   │   ├── SkyViewSetup.jsx      # Sky view mode configuration
+│   │   ├── Quiz.jsx              # Quiz screen
+│   │   ├── QuizResults.jsx       # Quiz results screen
+│   │   ├── SkyView.jsx           # Sky view mode screen
+│   │   ├── SkyViewResults.jsx    # Sky view results
+│   │   ├── StudyPage.jsx         # Study guide reference table
+│   │   ├── QuizCanvas.jsx        # Canvas constellation renderer
+│   │   ├── QuizASCII.jsx         # ASCII constellation renderer
+│   │   ├── SkyViewCanvas.jsx     # Sky view canvas renderer
+│   │   ├── StudyPage.css         # Study page styles
+│   │   └── Title.css             # Title screen styles
 │   ├── utils/
-│   │   └── quizHelpers.js        # Quiz generation logic
+│   │   ├── quizHelpers.js        # Quiz generation logic
+│   │   └── studyDataUtils.js     # Study page data utilities
 │   └── styles/
 │       └── index.css             # Global styles
+├── data/                         # Constellation data files
+│   ├── constellation_data.json   # Core constellation data (1.0 MB)
+│   ├── constellation_info.json   # Wikipedia-sourced mythology/history (107 KB)
+│   ├── background_stars_visible.json  # Hipparcos star catalog (5.8 MB)
+│   ├── stars_visible.json        # Named visible stars (726 KB)
+│   └── stars_all.json            # All Hipparcos stars (9.3 MB)
 ├── public/
-│   └── data/                     # Constellation data (copied to dist/)
-│       ├── constellation_data.json
-│       └── background_stars_visible.json
+│   └── data/                     # Data symlinks (served by Vite)
 ├── dist/                         # Build output (generated)
 ├── index.html                    # HTML template
 ├── package.json                  # Dependencies
@@ -118,12 +128,13 @@ pip install skyfield numpy
 python build_quiz_data.py
 
 # Copy generated data to public/ for Vite to serve
-cp ../constellation_data.json ../../public/data/
+cp ../constellation_data.json ../constellation_info.json ../../public/data/
 cp ../background_stars_visible.json ../../public/data/
 ```
 
 This generates:
 - `constellation_data.json` - 88 constellations with stereographic projections (1.0 MB)
+- `constellation_info.json` - Wikipedia-sourced mythology and history (107 KB)
 - `background_stars_visible.json` - Naked-eye stars from Hipparcos catalog (5.8 MB)
 
 **Note:** Only `data/*.json` files are tracked in git. The `public/data/*.json` copies are gitignored and created on-demand.
@@ -132,6 +143,7 @@ This generates:
 
 Constellation line data from [Stellarium](https://github.com/Stellarium/stellarium).
 Star data from the Hipparcos catalog via [Skyfield](https://rhodesmill.org/skyfield/).
+Constellation mythology and history from [Wikipedia](https://en.wikipedia.org/).
 
 ## License
 
