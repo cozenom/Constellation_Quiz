@@ -181,6 +181,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
         <table className="study-table">
           <thead>
             <tr>
+              <th className="image-col">Image</th>
               <th onClick={() => handleSort('abbrev')} className="sortable">
                 Abbrev {getSortIcon('abbrev')}
               </th>
@@ -205,6 +206,18 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
             {filteredAndSorted.map((constellation) => (
               <React.Fragment key={constellation.abbrev}>
                 <tr className={expandedRow === constellation.abbrev ? 'expanded' : ''}>
+                  <td className="image-cell">
+                    <QuizCanvas
+                      constellation={{
+                        stars: constellationData[constellation.abbrev].stars,
+                        lines: constellationData[constellation.abbrev].lines
+                      }}
+                      showLines={true}
+                      backgroundStars={[]}
+                      rotationAngle={0}
+                      starSizeScale="large"
+                    />
+                  </td>
                   <td className="abbrev">{constellation.abbrev}</td>
                   <td className="name">{constellation.name}</td>
                   <td className="name-english">{constellation.nameEnglish}</td>
@@ -215,8 +228,11 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                   </td>
                   <td className="stars">
                     {constellation.namedStars.length > 0
-                      ? constellation.namedStars.slice(0, 3).join(', ') +
-                        (constellation.namedStars.length > 3 ? '...' : '')
+                      ? constellation.namedStars.slice(0, 5).map((star, i) => (
+                          <div key={i}>
+                            {star.name} {star.magnitude?.toFixed(1)}
+                          </div>
+                        ))
                       : '—'}
                   </td>
                   <td className="expand-col">
@@ -232,22 +248,9 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
 
                 {(expandAll || expandedRow === constellation.abbrev) && (
                   <tr className="details-row">
-                    <td colSpan="8">
+                    <td colSpan="9">
                       <div className="details-content">
-                        <div className="details-layout">
-                          <div className="constellation-visual">
-                            <QuizCanvas
-                              constellation={{
-                                stars: constellationData[constellation.abbrev].stars,
-                                lines: constellationData[constellation.abbrev].lines
-                              }}
-                              showLines={true}
-                              backgroundStars={[]}
-                              rotationAngle={0}
-                            />
-                          </div>
-
-                          <div className="details-text">
+                        <div className="details-text">
                             {constellation.intro && (
                               <div className="detail-section">
                                 <h4>Description</h4>
@@ -283,14 +286,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                               </div>
                             )}
 
-                            {constellation.namedStars.length > 0 && (
-                              <div className="detail-section">
-                                <h4>Named Stars ({constellation.namedStars.length})</h4>
-                                <p>{constellation.namedStars.join(', ')}</p>
-                              </div>
-                            )}
                           </div>
-                        </div>
                       </div>
                     </td>
                   </tr>

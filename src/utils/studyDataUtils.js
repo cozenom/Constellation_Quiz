@@ -4,17 +4,17 @@
  */
 
 /**
- * Extract named stars from stars array
+ * Extract named stars from stars array with magnitudes
  * @param {Array} stars - Array of star objects
- * @returns {Array} - Array of star names
+ * @returns {Array} - Array of {name, magnitude} objects sorted by brightness
  */
 export function extractNamedStars(stars) {
   if (!Array.isArray(stars)) return [];
 
   return stars
     .filter(star => star.name)
-    .map(star => star.name)
-    .sort();
+    .map(star => ({ name: star.name, magnitude: star.magnitude }))
+    .sort((a, b) => a.magnitude - b.magnitude); // Sort by brightness (lower mag = brighter)
 }
 
 /**

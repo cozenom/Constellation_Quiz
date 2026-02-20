@@ -34,7 +34,7 @@
 
 .study-header p {
   margin: 0;
-  color: #666;
+  color: #94a3b8;
 }
 
 .study-filters {
@@ -43,7 +43,8 @@
   align-items: center;
   margin-bottom: 20px;
   padding: 15px;
-  background: #f5f5f5;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid #475569;
   border-radius: 8px;
   flex-wrap: wrap;
 }
@@ -56,19 +57,20 @@
 
 .filter-group label {
   font-weight: 600;
-  color: #333;
+  color: #e2e8f0;
 }
 
 .filter-group select {
   padding: 6px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid #475569;
   border-radius: 4px;
-  background: white;
+  background: #1e293b;
+  color: #e2e8f0;
   cursor: pointer;
 }
 
 .filter-group select:hover {
-  border-color: #888;
+  border-color: #64748b;
 }
 
 .expand-all-btn {
@@ -90,7 +92,7 @@
 .filter-stats {
   margin-left: auto;
   font-weight: 600;
-  color: #555;
+  color: #94a3b8;
 }
 
 .study-table-container {
@@ -102,12 +104,12 @@
 .study-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: #1e293b;
 }
 
 .study-table thead {
-  background: #2c3e50;
-  color: white;
+  background: #0f172a;
+  color: #e2e8f0;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -126,35 +128,36 @@
 }
 
 .study-table th.sortable:hover {
-  background: #34495e;
+  background: #1e293b;
 }
 
 .study-table td {
   padding: 10px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #334155;
+  color: #e2e8f0;
 }
 
 .study-table tbody tr:hover {
-  background: #f9f9f9;
+  background: #334155;
 }
 
 .study-table tbody tr.expanded {
-  background: #e8f4f8;
+  background: #475569;
 }
 
 .study-table .abbrev {
   font-weight: 600;
-  color: #2c3e50;
+  color: #60a5fa;
   font-family: monospace;
 }
 
 .study-table .name {
   font-weight: 600;
-  color: #34495e;
+  color: #e2e8f0;
 }
 
 .study-table .name-english {
-  color: #555;
+  color: #94a3b8;
   font-style: italic;
 }
 
@@ -164,25 +167,43 @@
 }
 
 .study-table .difficulty-easy {
-  color: #27ae60;
+  color: #4ade80;
 }
 
 .study-table .difficulty-medium {
-  color: #f39c12;
+  color: #fbbf24;
 }
 
 .study-table .difficulty-hard {
-  color: #e74c3c;
+  color: #f87171;
 }
 
 .study-table .stars {
-  font-size: 0.9em;
-  color: #666;
+  font-size: 0.85em;
+  color: #94a3b8;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .study-table .hemisphere,
 .study-table .seasons {
-  color: #000;
+  color: #cbd5e1;
+}
+
+.image-col {
+  width: 260px;
+}
+
+.image-cell {
+  padding: 4px !important;
+  vertical-align: middle;
+}
+
+.image-cell canvas {
+  width: 250px;
+  height: 250px;
+  display: block;
+  border-radius: 4px;
 }
 
 .expand-col {
@@ -206,37 +227,18 @@
 }
 
 .details-row {
-  background: #f8f9fa !important;
+  background: #0f172a !important;
 }
 
 .details-row:hover {
-  background: #f8f9fa !important;
+  background: #0f172a !important;
 }
 
 .details-content {
   padding: 20px;
 }
 
-.details-layout {
-  display: flex;
-  gap: 30px;
-  align-items: flex-start;
-}
-
-.constellation-visual {
-  flex-shrink: 0;
-  width: 300px;
-}
-
-.constellation-visual canvas {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
 .details-text {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -249,14 +251,14 @@
 
 .detail-section h4 {
   margin: 0 0 8px 0;
-  color: #2c3e50;
+  color: #60a5fa;
   font-size: 1em;
   font-weight: 600;
 }
 
 .detail-section p {
   margin: 0;
-  color: #555;
+  color: #cbd5e1;
   line-height: 1.6;
 }
 
@@ -298,14 +300,13 @@
     display: none;
   }
 
-  /* Stack constellation image and text on mobile */
-  .details-layout {
-    flex-direction: column;
+  /* Smaller images on mobile */
+  .image-col {
+    width: 120px;
   }
 
-  .constellation-visual {
-    width: 100%;
-    max-width: 300px;
-    margin: 0 auto;
+  .image-cell canvas {
+    width: 100px;
+    height: 100px;
   }
 }

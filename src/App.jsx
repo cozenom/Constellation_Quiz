@@ -18,6 +18,7 @@ function App() {
     const [constellationData, setConstellationData] = useState(null);
     const [constellationInfo, setConstellationInfo] = useState(null);
     const [starCatalogData, setStarCatalogData] = useState(null);
+    const [skyViewStars, setSkyViewStars] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -81,6 +82,33 @@ function App() {
                 console.error('Error loading star catalog:', error);
                 // Don't block quiz if star catalog fails to load
                 setStarCatalogData(null);
+                return null;
+            });
+    };
+
+    // Lazy load sky view stars (has ra/dec for sky view projection)
+    const loadSkyViewStars = () => {
+        // Return early if already loaded
+        if (skyViewStars !== null) {
+            return Promise.resolve(skyViewStars);
+        }
+
+        const filename = `${import.meta.env.BASE_URL}data/stars_visible.json`;
+
+        return fetch(filename)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load sky view stars: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setSkyViewStars(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading sky view stars:', error);
+                setSkyViewStars(null);
                 return null;
             });
     };
@@ -220,8 +248,8 @@ function App() {
         setSkyViewConfig(newConfig);
         setSavedSkyViewConfig(newConfig);
 
-        // Load star catalog if needed
-        await loadStarCatalog();
+        // Load sky view stars (ra/dec format)
+        await loadSkyViewStars();
 
         setScreen('skyview');
     };
@@ -271,7 +299,7 @@ function App() {
             {screen === 'skyview' && (
                 <SkyView
                     constellationData={constellationData}
-                    starCatalogData={starCatalogData}
+                    starCatalogData={skyViewStars}
                     config={skyViewConfig}
                     onBack={backToSkyViewSetup}
                 />
