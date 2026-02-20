@@ -198,7 +198,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
               <th onClick={() => handleSort('difficulty')} className="sortable">
                 Difficulty {getSortIcon('difficulty')}
               </th>
-              <th>Brightest Stars</th>
+              <th>Brightest Stars (Magnitude)</th>
               <th className="expand-col"></th>
             </tr>
           </thead>
@@ -230,7 +230,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                     {constellation.namedStars.length > 0
                       ? constellation.namedStars.slice(0, 5).map((star, i) => (
                           <div key={i}>
-                            {star.name} {star.magnitude?.toFixed(1)}
+                            {star.name} ({star.magnitude?.toFixed(1)})
                           </div>
                         ))
                       : '—'}
