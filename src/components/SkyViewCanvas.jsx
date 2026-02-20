@@ -201,7 +201,7 @@ function SkyViewCanvas({
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
-                    const radius = Math.max(0.3, 2.0 * Math.pow(10, -(mag + 1.5) / 6.5));
+                    const radius = Math.max(0.5, 2.0 * Math.pow(10, -(mag + 1.5) / 10));
 
                     ctx.fillStyle = '#ffffff';
                     ctx.beginPath();
@@ -321,7 +321,7 @@ function SkyViewCanvas({
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
-                    const radius = Math.max(0.5, 3.5 * Math.pow(10, -(mag + 1.5) / 6.5));
+                    const radius = Math.max(0.5, 2 * Math.pow(10, -(mag) / 10));
 
                     // Glow for bright stars
                     if (mag < 2.5) {

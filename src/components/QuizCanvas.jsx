@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [], backgroundStarOpacity = 100 }) {
+function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle = 0, backgroundStars = [], backgroundStarOpacity = 100, starSizeScale = "normal" }) {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -133,8 +133,8 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
 
         // Draw lines first (if enabled)
         if (showLines && lines) {
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2.5;
 
             lines.forEach(([idx1, idx2]) => {
                 if (idx1 < processedStars.length && idx2 < processedStars.length) {
@@ -164,7 +164,15 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
             const y = (1 - star.y) * height;
 
             // Logarithmic size based on magnitude (more astronomically accurate)
-            const radius = Math.max(0.5, 6 * Math.pow(10, -(mag + 1.5) / 6.5));
+            // Choose formula based on scale
+            let radius;
+            if (starSizeScale === 'large') {
+                // Study mode: exaggerated sizes for better visual learning
+                radius = Math.max(1, 15 * Math.pow(10, -(mag) / 5));
+            } else {
+                // Quiz mode: original conservative sizes
+                radius = Math.max(1, 10 * Math.pow(10, -(mag + 1.5) / 6.5));
+            }
 
             // Glow effect for bright stars
             if (mag < 2.5) {
@@ -185,7 +193,7 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
             ctx.fill();
         });
 
-    }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars, backgroundStarOpacity]);
+    }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars, backgroundStarOpacity, starSizeScale]);
 
     return <canvas ref={canvasRef} width="500" height="500" />;
 }
