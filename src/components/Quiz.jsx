@@ -155,14 +155,16 @@ function Quiz({ config, quizState, onAnswer, onNext, onBack }) {
                     </div>
 
                     <div className="quiz-interaction-col">
+                        <div>
                         <h2 style={{textAlign: 'center', margin: 0}}>
                             What constellation is this?
                         </h2>
-
-                        <div>
-                            <div className={`feedback ${feedback ? (feedback.correct ? 'correct' : 'incorrect') : ''}`} style={{visibility: feedback ? 'visible' : 'hidden'}}>
+                                                    <div className={`feedback ${feedback ? (feedback.correct ? 'correct' : 'incorrect') : ''}`} style={{visibility: feedback ? 'visible' : 'hidden'}}>
                                 {feedback ? feedback.message : 'Placeholder text for layout'}
                             </div>
+                        </div>
+                        <div>
+
 
                             {isTextMode ? (
                                 <div className="text-input-container">
