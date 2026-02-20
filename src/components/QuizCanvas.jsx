@@ -8,8 +8,11 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
-        const width = canvas.width = 500;
-        const height = canvas.height = 500;
+
+        // Use container size for responsive scaling
+        const containerWidth = canvas.parentElement?.offsetWidth || 500;
+        const width = canvas.width = containerWidth;
+        const height = canvas.height = containerWidth; // Keep square aspect ratio
 
         // Clear canvas
         ctx.fillStyle = '#0f172a';
@@ -195,7 +198,7 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
 
     }, [constellation, showLines, maxMagnitude, rotationAngle, backgroundStars, backgroundStarOpacity, starSizeScale]);
 
-    return <canvas ref={canvasRef} width="500" height="500" />;
+    return <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block'}} />;
 }
 
 export default QuizCanvas;

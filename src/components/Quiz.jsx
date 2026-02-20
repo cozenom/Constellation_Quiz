@@ -155,62 +155,62 @@ function Quiz({ config, quizState, onAnswer, onNext, onBack }) {
                     </div>
 
                     <div className="quiz-interaction-col">
-                        <h2 style={{textAlign: 'center', marginBottom: '1.5rem'}}>
+                        <h2 style={{textAlign: 'center', margin: 0}}>
                             What constellation is this?
                         </h2>
 
-                        {isTextMode ? (
-                            <div className="text-input-container">
-                                <form onSubmit={handleTextInputSubmit}>
-                                    <input
-                                        type="text"
-                                        value={textInput}
-                                        onChange={(e) => setTextInput(e.target.value)}
-                                        placeholder="Enter constellation name..."
-                                        disabled={feedback !== null}
-                                        autoFocus
-                                    />
-                                    {!showNextButton && (
-                                        <button type="submit" className="button-primary">
-                                            Submit Answer
+                        <div>
+                            <div className={`feedback ${feedback ? (feedback.correct ? 'correct' : 'incorrect') : ''}`} style={{visibility: feedback ? 'visible' : 'hidden'}}>
+                                {feedback ? feedback.message : 'Placeholder text for layout'}
+                            </div>
+
+                            {isTextMode ? (
+                                <div className="text-input-container">
+                                    <form onSubmit={handleTextInputSubmit}>
+                                        <input
+                                            type="text"
+                                            value={textInput}
+                                            onChange={(e) => setTextInput(e.target.value)}
+                                            placeholder="Enter constellation name..."
+                                            disabled={feedback !== null}
+                                            autoFocus
+                                        />
+                                        {!showNextButton && (
+                                            <button type="submit" className="button-primary">
+                                                Submit Answer
+                                            </button>
+                                        )}
+                                    </form>
+                                </div>
+                            ) : (
+                                <div className="answer-grid">
+                                    {currentQuestion.choices.map((choice, idx) => (
+                                        <button
+                                            key={idx}
+                                            className={`answer-button ${
+                                                feedback && choice.correct ? 'correct' : ''
+                                            } ${
+                                                feedback && selectedAnswer === choice && !choice.correct ? 'incorrect' : ''
+                                            }`}
+                                            onClick={() => handleMultipleChoiceAnswer(choice)}
+                                            disabled={feedback !== null}
+                                        >
+                                            {choice.name}
                                         </button>
-                                    )}
-                                </form>
-                            </div>
-                        ) : (
-                            <div className="answer-grid">
-                                {currentQuestion.choices.map((choice, idx) => (
-                                    <button
-                                        key={idx}
-                                        className={`answer-button ${
-                                            feedback && choice.correct ? 'correct' : ''
-                                        } ${
-                                            feedback && selectedAnswer === choice && !choice.correct ? 'incorrect' : ''
-                                        }`}
-                                        onClick={() => handleMultipleChoiceAnswer(choice)}
-                                        disabled={feedback !== null}
-                                    >
-                                        {choice.name}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                        {feedback && (
-                            <div className={`feedback ${feedback.correct ? 'correct' : 'incorrect'}`}>
-                                {feedback.message}
-                            </div>
-                        )}
-
-                        {showNextButton && (
+                        <div style={{visibility: showNextButton ? 'visible' : 'hidden'}}>
                             <button
                                 className="button-primary"
                                 onClick={handleNext}
-                                style={{marginTop: '1rem'}}
+                                style={{width: '100%'}}
                             >
                                 {isEndless || progress < total ? 'Next Question →' : 'See Results'}
                             </button>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>

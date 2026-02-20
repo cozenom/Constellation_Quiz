@@ -493,21 +493,36 @@ canvas {
 
     .quiz-desktop-grid {
         display: grid;
-        grid-template-columns: 600px 300px;
+        grid-template-columns: 2fr 1fr;
         gap: 1.5rem;
         align-items: start;
+        max-width: 80vw;
+        margin: 0 auto;
     }
 
     .quiz-constellation-col {
         position: sticky;
         top: 1rem;
+        width: 100%;
+        aspect-ratio: 1;
+    }
+
+    .quiz-constellation-col canvas {
+        width: 100% !important;
+        height: 100% !important;
     }
 
     .quiz-interaction-col {
-        min-height: 500px;
+        height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        align-items: stretch;
+        flex-shrink: 0;
+    }
+
+    .quiz-interaction-col>*:nth-child(2) {
+        margin: auto 0;
     }
 }
 
