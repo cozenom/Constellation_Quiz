@@ -171,7 +171,7 @@ function QuizCanvas({ constellation, showLines, maxMagnitude = 6, rotationAngle 
             let radius;
             if (starSizeScale === 'large') {
                 // Study mode: exaggerated sizes for better visual learning
-                radius = Math.max(1, 15 * Math.pow(10, -(mag) / 5));
+                radius = Math.max(1, 10 * Math.pow(10, -(mag) / 5));
             } else {
                 // Quiz mode: original conservative sizes
                 radius = Math.max(1, 10 * Math.pow(10, -(mag + 1.5) / 6.5));
