@@ -217,6 +217,10 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                       rotationAngle={0}
                       starSizeScale="large"
                     />
+                    <div className="mobile-constellation-info">
+                      <div className="mobile-constellation-name">{constellation.name}</div>
+                      <div className="mobile-constellation-subtitle">{constellation.nameEnglish}</div>
+                    </div>
                   </td>
                   <td className="abbrev">{constellation.abbrev}</td>
                   <td className="name">{constellation.name}</td>
@@ -251,6 +255,35 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                     <td colSpan="9">
                       <div className="details-content">
                         <div className="details-text">
+                            <div className="detail-section mobile-basic-info">
+                              <div className="info-grid">
+                                <div className="info-item">
+                                  <strong>Abbreviation:</strong> {constellation.abbrev}
+                                </div>
+                                <div className="info-item">
+                                  <strong>Hemisphere:</strong> {formatHemisphere(constellation.hemisphere)}
+                                </div>
+                                <div className="info-item">
+                                  <strong>Best Seasons:</strong> {formatSeasons(constellation.seasons)}
+                                </div>
+                                <div className="info-item">
+                                  <strong>Difficulty:</strong> {formatDifficulty(constellation.difficulty)}
+                                </div>
+                                <div className="info-item info-item-full">
+                                  <strong>Brightest Stars:</strong>
+                                  <div className="mobile-stars-list">
+                                    {constellation.namedStars.length > 0
+                                      ? constellation.namedStars.slice(0, 5).map((star, i) => (
+                                          <div key={i}>
+                                            {star.name} ({star.magnitude?.toFixed(1)})
+                                          </div>
+                                        ))
+                                      : '—'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
                             {constellation.intro && (
                               <div className="detail-section">
                                 <h4>Description</h4>

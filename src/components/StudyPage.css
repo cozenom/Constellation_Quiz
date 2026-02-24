@@ -206,6 +206,15 @@
   border-radius: 4px;
 }
 
+/* Hide mobile-specific info on desktop */
+.mobile-constellation-info {
+  display: none;
+}
+
+.mobile-basic-info {
+  display: none;
+}
+
 .expand-col {
   width: 40px;
   text-align: center;
@@ -286,27 +295,109 @@
   }
 
   .study-table {
-    font-size: 0.85em;
+    font-size: 0.9em;
   }
 
-  .study-table th,
-  .study-table td {
-    padding: 6px 8px;
-  }
-
-  /* Hide less important columns on mobile */
-  .study-table .name-english,
-  .study-table .stars {
+  /* Hide all header columns except first and last on mobile */
+  .study-table thead th:not(:first-child):not(:last-child) {
     display: none;
   }
 
-  /* Smaller images on mobile */
+  /* Hide all table cells except first and last on mobile */
+  .study-table tbody td:not(:first-child):not(:last-child) {
+    display: none;
+  }
+
+  /* Make first column (image + name) take full width */
   .image-col {
-    width: 120px;
+    width: auto;
+  }
+
+  .image-cell {
+    padding: 12px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .image-cell canvas {
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
+    margin-bottom: 8px;
+  }
+
+  /* Show constellation name and info inside the first cell on mobile */
+  .mobile-constellation-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mobile-constellation-name {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+
+  .mobile-constellation-subtitle {
+    font-size: 0.85em;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  /* Show basic info section in expanded view on mobile */
+  .mobile-basic-info {
+    display: block;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .info-item {
+    font-size: 0.95em;
+    line-height: 1.4;
+  }
+
+  .info-item strong {
+    color: #cbd5e1;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .info-item-full {
+    border-top: 1px solid #334155;
+    padding-top: 10px;
+    margin-top: 4px;
+  }
+
+  .mobile-stars-list {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* Expand column stays on the right */
+  .expand-col {
+    width: 50px;
+    vertical-align: middle;
+  }
+
+  .expand-btn {
+    font-size: 20px;
+  }
+
+  /* Details row spans both columns */
+  .details-row td {
+    padding: 16px !important;
   }
 }
