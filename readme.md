@@ -7,7 +7,7 @@ A mobile-friendly web quiz application for practicing constellation identificati
 - **Multiple Quiz Modes**
   - Multiple Choice Quiz: Identify constellations from star patterns with 4 answer choices
   - Sky View Mode: Click to identify constellations in a realistic dual-hemisphere night sky
-  - Study Guide: Complete reference table with mythology, history, features, and visualizations
+  - Study Guide: Complete reference table with mythology, history, features, and visualizations (mobile-optimized)
 
 - **Customizable Options**
   - Difficulty levels: Easy (20), Medium (36), Hard (32), or All (88) constellations
