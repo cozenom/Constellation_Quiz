@@ -6,6 +6,7 @@ import Quiz from './components/Quiz';
 import QuizResults from './components/QuizResults';
 import SkyView from './components/SkyView';
 import StudyPage from './components/StudyPage';
+import KeybindsPanel from './components/KeybindsPanel';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
 function App() {
@@ -256,6 +257,8 @@ function App() {
 
     return (
         <>
+            <KeybindsPanel screen={screen} />
+
             {screen === 'title' && (
                 <Title
                     onSelectRegularQuiz={goToSetup}
