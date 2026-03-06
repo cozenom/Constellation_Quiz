@@ -12,6 +12,7 @@ const FACTS = [
 
 function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
     const [currentFact, setCurrentFact] = useState('');
+    const [showAbout, setShowAbout] = useState(false);
 
     useEffect(() => {
         // Pick a random fact on mount
@@ -52,6 +53,33 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                     <div className="mode-description">Complete reference with mythology, history, and data</div>
                 </button>
             </div>
+
+            <button className="info-button" onClick={() => setShowAbout(true)} aria-label="About">
+                ⓘ
+            </button>
+
+            {showAbout && (
+                <div className="modal-overlay" onClick={() => setShowAbout(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h2>About Constellation Quiz</h2>
+                        <p>An interactive tool for learning all 88 constellations.</p>
+
+                        <h3>Data Sources</h3>
+                        <ul>
+                            <li>Constellation lines: <a href="https://github.com/Stellarium/stellarium" target="_blank" rel="noopener noreferrer">Stellarium</a></li>
+                            <li>Star positions: Hipparcos catalog via <a href="https://rhodesmill.org/skyfield/" target="_blank" rel="noopener noreferrer">Skyfield</a></li>
+                            <li>Stereographic projections & rendering: Me!</li>
+                            <li>Mythology & history: <a href="https://en.wikipedia.org/" target="_blank" rel="noopener noreferrer">Wikipedia</a></li>
+                        </ul>
+
+                        <p className="github-link">
+                            <a href="https://github.com/yourusername/Constellation_quiz" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+                        </p>
+
+                        <button className="close-button" onClick={() => setShowAbout(false)}>Close</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
