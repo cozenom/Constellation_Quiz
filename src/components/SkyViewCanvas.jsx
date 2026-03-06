@@ -212,29 +212,42 @@ function SkyViewCanvas({
             }
 
             // Build Path2D for constellations in this hemisphere
+            // All constellations now have boundary as array of polygons: [[[ra,dec],...], ...]
+            // Most have 1 polygon, Serpens has 2 (Caput and Cauda)
             for (const [abbrev, data] of allConstellations) {
-                if (!data.boundary || data.boundary.length < 3) continue;
+                if (!data.boundary || data.boundary.length === 0) continue;
 
-                // Check if any boundary point is visible in this hemisphere
-                const anyVisible = data.boundary.some(([ra, dec]) => {
-                    const pt = projectToHemisphere(ra, dec, hemisphere, centerX, centerY);
-                    return pt.visible;
-                });
-                if (!anyVisible) continue;
+                // Create a combined Path2D for all polygon parts
+                const combinedPath = new Path2D();
+                let anyPartVisible = false;
 
-                // Create Path2D for this constellation in this hemisphere
-                const path = new Path2D();
-                const first = projectToHemisphere(data.boundary[0][0], data.boundary[0][1], hemisphere, centerX, centerY);
-                path.moveTo(first.x, first.y);
+                for (const polygon of data.boundary) {
+                    if (!polygon || polygon.length < 3) continue;
 
-                for (let i = 1; i < data.boundary.length; i++) {
-                    const pt = projectToHemisphere(data.boundary[i][0], data.boundary[i][1], hemisphere, centerX, centerY);
-                    path.lineTo(pt.x, pt.y);
+                    // Check if any point in this polygon is visible in this hemisphere
+                    const polygonVisible = polygon.some(([ra, dec]) => {
+                        const pt = projectToHemisphere(ra, dec, hemisphere, centerX, centerY);
+                        return pt.visible;
+                    });
+
+                    if (!polygonVisible) continue;
+                    anyPartVisible = true;
+
+                    // Add this polygon to the combined path
+                    const first = projectToHemisphere(polygon[0][0], polygon[0][1], hemisphere, centerX, centerY);
+                    combinedPath.moveTo(first.x, first.y);
+
+                    for (let i = 1; i < polygon.length; i++) {
+                        const pt = projectToHemisphere(polygon[i][0], polygon[i][1], hemisphere, centerX, centerY);
+                        combinedPath.lineTo(pt.x, pt.y);
+                    }
+                    combinedPath.closePath();
                 }
-                path.closePath();
 
-                // Store ALL boundaries for hit testing (so we can identify what was tapped)
-                boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, path);
+                if (!anyPartVisible) continue;
+
+                // Store combined path for hit testing
+                boundaryPathsRef.current.set(`${abbrev}-${hemisphere}`, combinedPath);
 
                 // Draw the path
                 const isHighlighted = abbrev === highlightedAbbrev;
@@ -249,20 +262,20 @@ function SkyViewCanvas({
                         ctx.fillStyle = color + ', 0.15)';
                         ctx.strokeStyle = color + ', 0.8)';
                         ctx.lineWidth = 2;
-                        ctx.fill(path);
+                        ctx.fill(combinedPath);
                     } else if (isHighlighted && !tappedFeedback?.correct) {
                         // Blue for correct answer (only show when wrong click)
                         ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
                         ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
                         ctx.lineWidth = 2;
-                        ctx.fill(path);
+                        ctx.fill(combinedPath);
                     } else if (showBoundaries) {
                         // Only show neutral boundaries if toggle is on
                         ctx.strokeStyle = 'rgba(71, 85, 105, 0.3)';
                         ctx.lineWidth = 1;
                     }
                     if (isFeedbackTarget || showBoundaries) {
-                        ctx.stroke(path);
+                        ctx.stroke(combinedPath);
                     }
                 }
             }
