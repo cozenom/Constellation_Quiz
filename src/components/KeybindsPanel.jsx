@@ -14,6 +14,7 @@ function KeybindsPanel({ screen }) {
             case 'setup':
             case 'skyview-setup':
                 return [
+                    { keys: ['Enter'], label: 'Start quiz' },
                     { keys: ['Esc'], label: 'Back to menu' }
                 ];
 
@@ -38,6 +39,7 @@ function KeybindsPanel({ screen }) {
             case 'results':
             case 'skyview-results':
                 return [
+                    { keys: ['Enter'], label: 'Restart quiz' },
                     { keys: ['Esc'], label: 'Back to setup' }
                 ];
 

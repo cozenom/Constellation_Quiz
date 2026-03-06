@@ -20,11 +20,15 @@ function QuizResults({ quizState, onRestart, onNewQuiz, onBackToSetup }) {
             if (e.code === 'Escape') {
                 onBackToSetup();
             }
+            // Enter → Restart with same settings
+            if (e.code === 'Enter') {
+                onRestart();
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onBackToSetup]);
+    }, [onBackToSetup, onRestart]);
 
     return (
         <div>

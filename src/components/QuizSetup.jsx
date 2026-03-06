@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 
 function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
@@ -23,17 +23,6 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
             setConfig(prev => ({ ...prev, ...initialConfig }));
         }
     }, [initialConfig]);
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.code === 'Escape') {
-                onBack();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onBack]);
 
     // Get all constellations sorted alphabetically
     const allConstellations = useMemo(() => {
@@ -89,9 +78,24 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
         setConfig(prev => ({ ...prev, selectedConstellations: [] }));
     };
 
-    const handleStart = () => {
+    const handleStart = useCallback(() => {
         onStart(config);
-    };
+    }, [onStart, config]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.code === 'Escape') {
+                onBack();
+            }
+            // Enter → Start quiz (if valid)
+            if (e.code === 'Enter' && filteredCount > 0) {
+                handleStart();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onBack, handleStart, filteredCount]);
 
     return (
         <div>

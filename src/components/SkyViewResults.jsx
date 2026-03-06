@@ -17,11 +17,15 @@ function SkyViewResults({ score, missedAnswers, onPlayAgain, onBack }) {
             if (e.code === 'Escape') {
                 onBack();
             }
+            // Enter → Restart with same settings
+            if (e.code === 'Enter') {
+                onPlayAgain();
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onBack]);
+    }, [onBack, onPlayAgain]);
 
     return (
         <div>
