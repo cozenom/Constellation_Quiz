@@ -17,7 +17,7 @@ function App() {
     const [savedSkyViewConfig, setSavedSkyViewConfig] = useState(null);
     const [quizState, setQuizState] = useState(null);
     const [constellationData, setConstellationData] = useState(null);
-    const [constellationInfo, setConstellationInfo] = useState(null);
+    const [constellationStudy, setConstellationStudy] = useState(null);
     const [starCatalogData, setStarCatalogData] = useState(null);
     const [skyViewStars, setSkyViewStars] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
@@ -40,22 +40,22 @@ function App() {
             });
     }, []);
 
-    // Load constellation info (Wikipedia data) from external JSON
+    // Load constellation study data (rich Wikipedia data) from external JSON
     useEffect(() => {
-        fetch(`${import.meta.env.BASE_URL}data/constellation_info.json`)
+        fetch(`${import.meta.env.BASE_URL}data/constellation_study.json`)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Failed to load constellation info: ${response.statusText}`);
+                    throw new Error(`Failed to load constellation study data: ${response.statusText}`);
                 }
                 return response.json();
             })
             .then(data => {
-                setConstellationInfo(data);
+                setConstellationStudy(data);
             })
             .catch(error => {
-                console.error('Error loading constellation info:', error);
-                // Don't block app if constellation info fails to load
-                setConstellationInfo(null);
+                console.error('Error loading constellation study data:', error);
+                // Don't block app if constellation study fails to load
+                setConstellationStudy(null);
             });
     }, []);
 
@@ -311,7 +311,7 @@ function App() {
                 <StudyPage
                     onBack={backToTitle}
                     constellationData={constellationData}
-                    constellationInfo={constellationInfo}
+                    constellationStudy={constellationStudy}
                 />
             )}
         </>

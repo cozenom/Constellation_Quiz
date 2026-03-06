@@ -4,13 +4,13 @@ import {
   formatSeasons,
   formatHemisphere,
   formatDifficulty,
-  getFeaturesSummary,
-  getCulturalSummary
+  formatArea,
+  formatSource
 } from '../utils/studyDataUtils';
 import QuizCanvas from './QuizCanvas';
 import './StudyPage.css';
 
-function StudyPage({ onBack, constellationData, constellationInfo }) {
+function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [filterHemisphere, setFilterHemisphere] = useState('all');
@@ -30,7 +30,7 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
   }, [onBack]);
 
   // Show loading state if data isn't ready
-  if (!constellationData || !constellationInfo) {
+  if (!constellationData || !constellationStudy) {
     return (
       <div className="study-page">
         <div className="study-header">
@@ -44,8 +44,8 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
 
   // Merge data once
   const studyData = useMemo(() => {
-    return mergeStudyData(constellationData, constellationInfo);
-  }, [constellationData, constellationInfo]);
+    return mergeStudyData(constellationData, constellationStudy);
+  }, [constellationData, constellationStudy]);
 
   // Apply filters and sorting
   const filteredAndSorted = useMemo(() => {
@@ -260,6 +260,21 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                                 <div className="info-item">
                                   <strong>Abbreviation:</strong> {constellation.abbrev}
                                 </div>
+                                {constellation.genitive && (
+                                  <div className="info-item">
+                                    <strong>Genitive:</strong> {constellation.genitive}
+                                  </div>
+                                )}
+                                {constellation.pronunciation && (
+                                  <div className="info-item">
+                                    <strong>Pronunciation:</strong> {constellation.pronunciation}
+                                  </div>
+                                )}
+                                {constellation.symbolism && (
+                                  <div className="info-item">
+                                    <strong>Symbolism:</strong> {constellation.symbolism}
+                                  </div>
+                                )}
                                 <div className="info-item">
                                   <strong>Hemisphere:</strong> {formatHemisphere(constellation.hemisphere)}
                                 </div>
@@ -269,25 +284,55 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                                 <div className="info-item">
                                   <strong>Difficulty:</strong> {formatDifficulty(constellation.difficulty)}
                                 </div>
-                                <div className="info-item info-item-full">
-                                  <strong>Brightest Stars:</strong>
-                                  <div className="mobile-stars-list">
-                                    {constellation.namedStars.length > 0
-                                      ? constellation.namedStars.slice(0, 5).map((star, i) => (
-                                          <div key={i}>
-                                            {star.name} ({star.magnitude?.toFixed(1)})
-                                          </div>
-                                        ))
-                                      : '—'}
+                                {constellation.area && (
+                                  <div className="info-item">
+                                    <strong>Area:</strong> {formatArea(constellation.area)}
                                   </div>
-                                </div>
+                                )}
+                                {constellation.brightestStar && (
+                                  <div className="info-item">
+                                    <strong>Brightest Star:</strong> {constellation.brightestStar}
+                                  </div>
+                                )}
+                                {constellation.messierObjects && (
+                                  <div className="info-item">
+                                    <strong>Messier Objects:</strong> {constellation.messierObjects}
+                                  </div>
+                                )}
+                                {constellation.meteorShowers && (
+                                  <div className="info-item">
+                                    <strong>Meteor Showers:</strong> {constellation.meteorShowers}
+                                  </div>
+                                )}
+                                {constellation.source && (
+                                  <div className="info-item">
+                                    <strong>Source:</strong> {formatSource(constellation.source)}
+                                  </div>
+                                )}
+                                {constellation.bordering && constellation.bordering.length > 0 && (
+                                  <div className="info-item info-item-full">
+                                    <strong>Bordering Constellations:</strong> {constellation.bordering.join(', ')}
+                                  </div>
+                                )}
+                                {constellation.namedStars.length > 0 && (
+                                  <div className="info-item info-item-full">
+                                    <strong>Brightest Stars:</strong>
+                                    <div className="mobile-stars-list">
+                                      {constellation.namedStars.slice(0, 5).map((star, i) => (
+                                        <div key={i}>
+                                          {star.name} ({star.magnitude?.toFixed(1)})
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
-                            {constellation.intro && (
+                            {constellation.description && (
                               <div className="detail-section">
                                 <h4>Description</h4>
-                                <p>{constellation.intro}</p>
+                                <p>{constellation.description}</p>
                               </div>
                             )}
 
@@ -298,24 +343,32 @@ function StudyPage({ onBack, constellationData, constellationInfo }) {
                               </div>
                             )}
 
-                            {constellation.history && (
+                            {constellation.starsText && (
                               <div className="detail-section">
-                                <h4>History</h4>
-                                <p>{constellation.history}</p>
+                                <h4>Notable Stars</h4>
+                                <p>{constellation.starsText}</p>
                               </div>
                             )}
 
-                            {getFeaturesSummary(constellation.features) && (
+                            {constellation.deepSkyObjects && (
                               <div className="detail-section">
-                                <h4>Notable Features</h4>
-                                <p>{getFeaturesSummary(constellation.features)}</p>
+                                <h4>Deep Sky Objects</h4>
+                                <p>{constellation.deepSkyObjects}</p>
                               </div>
                             )}
 
-                            {getCulturalSummary(constellation.cultural) && (
+                            {constellation.meteorShowersDetail && (
                               <div className="detail-section">
-                                <h4>Cultural Significance</h4>
-                                <p>{getCulturalSummary(constellation.cultural)}</p>
+                                <h4>Meteor Showers (Details)</h4>
+                                <p>{constellation.meteorShowersDetail}</p>
+                              </div>
+                            )}
+
+                            {constellation.wikiUrl && (
+                              <div className="detail-section">
+                                <a href={constellation.wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">
+                                  Read more on Wikipedia →
+                                </a>
                               </div>
                             )}
 
