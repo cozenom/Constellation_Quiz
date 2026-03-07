@@ -190,6 +190,42 @@
   color: #cbd5e1;
 }
 
+.study-table .area {
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+.study-table .area-rank {
+  color: #94a3b8;
+  font-size: 0.85em;
+}
+
+.study-table .source {
+  color: #cbd5e1;
+  font-size: 0.9em;
+}
+
+.study-table .messier {
+  color: #cbd5e1;
+  text-align: center;
+}
+
+.wiki-col {
+  width: 50px;
+  text-align: center;
+}
+
+.wiki-link-icon {
+  font-size: 1.2em;
+  text-decoration: none;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.wiki-link-icon:hover {
+  transform: scale(1.2);
+}
+
 .image-col {
   width: 260px;
 }

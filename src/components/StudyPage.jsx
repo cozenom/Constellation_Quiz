@@ -93,6 +93,14 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
           aVal = a.seasons[0] || '';
           bVal = b.seasons[0] || '';
           break;
+        case 'area':
+          aVal = a.area?.value || 0;
+          bVal = b.area?.value || 0;
+          break;
+        case 'source':
+          aVal = a.source?.discoverer || '';
+          bVal = b.source?.discoverer || '';
+          break;
         default:
           return 0;
       }
@@ -198,7 +206,14 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
               <th onClick={() => handleSort('difficulty')} className="sortable">
                 Difficulty {getSortIcon('difficulty')}
               </th>
-              <th>Brightest Stars (Magnitude)</th>
+              <th onClick={() => handleSort('area')} className="sortable">
+                Area (sq°) {getSortIcon('area')}
+              </th>
+              <th onClick={() => handleSort('source')} className="sortable">
+                Source {getSortIcon('source')}
+              </th>
+              <th>Messier</th>
+              <th>Brightest Stars</th>
               <th className="expand-col"></th>
             </tr>
           </thead>
@@ -230,9 +245,19 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   <td className={`difficulty difficulty-${constellation.difficulty}`}>
                     {formatDifficulty(constellation.difficulty)}
                   </td>
+                  <td className="area">
+                    {constellation.area ? (
+                      <>
+                        {constellation.area.value}
+                        <span className="area-rank"> (#{constellation.area.rank})</span>
+                      </>
+                    ) : '—'}
+                  </td>
+                  <td className="source">{formatSource(constellation.source)}</td>
+                  <td className="messier">{constellation.messierObjects || '—'}</td>
                   <td className="stars">
                     {constellation.namedStars.length > 0
-                      ? constellation.namedStars.slice(0, 5).map((star, i) => (
+                      ? constellation.namedStars.slice(0, 3).map((star, i) => (
                           <div key={i}>
                             {star.name} ({star.magnitude?.toFixed(1)})
                           </div>
@@ -252,7 +277,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
 
                 {(expandAll || expandedRow === constellation.abbrev) && (
                   <tr className="details-row">
-                    <td colSpan="9">
+                    <td colSpan="12">
                       <div className="details-content">
                         <div className="details-text">
                             <div className="detail-section mobile-basic-info">
