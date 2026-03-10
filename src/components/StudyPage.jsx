@@ -14,7 +14,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [sortBy, setSortBy] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [filterHemisphere, setFilterHemisphere] = useState('all');
-  const [filterSeason, setFilterSeason] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [expandedRow, setExpandedRow] = useState(null);
   const [expandAll, setExpandAll] = useState(false);
@@ -59,10 +58,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
       });
     }
 
-    if (filterSeason !== 'all') {
-      data = data.filter(c => c.seasons.includes(filterSeason));
-    }
-
     if (filterDifficulty !== 'all') {
       data = data.filter(c => c.difficulty === filterDifficulty);
     }
@@ -89,17 +84,32 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
           aVal = diffOrder[a.difficulty];
           bVal = diffOrder[b.difficulty];
           break;
-        case 'seasons':
-          aVal = a.seasons[0] || '';
-          bVal = b.seasons[0] || '';
-          break;
         case 'area':
           aVal = a.area?.value || 0;
           bVal = b.area?.value || 0;
           break;
         case 'source':
-          aVal = a.source?.discoverer || '';
-          bVal = b.source?.discoverer || '';
+          // Sort by year (extract numeric year, handle "2nd century" format)
+          const extractYear = (source) => {
+            if (!source?.year) return 9999; // Put items without year at end
+            const yearStr = source.year.toString();
+            // Handle "2nd century" -> 200, "17th century" -> 1700, etc.
+            if (yearStr.includes('century')) {
+              const centuryMatch = yearStr.match(/(\d+)/);
+              if (centuryMatch) {
+                return parseInt(centuryMatch[1]) * 100;
+              }
+            }
+            // Handle regular year like "1756"
+            const yearMatch = yearStr.match(/(\d{3,4})/);
+            return yearMatch ? parseInt(yearMatch[1]) : 9999;
+          };
+          aVal = extractYear(a.source);
+          bVal = extractYear(b.source);
+          break;
+        case 'bordering':
+          aVal = a.bordering?.length || 0;
+          bVal = b.bordering?.length || 0;
           break;
         default:
           return 0;
@@ -111,7 +121,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
     });
 
     return data;
-  }, [studyData, sortBy, sortDir, filterHemisphere, filterSeason, filterDifficulty]);
+  }, [studyData, sortBy, sortDir, filterHemisphere, filterDifficulty]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -156,17 +166,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
         </div>
 
         <div className="filter-group">
-          <label>Season:</label>
-          <select value={filterSeason} onChange={(e) => setFilterSeason(e.target.value)}>
-            <option value="all">All</option>
-            <option value="winter">Winter</option>
-            <option value="spring">Spring</option>
-            <option value="summer">Summer</option>
-            <option value="fall">Fall</option>
-          </select>
-        </div>
-
-        <div className="filter-group">
           <label>Difficulty:</label>
           <select value={filterDifficulty} onChange={(e) => setFilterDifficulty(e.target.value)}>
             <option value="all">All</option>
@@ -200,19 +199,18 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
               <th onClick={() => handleSort('hemisphere')} className="sortable">
                 Hemisphere {getSortIcon('hemisphere')}
               </th>
-              <th onClick={() => handleSort('seasons')} className="sortable">
-                Best Seasons {getSortIcon('seasons')}
-              </th>
               <th onClick={() => handleSort('difficulty')} className="sortable">
                 Difficulty {getSortIcon('difficulty')}
               </th>
               <th onClick={() => handleSort('area')} className="sortable">
                 Area (sq°) {getSortIcon('area')}
               </th>
-              <th onClick={() => handleSort('source')} className="sortable">
-                Source {getSortIcon('source')}
+              <th onClick={() => handleSort('bordering')} className="sortable">
+                Bordering {getSortIcon('bordering')}
               </th>
-              <th>Messier</th>
+              <th onClick={() => handleSort('source')} className="sortable">
+                Origin {getSortIcon('source')}
+              </th>
               <th>Brightest Stars</th>
               <th className="expand-col"></th>
             </tr>
@@ -241,7 +239,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   <td className="name">{constellation.name}</td>
                   <td className="name-english">{constellation.nameEnglish}</td>
                   <td className="hemisphere">{formatHemisphere(constellation.hemisphere)}</td>
-                  <td className="seasons">{formatSeasons(constellation.seasons)}</td>
                   <td className={`difficulty difficulty-${constellation.difficulty}`}>
                     {formatDifficulty(constellation.difficulty)}
                   </td>
@@ -253,8 +250,12 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                       </>
                     ) : '—'}
                   </td>
+                  <td className="bordering">
+                    {constellation.bordering && constellation.bordering.length > 0
+                      ? constellation.bordering.join(', ')
+                      : '—'}
+                  </td>
                   <td className="source">{formatSource(constellation.source)}</td>
-                  <td className="messier">{constellation.messierObjects || '—'}</td>
                   <td className="stars">
                     {constellation.namedStars.length > 0
                       ? constellation.namedStars.slice(0, 3).map((star, i) => (
@@ -277,7 +278,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
 
                 {(expandAll || expandedRow === constellation.abbrev) && (
                   <tr className="details-row">
-                    <td colSpan="12">
+                    <td colSpan="11">
                       <div className="details-content">
                         <div className="details-text">
                             <div className="detail-section mobile-basic-info">
