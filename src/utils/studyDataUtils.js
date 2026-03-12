@@ -52,6 +52,7 @@ export function mergeStudyData(constellationData, constellationStudy) {
       meteorShowers: study.meteor_showers || null,
       source: study.source || null,
       description: study.description || null,
+      // Keep the data types as-is (object for mythology, arrays for text fields)
       mythology: study.mythology || null,
       starsText: study.stars_text || null,
       deepSkyObjects: study.deep_sky_objects || null,

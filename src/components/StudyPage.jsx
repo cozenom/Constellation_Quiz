@@ -17,6 +17,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [expandedRow, setExpandedRow] = useState(null);
   const [expandAll, setExpandAll] = useState(false);
+  const [activeTab, setActiveTab] = useState({}); // Track active tab per constellation
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -134,6 +135,14 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
 
   const toggleRow = (abbrev) => {
     setExpandedRow(expandedRow === abbrev ? null : abbrev);
+    // Set default tab to 'overview' when expanding
+    if (expandedRow !== abbrev && !activeTab[abbrev]) {
+      setActiveTab(prev => ({ ...prev, [abbrev]: 'overview' }));
+    }
+  };
+
+  const handleTabChange = (abbrev, tab) => {
+    setActiveTab(prev => ({ ...prev, [abbrev]: tab }));
   };
 
   const toggleExpandAll = () => {
@@ -280,9 +289,74 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   <tr className="details-row">
                     <td colSpan="11">
                       <div className="details-content">
-                        <div className="details-text">
-                            <div className="detail-section mobile-basic-info">
-                              <div className="info-grid">
+                        {/* Tab Navigation */}
+                        <div className="tabs-nav">
+                          <button
+                            className={`tab-btn ${(activeTab[constellation.abbrev] || 'overview') === 'overview' ? 'active' : ''}`}
+                            onClick={() => handleTabChange(constellation.abbrev, 'overview')}
+                          >
+                            Overview
+                          </button>
+                          {constellation.description && (
+                            <button
+                              className={`tab-btn ${activeTab[constellation.abbrev] === 'description' ? 'active' : ''}`}
+                              onClick={() => handleTabChange(constellation.abbrev, 'description')}
+                            >
+                              Description
+                            </button>
+                          )}
+                          {(constellation.mythology && (
+                            typeof constellation.mythology === 'string' ||
+                            (typeof constellation.mythology === 'object' && Object.keys(constellation.mythology).length > 0)
+                          )) && (
+                            <button
+                              className={`tab-btn ${activeTab[constellation.abbrev] === 'mythology' ? 'active' : ''}`}
+                              onClick={() => handleTabChange(constellation.abbrev, 'mythology')}
+                            >
+                              Mythology
+                            </button>
+                          )}
+                          {(constellation.starsText && (
+                            typeof constellation.starsText === 'string' ||
+                            (Array.isArray(constellation.starsText) && constellation.starsText.length > 0)
+                          )) && (
+                            <button
+                              className={`tab-btn ${activeTab[constellation.abbrev] === 'stars' ? 'active' : ''}`}
+                              onClick={() => handleTabChange(constellation.abbrev, 'stars')}
+                            >
+                              Notable Stars
+                            </button>
+                          )}
+                          {(constellation.deepSkyObjects && (
+                            typeof constellation.deepSkyObjects === 'string' ||
+                            (Array.isArray(constellation.deepSkyObjects) && constellation.deepSkyObjects.length > 0)
+                          )) && (
+                            <button
+                              className={`tab-btn ${activeTab[constellation.abbrev] === 'deepsky' ? 'active' : ''}`}
+                              onClick={() => handleTabChange(constellation.abbrev, 'deepsky')}
+                            >
+                              Deep Sky
+                            </button>
+                          )}
+                          {(constellation.meteorShowersDetail && (
+                            typeof constellation.meteorShowersDetail === 'string' ||
+                            (Array.isArray(constellation.meteorShowersDetail) && constellation.meteorShowersDetail.length > 0)
+                          )) && (
+                            <button
+                              className={`tab-btn ${activeTab[constellation.abbrev] === 'meteors' ? 'active' : ''}`}
+                              onClick={() => handleTabChange(constellation.abbrev, 'meteors')}
+                            >
+                              Meteor Showers
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Tab Content */}
+                        <div className="tab-content">
+                          {/* Overview Tab */}
+                          {(activeTab[constellation.abbrev] || 'overview') === 'overview' && (
+                            <div className="tab-panel">
+                              <div className="info-grid-details">
                                 <div className="info-item">
                                   <strong>Abbreviation:</strong> {constellation.abbrev}
                                 </div>
@@ -303,9 +377,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                 )}
                                 <div className="info-item">
                                   <strong>Hemisphere:</strong> {formatHemisphere(constellation.hemisphere)}
-                                </div>
-                                <div className="info-item">
-                                  <strong>Best Seasons:</strong> {formatSeasons(constellation.seasons)}
                                 </div>
                                 <div className="info-item">
                                   <strong>Difficulty:</strong> {formatDifficulty(constellation.difficulty)}
@@ -332,7 +403,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                 )}
                                 {constellation.source && (
                                   <div className="info-item">
-                                    <strong>Source:</strong> {formatSource(constellation.source)}
+                                    <strong>Origin:</strong> {formatSource(constellation.source)}
                                   </div>
                                 )}
                                 {constellation.bordering && constellation.bordering.length > 0 && (
@@ -343,9 +414,9 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                 {constellation.namedStars.length > 0 && (
                                   <div className="info-item info-item-full">
                                     <strong>Brightest Stars:</strong>
-                                    <div className="mobile-stars-list">
-                                      {constellation.namedStars.slice(0, 5).map((star, i) => (
-                                        <div key={i}>
+                                    <div className="stars-list">
+                                      {constellation.namedStars.slice(0, 10).map((star, i) => (
+                                        <div key={i} className="star-item">
                                           {star.name} ({star.magnitude?.toFixed(1)})
                                         </div>
                                       ))}
@@ -354,51 +425,142 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                 )}
                               </div>
                             </div>
+                          )}
 
-                            {constellation.description && (
-                              <div className="detail-section">
-                                <h4>Description</h4>
-                                <p>{constellation.description}</p>
+                          {/* Description Tab */}
+                          {activeTab[constellation.abbrev] === 'description' && constellation.description && (
+                            <div className="tab-panel">
+                              <div className="text-content">
+                                {constellation.description}
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {constellation.mythology && (
-                              <div className="detail-section">
-                                <h4>Mythology</h4>
-                                <p>{constellation.mythology}</p>
+                          {/* Mythology Tab */}
+                          {activeTab[constellation.abbrev] === 'mythology' && constellation.mythology && (
+                            <div className="tab-panel">
+                              <div className="mythology-content">
+                                {(typeof constellation.mythology === 'object' &&
+                                  !Array.isArray(constellation.mythology) &&
+                                  constellation.mythology !== null) ? (
+                                  <>
+                                    {constellation.mythology.babylonian && Array.isArray(constellation.mythology.babylonian) && constellation.mythology.babylonian.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Babylonian</h4>
+                                        {constellation.mythology.babylonian.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.greek && Array.isArray(constellation.mythology.greek) && constellation.mythology.greek.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Greek</h4>
+                                        {constellation.mythology.greek.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.roman && Array.isArray(constellation.mythology.roman) && constellation.mythology.roman.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Roman</h4>
+                                        {constellation.mythology.roman.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.arab && Array.isArray(constellation.mythology.arab) && constellation.mythology.arab.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Arab</h4>
+                                        {constellation.mythology.arab.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.chinese && Array.isArray(constellation.mythology.chinese) && constellation.mythology.chinese.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Chinese</h4>
+                                        {constellation.mythology.chinese.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.hindu && Array.isArray(constellation.mythology.hindu) && constellation.mythology.hindu.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Hindu</h4>
+                                        {constellation.mythology.hindu.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.polynesian && Array.isArray(constellation.mythology.polynesian) && constellation.mythology.polynesian.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>Polynesian</h4>
+                                        {constellation.mythology.polynesian.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {constellation.mythology.history && Array.isArray(constellation.mythology.history) && constellation.mythology.history.length > 0 && (
+                                      <div className="mythology-section">
+                                        <h4>History</h4>
+                                        {constellation.mythology.history.map((text, i) => (
+                                          <p key={i}>{text}</p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="text-content">{constellation.mythology}</div>
+                                )}
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {constellation.starsText && (
-                              <div className="detail-section">
-                                <h4>Notable Stars</h4>
-                                <p>{constellation.starsText}</p>
+                          {/* Notable Stars Tab */}
+                          {activeTab[constellation.abbrev] === 'stars' && constellation.starsText && (
+                            <div className="tab-panel">
+                              <div className="text-content">
+                                {Array.isArray(constellation.starsText) ? (
+                                  constellation.starsText.map((text, i) => (
+                                    <p key={i}>{text}</p>
+                                  ))
+                                ) : (
+                                  constellation.starsText
+                                )}
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {constellation.deepSkyObjects && (
-                              <div className="detail-section">
-                                <h4>Deep Sky Objects</h4>
-                                <p>{constellation.deepSkyObjects}</p>
+                          {/* Deep Sky Tab */}
+                          {activeTab[constellation.abbrev] === 'deepsky' && constellation.deepSkyObjects && (
+                            <div className="tab-panel">
+                              <div className="text-content">
+                                {Array.isArray(constellation.deepSkyObjects) ? (
+                                  constellation.deepSkyObjects.map((text, i) => (
+                                    <p key={i}>{text}</p>
+                                  ))
+                                ) : (
+                                  constellation.deepSkyObjects
+                                )}
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {constellation.meteorShowersDetail && (
-                              <div className="detail-section">
-                                <h4>Meteor Showers (Details)</h4>
-                                <p>{constellation.meteorShowersDetail}</p>
+                          {/* Meteor Showers Tab */}
+                          {activeTab[constellation.abbrev] === 'meteors' && constellation.meteorShowersDetail && (
+                            <div className="tab-panel">
+                              <div className="text-content">
+                                {Array.isArray(constellation.meteorShowersDetail) ? (
+                                  constellation.meteorShowersDetail.map((text, i) => (
+                                    <p key={i}>{text}</p>
+                                  ))
+                                ) : (
+                                  constellation.meteorShowersDetail
+                                )}
                               </div>
-                            )}
-
-                            {constellation.wikiUrl && (
-                              <div className="detail-section">
-                                <a href={constellation.wikiUrl} target="_blank" rel="noopener noreferrer" className="wiki-link">
-                                  Read more on Wikipedia →
-                                </a>
-                              </div>
-                            )}
-
-                          </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
