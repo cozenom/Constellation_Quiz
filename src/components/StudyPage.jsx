@@ -161,6 +161,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
         <button className="back-button" onClick={onBack}>← Back to Menu</button>
         <h1>Constellation Study Guide</h1>
         <p>Reference table for all 88 IAU constellations</p>
+        <div className="under-construction-tag">🚧 Under Construction 🚧</div>
       </div>
 
       <div className="study-filters">
@@ -297,14 +298,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           >
                             Overview
                           </button>
-                          {constellation.description && (
-                            <button
-                              className={`tab-btn ${activeTab[constellation.abbrev] === 'description' ? 'active' : ''}`}
-                              onClick={() => handleTabChange(constellation.abbrev, 'description')}
-                            >
-                              Description
-                            </button>
-                          )}
                           {(constellation.mythology && (
                             typeof constellation.mythology === 'string' ||
                             (typeof constellation.mythology === 'object' && Object.keys(constellation.mythology).length > 0)
@@ -356,10 +349,15 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Overview Tab */}
                           {(activeTab[constellation.abbrev] || 'overview') === 'overview' && (
                             <div className="tab-panel">
-                              <div className="info-grid-details">
-                                <div className="info-item">
-                                  <strong>Abbreviation:</strong> {constellation.abbrev}
+                              {/* Description at top */}
+                              {constellation.description && (
+                                <div className="overview-description">
+                                  {constellation.description}
                                 </div>
+                              )}
+
+                              {/* Info grid with non-redundant data */}
+                              <div className="info-grid-details">
                                 {constellation.genitive && (
                                   <div className="info-item">
                                     <strong>Genitive:</strong> {constellation.genitive}
@@ -373,17 +371,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                 {constellation.symbolism && (
                                   <div className="info-item">
                                     <strong>Symbolism:</strong> {constellation.symbolism}
-                                  </div>
-                                )}
-                                <div className="info-item">
-                                  <strong>Hemisphere:</strong> {formatHemisphere(constellation.hemisphere)}
-                                </div>
-                                <div className="info-item">
-                                  <strong>Difficulty:</strong> {formatDifficulty(constellation.difficulty)}
-                                </div>
-                                {constellation.area && (
-                                  <div className="info-item">
-                                    <strong>Area:</strong> {formatArea(constellation.area)}
                                   </div>
                                 )}
                                 {constellation.brightestStar && (
@@ -401,16 +388,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                     <strong>Meteor Showers:</strong> {constellation.meteorShowers}
                                   </div>
                                 )}
-                                {constellation.source && (
-                                  <div className="info-item">
-                                    <strong>Origin:</strong> {formatSource(constellation.source)}
-                                  </div>
-                                )}
-                                {constellation.bordering && constellation.bordering.length > 0 && (
-                                  <div className="info-item info-item-full">
-                                    <strong>Bordering Constellations:</strong> {constellation.bordering.join(', ')}
-                                  </div>
-                                )}
                                 {constellation.namedStars.length > 0 && (
                                   <div className="info-item info-item-full">
                                     <strong>Brightest Stars:</strong>
@@ -423,15 +400,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                                     </div>
                                   </div>
                                 )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Description Tab */}
-                          {activeTab[constellation.abbrev] === 'description' && constellation.description && (
-                            <div className="tab-panel">
-                              <div className="text-content">
-                                {constellation.description}
                               </div>
                             </div>
                           )}
