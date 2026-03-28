@@ -349,58 +349,104 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Overview Tab */}
                           {(activeTab[constellation.abbrev] || 'overview') === 'overview' && (
                             <div className="tab-panel">
-                              {/* Description at top */}
+                              {/* Key Stats Badges */}
+                              <div className="stats-badges">
+                                <div className={`badge badge-hemisphere badge-${constellation.hemisphere}`}>
+                                  <span className="badge-label">{formatHemisphere(constellation.hemisphere)}</span>
+                                </div>
+                                <div className={`badge badge-difficulty badge-diff-${constellation.difficulty}`}>
+                                  <span className="badge-label">{formatDifficulty(constellation.difficulty)}</span>
+                                </div>
+                                {constellation.seasons && (
+                                  <div className="badge badge-seasons">
+                                    <span className="badge-label">{formatSeasons(constellation.seasons)}</span>
+                                  </div>
+                                )}
+                                {constellation.area && (
+                                  <div className="badge badge-area">
+                                    <span className="badge-label">{constellation.area.value} sq° (#{constellation.area.rank})</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Symbolism - Featured */}
+                              {constellation.symbolism && (
+                                <div className="symbolism-featured">
+                                  <div>
+                                    <div className="symbolism-label">Symbolism</div>
+                                    <div className="symbolism-text">{constellation.symbolism}</div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Description */}
                               {constellation.description && (
                                 <div className="overview-description">
                                   {constellation.description}
                                 </div>
                               )}
 
-                              {/* Info grid with non-redundant data */}
-                              <div className="info-grid-details">
-                                {constellation.genitive && (
-                                  <div className="info-item">
-                                    <strong>Genitive:</strong> {constellation.genitive}
-                                  </div>
-                                )}
+                              {/* Info Cards Grid */}
+                              <div className="info-cards-grid">
                                 {constellation.pronunciation && (
-                                  <div className="info-item">
-                                    <strong>Pronunciation:</strong> {constellation.pronunciation}
+                                  <div className="info-card">
+                                    <div className="info-card-header">
+                                      <span className="info-card-title">Pronunciation</span>
+                                    </div>
+                                    <div className="info-card-content">{constellation.pronunciation}</div>
                                   </div>
                                 )}
-                                {constellation.symbolism && (
-                                  <div className="info-item">
-                                    <strong>Symbolism:</strong> {constellation.symbolism}
+                                {constellation.genitive && (
+                                  <div className="info-card">
+                                    <div className="info-card-header">
+                                      <span className="info-card-title">Genitive Form</span>
+                                    </div>
+                                    <div className="info-card-content">{constellation.genitive}</div>
                                   </div>
                                 )}
                                 {constellation.brightestStar && (
-                                  <div className="info-item">
-                                    <strong>Brightest Star:</strong> {constellation.brightestStar}
+                                  <div className="info-card">
+                                    <div className="info-card-header">
+                                      <span className="info-card-title">Brightest Star</span>
+                                    </div>
+                                    <div className="info-card-content">{constellation.brightestStar}</div>
                                   </div>
                                 )}
                                 {constellation.messierObjects && (
-                                  <div className="info-item">
-                                    <strong>Messier Objects:</strong> {constellation.messierObjects}
+                                  <div className="info-card">
+                                    <div className="info-card-header">
+                                      <span className="info-card-title">Messier Objects</span>
+                                    </div>
+                                    <div className="info-card-content">{constellation.messierObjects}</div>
                                   </div>
                                 )}
                                 {constellation.meteorShowers && (
-                                  <div className="info-item">
-                                    <strong>Meteor Showers:</strong> {constellation.meteorShowers}
-                                  </div>
-                                )}
-                                {constellation.namedStars.length > 0 && (
-                                  <div className="info-item info-item-full">
-                                    <strong>Brightest Stars:</strong>
-                                    <div className="stars-list">
-                                      {constellation.namedStars.slice(0, 10).map((star, i) => (
-                                        <div key={i} className="star-item">
-                                          {star.name} ({star.magnitude?.toFixed(1)})
-                                        </div>
-                                      ))}
+                                  <div className="info-card">
+                                    <div className="info-card-header">
+                                      <span className="info-card-title">Meteor Showers</span>
                                     </div>
+                                    <div className="info-card-content">{constellation.meteorShowers}</div>
                                   </div>
                                 )}
                               </div>
+
+                              {/* Brightest Stars Section */}
+                              {constellation.namedStars.length > 0 && (
+                                <div className="stars-section">
+                                  <h4 className="section-title">
+                                    Brightest Stars
+                                  </h4>
+                                  <div className="stars-grid">
+                                    {constellation.namedStars.slice(0, 10).map((star, i) => (
+                                      <div key={i} className="star-card">
+                                        <span className="star-number">#{i + 1}</span>
+                                        <span className="star-name">{star.name}</span>
+                                        <span className="star-magnitude">mag {star.magnitude?.toFixed(1)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
