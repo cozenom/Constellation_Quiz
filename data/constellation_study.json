@@ -4119,7 +4119,23 @@
     ],
     "meteor_showers_detail": [
       "The May Librids is a meteor shower that radiates from Libra during the month of May."
-    ]
+    ],
+    "name": "The balance",
+    "area": "538 sq. deg. (29th)",
+    "symbolism": "the balance",
+    "genitive": "Librae",
+    "pronunciation": "/ˈliːbrə/, genitive /ˈliːbriː/",
+    "brightest_star": "β Lib (2.61m)",
+    "bordering": "Serpens Caput, Virgo, Hydra, Centaurus (corner), Lupus, Scorpius, Ophiuchus",
+    "messier_objects": "0",
+    "meteor_showers": "May Librids",
+    "hemisphere": "Southern",
+    "seasons": "Visible in various seasons",
+    "source": "wikipedia",
+    "wiki_url": "https://en.wikipedia.org/wiki/Libra_(constellation)",
+    "description": "the balance in the southern sky.",
+    "difficulty": "moderate",
+    "named_stars": 0
   },
   "Lup": {
     "mythology": {
@@ -4152,7 +4168,23 @@
       "ESO 274-1 is a spiral galaxy seen edge-on, requiring a telescope with at least 12 inches of aperture. It is 9 arcminutes by 0.7 arcminutes with a small, elliptical nucleus and can only be seen under very dark skies.",
       "The historic supernova SN 1006 appeared on April 30 to May 1, 1006, in the constellation of Lupus, as described by various historical sources."
     ],
-    "meteor_showers_detail": []
+    "meteor_showers_detail": [],
+    "name": "The wolf",
+    "area": "334 sq. deg. (46th)",
+    "symbolism": "The Wolf",
+    "genitive": "Lupi",
+    "pronunciation": "/ˈljuːpəs/, genitive /-paɪ/",
+    "brightest_star": "α Lup (Uridim) (2.30m)",
+    "bordering": "Norma, Scorpius, Circinus, Centaurus, Libra, Hydra (corner)",
+    "messier_objects": "0",
+    "meteor_showers": "",
+    "hemisphere": "Southern",
+    "seasons": "Visible in various seasons",
+    "source": "wikipedia",
+    "wiki_url": "https://en.wikipedia.org/wiki/Lupus_(constellation)",
+    "description": "The Wolf in the southern sky.",
+    "difficulty": "moderate",
+    "named_stars": 1
   },
   "Lyn": {
     "mythology": {
@@ -4182,7 +4214,23 @@
     "meteor_showers_detail": [
       "The September Lyncids are a minor meteor shower appearing around September 6. They were historically more prominent, described by Chinese observers in 1037 and 1063, and Korean astronomers in 1560.",
       "The Alpha Lyncids were discovered in 1971 by Malcolm Currie and appear between December 10 and January 3."
-    ]
+    ],
+    "name": "The lynx",
+    "area": "545 sq. deg. (28th)",
+    "symbolism": "the Lynx",
+    "genitive": "Lyncis",
+    "pronunciation": "/ˈlɪŋks/, genitive /ˈlɪnsɪs/",
+    "brightest_star": "α Lyn (3.14m)",
+    "bordering": "Ursa Major, Camelopardalis, Auriga, Gemini, Cancer, Leo (corner), Leo Minor",
+    "messier_objects": "0",
+    "meteor_showers": "Alpha Lyncids, September Lyncids",
+    "hemisphere": "Northern",
+    "seasons": "Visible in various seasons",
+    "source": "wikipedia",
+    "wiki_url": "https://en.wikipedia.org/wiki/Lynx_(constellation)",
+    "description": "the Lynx in the northern sky.",
+    "difficulty": "moderate",
+    "named_stars": 1
   },
   "Lyr": {
     "mythology": {
@@ -4230,7 +4278,23 @@
     "meteor_showers_detail": [
       "The Lyrids meteor shower is one of the oldest known meteor showers, radiating from Lyra each April. It has been observed for over 2,600 years and typically produces 10-20 meteors per hour at its peak.",
       "The June Lyrids is a minor meteor shower that appears in June, while the Alpha Lyrids occur in a different part of the year, providing multiple meteor viewing opportunities from this constellation."
-    ]
+    ],
+    "name": "Lyre",
+    "area": "286 sq. deg. (52nd)",
+    "symbolism": "Lyre, harp",
+    "genitive": "Lyrae",
+    "pronunciation": "/ˈlaɪrə/, genitive /ˈlaɪriː/",
+    "brightest_star": "Vega (α Lyr) (0.03m)",
+    "bordering": "Draco, Hercules, Vulpecula, Cygnus",
+    "messier_objects": "2",
+    "meteor_showers": "Lyrids, June Lyrids, Alpha Lyrids",
+    "hemisphere": "Both",
+    "seasons": "Visible in various seasons",
+    "source": "wikipedia",
+    "wiki_url": "https://en.wikipedia.org/wiki/Lyra_(constellation)",
+    "description": "Lyre, harp in the both sky.",
+    "difficulty": "moderate",
+    "named_stars": 1
   },
   "Men": {
     "wiki_url": "https://en.wikipedia.org/wiki/Mensa_(constellation)",
