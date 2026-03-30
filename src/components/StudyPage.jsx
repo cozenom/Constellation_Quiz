@@ -280,15 +280,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
         <h1>Constellation Study Guide</h1>
         <p>Reference table for all 88 IAU constellations</p>
         <div className="under-construction-tag">🚧 Under Construction 🚧</div>
-        <div className="keyboard-hints">
-          <span className="hint">↑↓ Navigate</span>
-          <span className="hint-separator">•</span>
-          <span className="hint">Enter Expand</span>
-          <span className="hint-separator">•</span>
-          <span className="hint">←→ Switch Tabs</span>
-          <span className="hint-separator">•</span>
-          <span className="hint">Esc Back</span>
-        </div>
       </div>
 
       <div className="study-filters">
