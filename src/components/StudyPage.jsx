@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   mergeStudyData,
   formatSeasons,
@@ -18,16 +18,8 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [expandedRow, setExpandedRow] = useState(null);
   const [expandAll, setExpandAll] = useState(false);
   const [activeTab, setActiveTab] = useState({}); // Track active tab per constellation
-
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onBack();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onBack]);
+  const [selectedIndex, setSelectedIndex] = useState(0); // Track selected row index
+  const selectedRowRef = useRef(null);
 
   // Show loading state if data isn't ready
   if (!constellationData || !constellationStudy) {
@@ -124,6 +116,75 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
     return data;
   }, [studyData, sortBy, sortDir, filterHemisphere, filterDifficulty]);
 
+  // Reset selected index when filters change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [filteredAndSorted]);
+
+  // Scroll selected row into view
+  useEffect(() => {
+    if (selectedRowRef.current) {
+      selectedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedIndex]);
+
+  // Escape key handler
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't interfere if user is typing in a form element
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      const currentConstellation = filteredAndSorted[selectedIndex];
+
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedIndex(prev => Math.max(0, prev - 1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedIndex(prev => Math.min(filteredAndSorted.length - 1, prev + 1));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (currentConstellation) {
+            toggleRow(currentConstellation.abbrev);
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (expandedRow === currentConstellation?.abbrev) {
+            navigateTabs(currentConstellation.abbrev, -1);
+          }
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (expandedRow === currentConstellation?.abbrev) {
+            navigateTabs(currentConstellation.abbrev, 1);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIndex, filteredAndSorted, expandedRow, activeTab]);
+
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -134,10 +195,23 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   };
 
   const toggleRow = (abbrev) => {
+    const isExpanding = expandedRow !== abbrev;
     setExpandedRow(expandedRow === abbrev ? null : abbrev);
     // Set default tab to 'overview' when expanding
-    if (expandedRow !== abbrev && !activeTab[abbrev]) {
+    if (isExpanding && !activeTab[abbrev]) {
       setActiveTab(prev => ({ ...prev, [abbrev]: 'overview' }));
+    }
+
+    // Scroll to show expanded content after a short delay
+    if (isExpanding) {
+      setTimeout(() => {
+        if (selectedRowRef.current) {
+          const detailsRow = selectedRowRef.current.nextElementSibling;
+          if (detailsRow) {
+            detailsRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }, 100);
     }
   };
 
@@ -155,6 +229,50 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
     return sortDir === 'asc' ? '↑' : '↓';
   };
 
+  const navigateTabs = (abbrev, direction) => {
+    const constellation = filteredAndSorted.find(c => c.abbrev === abbrev);
+    if (!constellation) return;
+
+    // Get available tabs
+    const availableTabs = ['overview'];
+    if (constellation.mythology && (
+      typeof constellation.mythology === 'string' ||
+      (typeof constellation.mythology === 'object' && Object.keys(constellation.mythology).length > 0)
+    )) {
+      availableTabs.push('mythology');
+    }
+    if (constellation.starsText && (
+      typeof constellation.starsText === 'string' ||
+      (Array.isArray(constellation.starsText) && constellation.starsText.length > 0)
+    )) {
+      availableTabs.push('stars');
+    }
+    if (constellation.deepSkyObjects && (
+      typeof constellation.deepSkyObjects === 'string' ||
+      (Array.isArray(constellation.deepSkyObjects) && constellation.deepSkyObjects.length > 0)
+    )) {
+      availableTabs.push('deepsky');
+    }
+    if (constellation.meteorShowersDetail && (
+      typeof constellation.meteorShowersDetail === 'string' ||
+      (Array.isArray(constellation.meteorShowersDetail) && constellation.meteorShowersDetail.length > 0)
+    )) {
+      availableTabs.push('meteors');
+    }
+
+    // Get current tab index
+    const currentTab = activeTab[abbrev] || 'overview';
+    const currentIndex = availableTabs.indexOf(currentTab);
+
+    // Calculate new index with wrapping
+    let newIndex = currentIndex + direction;
+    if (newIndex < 0) newIndex = availableTabs.length - 1;
+    if (newIndex >= availableTabs.length) newIndex = 0;
+
+    // Set new tab
+    setActiveTab(prev => ({ ...prev, [abbrev]: availableTabs[newIndex] }));
+  };
+
   return (
     <div className="study-page">
       <div className="study-header">
@@ -162,6 +280,15 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
         <h1>Constellation Study Guide</h1>
         <p>Reference table for all 88 IAU constellations</p>
         <div className="under-construction-tag">🚧 Under Construction 🚧</div>
+        <div className="keyboard-hints">
+          <span className="hint">↑↓ Navigate</span>
+          <span className="hint-separator">•</span>
+          <span className="hint">Enter Expand</span>
+          <span className="hint-separator">•</span>
+          <span className="hint">←→ Switch Tabs</span>
+          <span className="hint-separator">•</span>
+          <span className="hint">Esc Back</span>
+        </div>
       </div>
 
       <div className="study-filters">
@@ -226,9 +353,15 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
             </tr>
           </thead>
           <tbody>
-            {filteredAndSorted.map((constellation) => (
+            {filteredAndSorted.map((constellation, index) => (
               <React.Fragment key={constellation.abbrev}>
-                <tr className={expandedRow === constellation.abbrev ? 'expanded' : ''}>
+                <tr
+                  className={`
+                    ${expandedRow === constellation.abbrev ? 'expanded' : ''}
+                    ${selectedIndex === index ? 'selected' : ''}
+                  `.trim()}
+                  ref={selectedIndex === index ? selectedRowRef : null}
+                >
                   <td className="image-cell">
                     <QuizCanvas
                       constellation={{

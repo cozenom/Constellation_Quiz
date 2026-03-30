@@ -33,6 +33,9 @@ function KeybindsPanel({ screen }) {
 
             case 'study':
                 return [
+                    { keys: ['↑', '↓'], label: 'Navigate constellations' },
+                    { keys: ['Enter'], label: 'Expand/collapse details' },
+                    { keys: ['←', '→'], label: 'Switch tabs (when expanded)' },
                     { keys: ['Esc'], label: 'Back to menu' }
                 ];
 
