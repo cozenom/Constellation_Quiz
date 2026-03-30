@@ -212,22 +212,6 @@
   font-style: italic;
 }
 
-.study-table .difficulty {
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.study-table .difficulty-easy {
-  color: #4ade80;
-}
-
-.study-table .difficulty-medium {
-  color: #fbbf24;
-}
-
-.study-table .difficulty-hard {
-  color: #f87171;
-}
 
 .study-table .stars {
   font-size: 0.85em;
@@ -236,19 +220,34 @@
   white-space: nowrap;
 }
 
-.study-table .hemisphere,
-.study-table .seasons {
-  color: #cbd5e1;
+.study-table .hemisphere {
+  text-align: center;
+}
+
+.study-table .difficulty {
+  text-align: center;
 }
 
 .study-table .area {
-  color: #e2e8f0;
+  text-align: center;
+}
+
+/* Table Badges */
+.table-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 0.85em;
+  font-weight: 600;
+  border: 2px solid transparent;
   white-space: nowrap;
 }
 
-.study-table .area-rank {
-  color: #94a3b8;
-  font-size: 0.85em;
+.area-rank-badge {
+  opacity: 0.7;
+  font-size: 0.9em;
+  margin-left: 4px;
 }
 
 .study-table .source {
@@ -430,10 +429,23 @@
   line-height: 1;
 }
 
-.badge-hemisphere {
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+/* Hemisphere badges - different colors for each */
+.badge-hemisphere.badge-north {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563a8 100%);
   color: white;
-  border-color: #60a5fa;
+  border-color: #3b72b8;
+}
+
+.badge-hemisphere.badge-south {
+  background: linear-gradient(135deg, #8b3a1a 0%, #c4521d 100%);
+  color: white;
+  border-color: #d66a32;
+}
+
+.badge-hemisphere.badge-both {
+  background: linear-gradient(135deg, #5b2a8f 0%, #7c3aad 100%);
+  color: white;
+  border-color: #9855c8;
 }
 
 .badge-difficulty {
@@ -441,30 +453,30 @@
 }
 
 .badge-diff-easy {
-  background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
-  border-color: #4ade80;
+  background: linear-gradient(135deg, #156b3a 0%, #1a8f52 100%);
+  border-color: #26a05f;
 }
 
 .badge-diff-medium {
-  background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
-  border-color: #fbbf24;
+  background: linear-gradient(135deg, #8b4513 0%, #b8690a 100%);
+  border-color: #ca8019;
 }
 
 .badge-diff-hard {
-  background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
-  border-color: #f87171;
+  background: linear-gradient(135deg, #8b1c1c 0%, #b82a2a 100%);
+  border-color: #c94444;
 }
 
 .badge-seasons {
-  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #5b2a8f 0%, #7c3aad 100%);
   color: white;
-  border-color: #c084fc;
+  border-color: #9855c8;
 }
 
 .badge-area {
-  background: linear-gradient(135deg, #0e7490 0%, #06b6d4 100%);
+  background: linear-gradient(135deg, #0d5f72 0%, #158197 100%);
   color: white;
-  border-color: #22d3ee;
+  border-color: #1a97b3;
 }
 
 /* Symbolism Featured */

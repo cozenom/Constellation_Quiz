@@ -372,16 +372,21 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   <td className="abbrev">{constellation.abbrev}</td>
                   <td className="name">{constellation.name}</td>
                   <td className="name-english">{constellation.nameEnglish}</td>
-                  <td className="hemisphere">{formatHemisphere(constellation.hemisphere)}</td>
-                  <td className={`difficulty difficulty-${constellation.difficulty}`}>
-                    {formatDifficulty(constellation.difficulty)}
+                  <td className="hemisphere">
+                    <span className={`table-badge badge-hemisphere badge-${constellation.hemisphere}`}>
+                      {formatHemisphere(constellation.hemisphere)}
+                    </span>
+                  </td>
+                  <td className="difficulty">
+                    <span className={`table-badge badge-difficulty badge-diff-${constellation.difficulty}`}>
+                      {formatDifficulty(constellation.difficulty)}
+                    </span>
                   </td>
                   <td className="area">
                     {constellation.area ? (
-                      <>
-                        {constellation.area.value}
-                        <span className="area-rank"> (#{constellation.area.rank})</span>
-                      </>
+                      <span className="table-badge badge-area">
+                        {constellation.area.value} sq° <span className="area-rank-badge">(#{constellation.area.rank})</span>
+                      </span>
                     ) : '—'}
                   </td>
                   <td className="bordering">
@@ -473,26 +478,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Overview Tab */}
                           {(activeTab[constellation.abbrev] || 'overview') === 'overview' && (
                             <div className="tab-panel">
-                              {/* Key Stats Badges */}
-                              <div className="stats-badges">
-                                <div className={`badge badge-hemisphere badge-${constellation.hemisphere}`}>
-                                  <span className="badge-label">{formatHemisphere(constellation.hemisphere)}</span>
-                                </div>
-                                <div className={`badge badge-difficulty badge-diff-${constellation.difficulty}`}>
-                                  <span className="badge-label">{formatDifficulty(constellation.difficulty)}</span>
-                                </div>
-                                {constellation.seasons && (
-                                  <div className="badge badge-seasons">
-                                    <span className="badge-label">{formatSeasons(constellation.seasons)}</span>
-                                  </div>
-                                )}
-                                {constellation.area && (
-                                  <div className="badge badge-area">
-                                    <span className="badge-label">{constellation.area.value} sq° (#{constellation.area.rank})</span>
-                                  </div>
-                                )}
-                              </div>
-
                               {/* Symbolism - Featured */}
                               {constellation.symbolism && (
                                 <div className="symbolism-featured">
