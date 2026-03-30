@@ -1112,7 +1112,7 @@
       "Columba",
       "Puppis"
     ],
-    "meteor_showers": "0",
+    "meteor_showers": "None",
     "source": {
       "discoverer": "Ptolemy",
       "year": "ancient"
@@ -1667,7 +1667,7 @@
       "Draco",
       "Ursa Minor"
     ],
-    "meteor_showers": "0",
+    "meteor_showers": "None",
     "source": {
       "discoverer": "Ptolemy",
       "year": "2nd century"
@@ -4121,21 +4121,59 @@
       "The May Librids is a meteor shower that radiates from Libra during the month of May."
     ],
     "name": "The balance",
-    "area": "538 sq. deg. (29th)",
+    "area": {
+      "value": 538.0,
+      "rank": 29
+    },
     "symbolism": "the balance",
     "genitive": "Librae",
     "pronunciation": "/ˈliːbrə/, genitive /ˈliːbriː/",
     "brightest_star": "β Lib (2.61m)",
-    "bordering": "Serpens Caput, Virgo, Hydra, Centaurus (corner), Lupus, Scorpius, Ophiuchus",
+    "bordering": [
+      "Serpens Caput",
+      "Virgo",
+      "Hydra",
+      "Centaurus",
+      "Lupus",
+      "Scorpius",
+      "Ophiuchus"
+    ],
     "messier_objects": "0",
     "meteor_showers": "May Librids",
     "hemisphere": "Southern",
-    "seasons": "Visible in various seasons",
-    "source": "wikipedia",
+    "seasons": [
+      "spring",
+      "summer"
+    ],
+    "source": {
+      "discoverer": "Ptolemy",
+      "year": "2nd century"
+    },
     "wiki_url": "https://en.wikipedia.org/wiki/Libra_(constellation)",
     "description": "the balance in the southern sky.",
     "difficulty": "moderate",
-    "named_stars": 0
+    "named_stars": [
+      {
+        "name": "Zubenelgenubi",
+        "bayer": "α Lib",
+        "magnitude": 2.7
+      },
+      {
+        "name": "Zubeneschamali",
+        "bayer": "β Lib",
+        "magnitude": 2.6
+      },
+      {
+        "name": "Zubenelakrab",
+        "bayer": "γ Lib",
+        "magnitude": 3.9
+      },
+      {
+        "name": "Brachium",
+        "bayer": "σ Lib",
+        "magnitude": 3.3
+      }
+    ]
   },
   "Lup": {
     "mythology": {
@@ -4170,21 +4208,43 @@
     ],
     "meteor_showers_detail": [],
     "name": "The wolf",
-    "area": "334 sq. deg. (46th)",
+    "area": {
+      "value": 334.0,
+      "rank": 46
+    },
     "symbolism": "The Wolf",
     "genitive": "Lupi",
     "pronunciation": "/ˈljuːpəs/, genitive /-paɪ/",
     "brightest_star": "α Lup (Uridim) (2.30m)",
-    "bordering": "Norma, Scorpius, Circinus, Centaurus, Libra, Hydra (corner)",
+    "bordering": [
+      "Norma",
+      "Scorpius",
+      "Circinus",
+      "Centaurus",
+      "Libra",
+      "Hydra"
+    ],
     "messier_objects": "0",
-    "meteor_showers": "",
+    "meteor_showers": "None",
     "hemisphere": "Southern",
-    "seasons": "Visible in various seasons",
-    "source": "wikipedia",
+    "seasons": [
+      "spring",
+      "summer"
+    ],
+    "source": {
+      "discoverer": "Ptolemy",
+      "year": "2nd century"
+    },
     "wiki_url": "https://en.wikipedia.org/wiki/Lupus_(constellation)",
     "description": "The Wolf in the southern sky.",
     "difficulty": "moderate",
-    "named_stars": 1
+    "named_stars": [
+      {
+        "name": "Uridim",
+        "bayer": "α Lup",
+        "magnitude": 2.3
+      }
+    ]
   },
   "Lyn": {
     "mythology": {
@@ -4216,21 +4276,44 @@
       "The Alpha Lyncids were discovered in 1971 by Malcolm Currie and appear between December 10 and January 3."
     ],
     "name": "The lynx",
-    "area": "545 sq. deg. (28th)",
+    "area": {
+      "value": 545.0,
+      "rank": 28
+    },
     "symbolism": "the Lynx",
     "genitive": "Lyncis",
     "pronunciation": "/ˈlɪŋks/, genitive /ˈlɪnsɪs/",
     "brightest_star": "α Lyn (3.14m)",
-    "bordering": "Ursa Major, Camelopardalis, Auriga, Gemini, Cancer, Leo (corner), Leo Minor",
+    "bordering": [
+      "Ursa Major",
+      "Camelopardalis",
+      "Auriga",
+      "Gemini",
+      "Cancer",
+      "Leo",
+      "Leo Minor"
+    ],
     "messier_objects": "0",
     "meteor_showers": "Alpha Lyncids, September Lyncids",
     "hemisphere": "Northern",
-    "seasons": "Visible in various seasons",
-    "source": "wikipedia",
+    "seasons": [
+      "autumn",
+      "winter"
+    ],
+    "source": {
+      "discoverer": "Ptolemy",
+      "year": "2nd century"
+    },
     "wiki_url": "https://en.wikipedia.org/wiki/Lynx_(constellation)",
     "description": "the Lynx in the northern sky.",
     "difficulty": "moderate",
-    "named_stars": 1
+    "named_stars": [
+      {
+        "name": "Alsciaukat",
+        "bayer": "31 Lyn",
+        "magnitude": 4.25
+      }
+    ]
   },
   "Lyr": {
     "mythology": {
@@ -4280,21 +4363,51 @@
       "The June Lyrids is a minor meteor shower that appears in June, while the Alpha Lyrids occur in a different part of the year, providing multiple meteor viewing opportunities from this constellation."
     ],
     "name": "Lyre",
-    "area": "286 sq. deg. (52nd)",
+    "area": {
+      "value": 286.0,
+      "rank": 52
+    },
     "symbolism": "Lyre, harp",
     "genitive": "Lyrae",
     "pronunciation": "/ˈlaɪrə/, genitive /ˈlaɪriː/",
     "brightest_star": "Vega (α Lyr) (0.03m)",
-    "bordering": "Draco, Hercules, Vulpecula, Cygnus",
+    "bordering": [
+      "Draco",
+      "Hercules",
+      "Vulpecula",
+      "Cygnus"
+    ],
     "messier_objects": "2",
     "meteor_showers": "Lyrids, June Lyrids, Alpha Lyrids",
     "hemisphere": "Both",
-    "seasons": "Visible in various seasons",
-    "source": "wikipedia",
+    "seasons": [
+      "autumn",
+      "winter"
+    ],
+    "source": {
+      "discoverer": "Ptolemy",
+      "year": "2nd century"
+    },
     "wiki_url": "https://en.wikipedia.org/wiki/Lyra_(constellation)",
     "description": "Lyre, harp in the both sky.",
     "difficulty": "moderate",
-    "named_stars": 1
+    "named_stars": [
+      {
+        "name": "Vega",
+        "bayer": "α Lyr",
+        "magnitude": 0.03
+      },
+      {
+        "name": "Sheliak",
+        "bayer": "β Lyr",
+        "magnitude": 3.45
+      },
+      {
+        "name": "Sulafat",
+        "bayer": "γ Lyr",
+        "magnitude": 3.24
+      }
+    ]
   },
   "Men": {
     "wiki_url": "https://en.wikipedia.org/wiki/Mensa_(constellation)",
@@ -5634,7 +5747,7 @@
       "Vela",
       "Antlia"
     ],
-    "meteor_showers": null,
+    "meteor_showers": "None",
     "source": {
       "discoverer": "Nicolas-Louis de Lacaille",
       "year": "1752"
@@ -5699,7 +5812,7 @@
       "Dorado",
       "Hydrus"
     ],
-    "meteor_showers": null,
+    "meteor_showers": "None",
     "source": {
       "discoverer": "Nicolas Louis de Lacaille",
       "year": "1621/18th century"
