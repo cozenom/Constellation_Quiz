@@ -54,21 +54,25 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                 </button>
             </div>
 
-            <button className="info-button" onClick={() => setShowAbout(true)} aria-label="About">
-                ⓘ
-            </button>
+            <div className="citations-footer">
+                <button className="citations-link" onClick={() => setShowAbout(true)}>
+                    About & Citations
+                </button>
+                <div className="creator-credit">Created by David Pan</div>
+            </div>
 
             {showAbout && (
                 <div className="modal-overlay" onClick={() => setShowAbout(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <h2>About Constellation Quiz</h2>
+                        <p className="modal-creator">Created by David Pan</p>
                         <p>An interactive tool for learning all 88 constellations.</p>
 
                         <h3>Data Sources</h3>
                         <ul>
                             <li>Constellation lines: <a href="https://github.com/Stellarium/stellarium" target="_blank" rel="noopener noreferrer">Stellarium</a></li>
                             <li>Star positions: Hipparcos catalog via <a href="https://rhodesmill.org/skyfield/" target="_blank" rel="noopener noreferrer">Skyfield</a></li>
-                            <li>Stereographic projections & rendering: Me!</li>
+                            <li>Stereographic projections & rendering: David Pan</li>
                             <li>Mythology & history: <a href="https://en.wikipedia.org/" target="_blank" rel="noopener noreferrer">Wikipedia</a></li>
                         </ul>
 
