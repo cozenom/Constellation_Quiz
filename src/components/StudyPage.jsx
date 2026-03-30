@@ -657,13 +657,13 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Notable Stars Tab */}
                           {activeTab[constellation.abbrev] === 'stars' && constellation.starsText && (
                             <div className="tab-panel">
-                              <div className="text-content">
+                              <div className="content-section">
                                 {Array.isArray(constellation.starsText) ? (
                                   constellation.starsText.map((text, i) => (
                                     <p key={i}>{text}</p>
                                   ))
                                 ) : (
-                                  constellation.starsText
+                                  <p>{constellation.starsText}</p>
                                 )}
                               </div>
                             </div>
@@ -672,13 +672,13 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Deep Sky Tab */}
                           {activeTab[constellation.abbrev] === 'deepsky' && constellation.deepSkyObjects && (
                             <div className="tab-panel">
-                              <div className="text-content">
+                              <div className="content-section">
                                 {Array.isArray(constellation.deepSkyObjects) ? (
                                   constellation.deepSkyObjects.map((text, i) => (
                                     <p key={i}>{text}</p>
                                   ))
                                 ) : (
-                                  constellation.deepSkyObjects
+                                  <p>{constellation.deepSkyObjects}</p>
                                 )}
                               </div>
                             </div>
@@ -687,13 +687,13 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                           {/* Meteor Showers Tab */}
                           {activeTab[constellation.abbrev] === 'meteors' && constellation.meteorShowersDetail && (
                             <div className="tab-panel">
-                              <div className="text-content">
+                              <div className="content-section">
                                 {Array.isArray(constellation.meteorShowersDetail) ? (
                                   constellation.meteorShowersDetail.map((text, i) => (
                                     <p key={i}>{text}</p>
                                   ))
                                 ) : (
-                                  constellation.meteorShowersDetail
+                                  <p>{constellation.meteorShowersDetail}</p>
                                 )}
                               </div>
                             </div>
