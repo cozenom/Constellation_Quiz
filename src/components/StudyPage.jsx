@@ -346,38 +346,54 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
       </div>
 
       <div className="study-table-container">
-        <table className="study-table">
-          <thead>
-            <tr>
-              <th className="image-col">Image</th>
-              <th onClick={() => handleSort('abbrev')} className="sortable">
-                Abbrev {getSortIcon('abbrev')}
-              </th>
-              <th onClick={() => handleSort('name')} className="sortable">
-                Name {getSortIcon('name')}
-              </th>
-              <th>English Name</th>
-              <th onClick={() => handleSort('hemisphere')} className="sortable">
-                Hemisphere {getSortIcon('hemisphere')}
-              </th>
-              <th onClick={() => handleSort('difficulty')} className="sortable">
-                Difficulty {getSortIcon('difficulty')}
-              </th>
-              <th onClick={() => handleSort('area')} className="sortable">
-                Area (sq°) {getSortIcon('area')}
-              </th>
-              <th onClick={() => handleSort('bordering')} className="sortable">
-                Bordering {getSortIcon('bordering')}
-              </th>
-              <th onClick={() => handleSort('source')} className="sortable">
-                Origin {getSortIcon('source')}
-              </th>
-              <th>Brightest Stars</th>
-              <th className="expand-col"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSorted.map((constellation, index) => (
+        {filteredAndSorted.length === 0 ? (
+          <div className="no-results">
+            <h3>No constellations found</h3>
+            <p>Try adjusting your search or filters</p>
+            <button
+              className="reset-filters-btn"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterHemisphere('all');
+                setFilterDifficulty('all');
+              }}
+            >
+              Reset All Filters
+            </button>
+          </div>
+        ) : (
+          <table className="study-table">
+            <thead>
+              <tr>
+                <th className="image-col">Image</th>
+                <th onClick={() => handleSort('abbrev')} className="sortable">
+                  Abbrev {getSortIcon('abbrev')}
+                </th>
+                <th onClick={() => handleSort('name')} className="sortable">
+                  Name {getSortIcon('name')}
+                </th>
+                <th>English Name</th>
+                <th onClick={() => handleSort('hemisphere')} className="sortable">
+                  Hemisphere {getSortIcon('hemisphere')}
+                </th>
+                <th onClick={() => handleSort('difficulty')} className="sortable">
+                  Difficulty {getSortIcon('difficulty')}
+                </th>
+                <th onClick={() => handleSort('area')} className="sortable">
+                  Area (sq°) {getSortIcon('area')}
+                </th>
+                <th onClick={() => handleSort('bordering')} className="sortable">
+                  Bordering {getSortIcon('bordering')}
+                </th>
+                <th onClick={() => handleSort('source')} className="sortable">
+                  Origin {getSortIcon('source')}
+                </th>
+                <th>Brightest Stars</th>
+                <th className="expand-col"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSorted.map((constellation, index) => (
               <React.Fragment key={constellation.abbrev}>
                 <tr
                   className={`
@@ -722,9 +738,10 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   </tr>
                 )}
               </React.Fragment>
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

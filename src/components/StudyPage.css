@@ -185,6 +185,51 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* No Results State */
+.no-results {
+  text-align: center;
+  padding: 80px 20px;
+  background: #1e293b;
+  border-radius: 8px;
+  border: 2px dashed #334155;
+}
+
+.no-results-icon {
+  font-size: 4em;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.no-results h3 {
+  color: #e2e8f0;
+  font-size: 1.5em;
+  margin: 0 0 10px 0;
+}
+
+.no-results p {
+  color: #94a3b8;
+  font-size: 1em;
+  margin: 0 0 24px 0;
+}
+
+.reset-filters-btn {
+  padding: 10px 24px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-filters-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+}
+
 .study-table {
   width: 100%;
   border-collapse: collapse;
