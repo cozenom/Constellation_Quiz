@@ -296,7 +296,6 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
         <button className="back-button" onClick={onBack}>← Back to Menu</button>
         <h1>Constellation Study Guide</h1>
         <p>Reference table for all 88 IAU constellations</p>
-        <div className="under-construction-tag">🚧 Under Construction 🚧</div>
       </div>
 
       <div className="study-filters">
