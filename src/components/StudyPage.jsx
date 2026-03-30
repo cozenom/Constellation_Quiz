@@ -194,9 +194,15 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
     }
   };
 
-  const toggleRow = (abbrev) => {
+  const toggleRow = (abbrev, index) => {
     const isExpanding = expandedRow !== abbrev;
     setExpandedRow(expandedRow === abbrev ? null : abbrev);
+
+    // Update keyboard selection to clicked row if index provided
+    if (index !== undefined) {
+      setSelectedIndex(index);
+    }
+
     // Set default tab to 'overview' when expanding
     if (isExpanding && !activeTab[abbrev]) {
       setActiveTab(prev => ({ ...prev, [abbrev]: 'overview' }));
@@ -407,7 +413,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
                   <td className="expand-col">
                     <button
                       className="expand-btn"
-                      onClick={() => toggleRow(constellation.abbrev)}
+                      onClick={() => toggleRow(constellation.abbrev, index)}
                       aria-label="Expand details"
                     >
                       {(expandAll || expandedRow === constellation.abbrev) ? '▼' : '▶'}
