@@ -19,6 +19,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [expandAll, setExpandAll] = useState(false);
   const [activeTab, setActiveTab] = useState({}); // Track active tab per constellation
   const [selectedIndex, setSelectedIndex] = useState(0); // Track selected row index
+  const [searchQuery, setSearchQuery] = useState(''); // Search filter
   const selectedRowRef = useRef(null);
 
   // Show loading state if data isn't ready
@@ -42,6 +43,16 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
   // Apply filters and sorting
   const filteredAndSorted = useMemo(() => {
     let data = studyData;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      data = data.filter(c =>
+        c.name.toLowerCase().includes(query) ||
+        c.nameEnglish?.toLowerCase().includes(query) ||
+        c.abbrev.toLowerCase().includes(query)
+      );
+    }
 
     // Apply filters
     if (filterHemisphere !== 'all') {
@@ -114,7 +125,7 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
     });
 
     return data;
-  }, [studyData, sortBy, sortDir, filterHemisphere, filterDifficulty]);
+  }, [studyData, sortBy, sortDir, filterHemisphere, filterDifficulty, searchQuery]);
 
   // Reset selected index when filters change
   useEffect(() => {
@@ -289,6 +300,22 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
       </div>
 
       <div className="study-filters">
+        <div className="filter-group search-group">
+          <label>Search:</label>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
+              ✕
+            </button>
+          )}
+        </div>
+
         <div className="filter-group">
           <label>Hemisphere:</label>
           <select value={filterHemisphere} onChange={(e) => setFilterHemisphere(e.target.value)}>
