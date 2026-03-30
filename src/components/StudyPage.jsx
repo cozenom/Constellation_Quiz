@@ -9,6 +9,7 @@ import {
 } from '../utils/studyDataUtils';
 import QuizCanvas from './QuizCanvas';
 import './StudyPage.css';
+import Footer from './Footer';
 
 function StudyPage({ onBack, constellationData, constellationStudy }) {
   const [sortBy, setSortBy] = useState('name');
@@ -742,6 +743,8 @@ function StudyPage({ onBack, constellationData, constellationStudy }) {
           </table>
         )}
       </div>
+
+      <Footer />
     </div>
   );
 }

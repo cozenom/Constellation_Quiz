@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Title.css';
+import Footer from './Footer';
 
 const FACTS = [
     "The 88 constellations cover the entire celestial sphere with official boundaries adopted by the International Astronomical Union in 1928, ensuring every point in the sky belongs to exactly one constellation.",
@@ -58,8 +59,9 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                 <button className="citations-link" onClick={() => setShowAbout(true)}>
                     About & Citations
                 </button>
-                <div className="creator-credit">Created by David Pan</div>
             </div>
+
+            <Footer />
 
             {showAbout && (
                 <div className="modal-overlay" onClick={() => setShowAbout(false)}>

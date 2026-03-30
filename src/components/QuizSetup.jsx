@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Footer from './Footer';
 
 function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
@@ -340,6 +341,8 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                     Start Quiz
                 </button>
             </div>
+
+            <Footer />
         </div>
     );
 }

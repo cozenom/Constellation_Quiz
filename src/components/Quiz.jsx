@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QuizCanvas from './QuizCanvas';
 import QuizASCII from './QuizASCII';
+import Footer from './Footer';
 
 function Quiz({ config, quizState, onAnswer, onNext, onBack }) {
     const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -216,6 +217,8 @@ function Quiz({ config, quizState, onAnswer, onNext, onBack }) {
                     </div>
                 </div>
             </div>
+
+            <Footer />
         </div>
     );
 }

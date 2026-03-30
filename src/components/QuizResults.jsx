@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import Footer from './Footer';
 
 function QuizResults({ quizState, onRestart, onNewQuiz, onBackToSetup }) {
     const total = quizState.questions.length;
@@ -64,6 +65,8 @@ function QuizResults({ quizState, onRestart, onNewQuiz, onBackToSetup }) {
                     </button>
                 </div>
             </div>
+
+            <Footer />
         </div>
     );
 }

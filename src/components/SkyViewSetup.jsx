@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import Footer from './Footer';
 
 function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
@@ -291,6 +292,8 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     Start Sky View
                 </button>
             </div>
+
+            <Footer />
         </div>
     );
 }

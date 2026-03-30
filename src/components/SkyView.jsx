@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SkyViewCanvas from './SkyViewCanvas';
 import SkyViewResults from './SkyViewResults';
 import { shuffleArray } from '../utils/quizHelpers';
+import Footer from './Footer';
 
 function SkyView({ constellationData, starCatalogData, config, onBack }) {
     const [targetAbbrev, setTargetAbbrev] = useState(null);
@@ -248,6 +249,8 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
                     onClick={handleTap}
                 />
             </div>
+
+            <Footer />
         </div>
     );
 }
