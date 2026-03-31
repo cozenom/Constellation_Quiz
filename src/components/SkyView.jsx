@@ -26,7 +26,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         if (!constellationData) return [];
 
         // Custom selection mode: use selected constellations
-        if (config.customSelection) {
+        if (config.difficulty === 'custom') {
             return config.selectedConstellations || [];
         }
 
@@ -49,7 +49,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         }
 
         return filtered;
-    }, [constellationData, config.hemisphere, config.difficulty, config.customSelection, config.selectedConstellations]);
+    }, [constellationData, config.hemisphere, config.difficulty, config.selectedConstellations]);
 
     // Pick a new target based on mode
     const pickNewTarget = useCallback((isInitial = false) => {

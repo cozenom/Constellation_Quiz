@@ -16,6 +16,9 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         selectedConstellations: [],
     });
 
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [lastDifficulty, setLastDifficulty] = useState('all');
+
     // Restore saved config if provided
     useEffect(() => {
         if (initialConfig) {
@@ -32,28 +35,39 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     // Get filtered constellations (by hemisphere/difficulty) - used for auto-selection
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
+        // Use lastDifficulty for filtering when in custom mode
+        const difficultyFilter = config.difficulty === 'custom' ? lastDifficulty : config.difficulty;
         return Object.entries(constellationData).filter(([abbrev, data]) => {
             const matchesHemisphere = config.hemisphere === 'both' || data.hemisphere === config.hemisphere || data.hemisphere === 'both';
-            const matchesDifficulty = config.difficulty === 'all' || data.difficulty === config.difficulty;
+            const matchesDifficulty = difficultyFilter === 'all' || data.difficulty === difficultyFilter;
             return matchesHemisphere && matchesDifficulty;
         });
-    }, [constellationData, config.hemisphere, config.difficulty]);
+    }, [constellationData, config.hemisphere, config.difficulty, lastDifficulty]);
 
     // Calculate final count (custom selection or all filtered)
     const filteredCount = useMemo(() => {
-        if (config.customSelection) {
+        if (config.difficulty === 'custom') {
             return config.selectedConstellations.length;
         }
         return filteredConstellations.length;
-    }, [config.customSelection, config.selectedConstellations.length, filteredConstellations.length]);
+    }, [config.difficulty, config.selectedConstellations.length, filteredConstellations.length]);
 
-    // When filters change OR custom selection is toggled, auto-select constellations that match filters
+    // When switching to custom selection, pre-select constellations based on last difficulty
+    // Track if we've already initialized to avoid re-selecting after user deselects
+    const [hasInitialized, setHasInitialized] = useState(false);
+
     useEffect(() => {
-        if (config.customSelection) {
-            const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
-            setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
+        if (config.difficulty === 'custom') {
+            if (!hasInitialized) {
+                const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
+                setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
+                setHasInitialized(true);
+            }
+        } else {
+            // Reset initialization flag when leaving custom mode
+            setHasInitialized(false);
         }
-    }, [config.hemisphere, config.difficulty, config.customSelection, filteredConstellations]);
+    }, [config.difficulty, filteredConstellations, hasInitialized]);
 
     // Toggle individual constellation
     const handleToggleConstellation = (abbrev, checked) => {
@@ -137,27 +151,24 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     <label>Difficulty</label>
                     <select
                         value={config.difficulty}
-                        onChange={(e) => setConfig({...config, difficulty: e.target.value})}
+                        onChange={(e) => {
+                            // Save the previous difficulty before switching to custom
+                            if (e.target.value === 'custom' && config.difficulty !== 'custom') {
+                                setLastDifficulty(config.difficulty);
+                            }
+                            setConfig({...config, difficulty: e.target.value});
+                        }}
                     >
                         <option value="all">All Difficulties</option>
                         <option value="easy">Easy</option>
                         <option value="medium">Medium</option>
                         <option value="hard">Hard</option>
+                        <option value="custom">Custom Selection</option>
                     </select>
                 </div>
 
                 {/* Custom Constellation Selection */}
-                <div className="checkbox-group full-width">
-                    <input
-                        type="checkbox"
-                        id="customSelection"
-                        checked={config.customSelection}
-                        onChange={(e) => setConfig({ ...config, customSelection: e.target.checked, selectedConstellations: [] })}
-                    />
-                    <label htmlFor="customSelection">Custom constellation selection</label>
-                </div>
-
-                {config.customSelection && (
+                {config.difficulty === 'custom' && (
                     <div className="full-width" style={{marginTop: '0.5rem'}}>
                         <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
                             <button
@@ -205,84 +216,101 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                     </div>
                 )}
 
-                {/* Section: Visual Aids */}
-                <div className="section-header full-width">Visual Aids</div>
-
-                <div className="form-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={config.showLines}
-                            onChange={(e) => setConfig({...config, showLines: e.target.checked})}
-                        />
-                        Show constellation lines
-                    </label>
+                {/* Advanced Options Toggle */}
+                <div className="full-width" style={{marginTop: '1rem'}}>
+                    <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        style={{width: '100%', padding: '0.75rem'}}
+                    >
+                        {showAdvanced ? '▼' : '▶'} Advanced Options
+                    </button>
                 </div>
 
-                <div className="form-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={config.showBoundaries}
-                            onChange={(e) => setConfig({...config, showBoundaries: e.target.checked})}
-                        />
-                        Show constellation boundaries
-                    </label>
-                </div>
+                {/* Advanced Options Section */}
+                {showAdvanced && (
+                    <>
+                        {/* Section: Visual Aids */}
+                        <div className="section-header full-width" style={{marginTop: '1rem'}}>Visual Aids</div>
 
-                <div className="form-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={config.showEnglishNames}
-                            onChange={(e) => setConfig({...config, showEnglishNames: e.target.checked})}
-                        />
-                        Show English names
-                    </label>
-                </div>
+                        <div className="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={config.showLines}
+                                    onChange={(e) => setConfig({...config, showLines: e.target.checked})}
+                                />
+                                Show constellation lines
+                            </label>
+                        </div>
 
-                {/* Section: Star Visibility */}
-                <div className="section-header full-width">Star Visibility</div>
+                        <div className="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={config.showBoundaries}
+                                    onChange={(e) => setConfig({...config, showBoundaries: e.target.checked})}
+                                />
+                                Show constellation boundaries
+                            </label>
+                        </div>
 
-                <div className="form-group full-width">
-                    <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max="14"
-                        step="0.1"
-                        value={config.maxMagnitude}
-                        onChange={(e) => setConfig({...config, maxMagnitude: parseFloat(e.target.value)})}
-                    />
-                </div>
+                        <div className="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={config.showEnglishNames}
+                                    onChange={(e) => setConfig({...config, showEnglishNames: e.target.checked})}
+                                />
+                                Show English names
+                            </label>
+                        </div>
 
-                <div className="form-group">
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked={config.showBackgroundStars}
-                            onChange={(e) => setConfig({...config, showBackgroundStars: e.target.checked})}
-                        />
-                        Show background stars
-                    </label>
-                </div>
+                        {/* Section: Star Visibility */}
+                        <div className="section-header full-width">Star Visibility</div>
 
-                {config.showBackgroundStars && (
-                    <div className="form-group full-width">
-                        <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={config.backgroundStarOpacity}
-                            onChange={(e) => setConfig({...config, backgroundStarOpacity: parseInt(e.target.value)})}
-                        />
-                    </div>
+                        <div className="form-group full-width">
+                            <label>Star brightness limit (magnitude {config.maxMagnitude})</label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="14"
+                                step="0.1"
+                                value={config.maxMagnitude}
+                                onChange={(e) => setConfig({...config, maxMagnitude: parseFloat(e.target.value)})}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={config.showBackgroundStars}
+                                    onChange={(e) => setConfig({...config, showBackgroundStars: e.target.checked})}
+                                />
+                                Show background stars
+                            </label>
+                        </div>
+
+                        {config.showBackgroundStars && (
+                            <div className="form-group full-width">
+                                <label>Background star opacity ({config.backgroundStarOpacity}%)</label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={config.backgroundStarOpacity}
+                                    onChange={(e) => setConfig({...config, backgroundStarOpacity: parseInt(e.target.value)})}
+                                />
+                            </div>
+                        )}
+                    </>
                 )}
                 </div>
 
                 <div className="filter-count">
-                    {config.customSelection
+                    {config.difficulty === 'custom'
                         ? `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} selected`
                         : `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} match your filters`
                     }
