@@ -86,7 +86,7 @@ export function shuffleArray(array) {
 
 // Generate a single new question for endless mode, avoiding recently asked
 export function generateSingleQuestion(config, constellationData, starCatalogData, recentAbbrevs = []) {
-    const { hemisphere, difficulty, renderMode, showLines, randomRotation, maxMagnitude, backgroundStarOpacity, showEnglishNames, selectedConstellations } = config;
+    const { hemisphere, difficulty, renderMode, showLines, randomRotation, maxMagnitude, showBackgroundStars, backgroundStarOpacity, showEnglishNames, selectedConstellations } = config;
 
     // Helper to format constellation names
     const formatName = (data) => {
@@ -136,7 +136,7 @@ export function generateSingleQuestion(config, constellationData, starCatalogDat
         renderMode,
         maxMagnitude,
         rotationAngle,
-        backgroundStars: (config.showBackgroundStars && starCatalogData && starCatalogData[abbrev]) || [],
+        backgroundStars: (showBackgroundStars && starCatalogData && starCatalogData[abbrev]) || [],
         backgroundStarOpacity
     };
 }
