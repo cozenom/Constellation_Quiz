@@ -59,9 +59,8 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                 <button className="citations-link" onClick={() => setShowAbout(true)}>
                     About & Citations
                 </button>
+                <Footer />
             </div>
-
-            <Footer />
 
             {showAbout && (
                 <div className="modal-overlay" onClick={() => setShowAbout(false)}>
