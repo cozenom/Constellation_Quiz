@@ -14,7 +14,6 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
         showBackgroundStars: true,
         backgroundStarOpacity: 100,
         showEnglishNames: true,
-        customSelection: false,
         selectedConstellations: [],
     });
 
