@@ -38,9 +38,6 @@ A mobile-friendly web quiz application for practicing constellation identificati
 # One-time setup
 npm install
 
-# Copy data files to public/ (needed for Vite to serve them)
-cp data/constellation_data.json data/constellation_study.json data/background_stars_visible.json data/stars_visible.json public/data/
-
 # Run development server with hot reload
 npm run dev
 # Opens at http://localhost:5173
@@ -96,13 +93,12 @@ constellation-quiz/
 │   │   └── studyDataUtils.js     # Study page data utilities
 │   └── styles/
 │       └── index.css             # Global styles
-├── data/                         # Constellation data files
-│   ├── constellation_data.json   # Core constellation data (1.1 MB)
-│   ├── constellation_study.json  # Study mode data with details (607 KB)
-│   ├── background_stars_visible.json  # Background stars (1 KB)
-│   └── stars_visible.json        # Naked-eye stars (840 KB)
 ├── public/
-│   └── data/                     # Data symlinks (served by Vite)
+│   └── data/                     # Constellation data files (pre-generated, ~8 MB total)
+│       ├── constellation_data.json   # Core constellation data (1.1 MB)
+│       ├── constellation_study.json  # Study mode data (607 KB)
+│       ├── background_stars_visible.json  # Background stars (5.5 MB)
+│       └── stars_visible.json        # Naked-eye stars (840 KB)
 ├── dist/                         # Build output (generated)
 ├── index.html                    # HTML template
 ├── package.json                  # Dependencies
@@ -113,32 +109,19 @@ constellation-quiz/
 
 - **Frontend**: React 18 + Vite
 - **Rendering**: HTML5 Canvas API (stereographic projection for sky view)
-- **Data Pipeline**: Python + Skyfield (Hipparcos catalog)
 - **Styling**: CSS (custom dark theme)
 - **Build Tool**: Vite (fast dev server, optimized production builds)
 - **Deployment**: GitHub Pages (static hosting)
 
-## Data Generation
+## Data Files
 
-Constellation data is pre-generated using Python scripts in `data/scripts/`:
-
-```bash
-cd data/scripts
-pip install skyfield numpy
-python build_quiz_data.py
-
-# Copy generated data to public/ for Vite to serve
-cp ../constellation_data.json ../constellation_study.json ../../public/data/
-cp ../background_stars_visible.json ../stars_visible.json ../../public/data/
-```
-
-This generates:
+Constellation data is pre-generated and stored in `public/data/`:
 - `constellation_data.json` - 88 constellations with stereographic projections (1.1 MB)
 - `constellation_study.json` - Study mode data with mythology and details (607 KB)
-- `background_stars_visible.json` - Background stars for rendering (1 KB)
+- `background_stars_visible.json` - Background stars for rendering (5.5 MB)
 - `stars_visible.json` - Naked-eye stars from Hipparcos catalog (840 KB)
 
-**Note:** Only `data/*.json` files are tracked in git. The `public/data/*.json` copies are gitignored and created on-demand.
+Data generation is handled in a separate private repository. Vite automatically copies files from `public/` into the build output during `npm run build`.
 
 ## Attribution
 
