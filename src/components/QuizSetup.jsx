@@ -119,8 +119,6 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
             </button>
 
             <div className="card">
-                <h1>Multiple Choice Quiz Setup</h1>
-                <p className="subtitle">Configure your quiz settings</p>
                 <div className="setup-grid">
                     {/* Section: Basic Settings */}
                     <div className="section-header full-width">Quiz Settings</div>

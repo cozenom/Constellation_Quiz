@@ -117,8 +117,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
             </button>
 
             <div className="card">
-                <h1>Sky View Mode Setup</h1>
-                <p className="subtitle">Configure your night sky identification settings</p>
 
                 <div className="setup-grid">
                 {/* Section: Quiz Settings */}
@@ -234,37 +232,34 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                         {/* Section: Visual Aids */}
                         <div className="section-header full-width" style={{marginTop: '1rem'}}>Visual Aids</div>
 
-                        <div className="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    checked={config.showLines}
-                                    onChange={(e) => setConfig({...config, showLines: e.target.checked})}
-                                />
-                                Show constellation lines
-                            </label>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="showLines"
+                                checked={config.showLines}
+                                onChange={(e) => setConfig({...config, showLines: e.target.checked})}
+                            />
+                            <label htmlFor="showLines">Show constellation lines</label>
                         </div>
 
-                        <div className="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    checked={config.showBoundaries}
-                                    onChange={(e) => setConfig({...config, showBoundaries: e.target.checked})}
-                                />
-                                Show constellation boundaries
-                            </label>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="showBoundaries"
+                                checked={config.showBoundaries}
+                                onChange={(e) => setConfig({...config, showBoundaries: e.target.checked})}
+                            />
+                            <label htmlFor="showBoundaries">Show constellation boundaries</label>
                         </div>
 
-                        <div className="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    checked={config.showEnglishNames}
-                                    onChange={(e) => setConfig({...config, showEnglishNames: e.target.checked})}
-                                />
-                                Show English names
-                            </label>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="showEnglishNames"
+                                checked={config.showEnglishNames}
+                                onChange={(e) => setConfig({...config, showEnglishNames: e.target.checked})}
+                            />
+                            <label htmlFor="showEnglishNames">Show English names</label>
                         </div>
 
                         {/* Section: Star Visibility */}
@@ -282,15 +277,14 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    checked={config.showBackgroundStars}
-                                    onChange={(e) => setConfig({...config, showBackgroundStars: e.target.checked})}
-                                />
-                                Show background stars
-                            </label>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="showBackgroundStars"
+                                checked={config.showBackgroundStars}
+                                onChange={(e) => setConfig({...config, showBackgroundStars: e.target.checked})}
+                            />
+                            <label htmlFor="showBackgroundStars">Show background stars</label>
                         </div>
 
                         {config.showBackgroundStars && (

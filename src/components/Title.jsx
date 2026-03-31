@@ -29,7 +29,7 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
             </div>
 
             <div className="title-hero">
-                <h1>Constellation Quiz</h1>
+                <h1>Constellations</h1>
                 <p className="subtitle">Learn to identify all 88 International Astronomical Union constellations</p>
             </div>
 
