@@ -2,10 +2,6 @@
 .claude/
 claude/
 
-# Data files (generated in separate repo)
-data/
-.data/
-
 # Node/npm
 node_modules/
 dist/
