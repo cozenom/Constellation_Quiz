@@ -100,8 +100,46 @@ function SkyViewCanvas({
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
-        // Check each constellation's boundary path
+        // Determine which hemisphere(s) to check based on current filter
+        const hemispheresToCheck = showBothHemispheres
+            ? ['north', 'south']
+            : [hemisphereFilter];
+
+        // Check each constellation's boundary path, but only within hemisphere circles
         for (const [key, path] of boundaryPathsRef.current.entries()) {
+            const hemisphere = key.split('-')[1]; // Extract hemisphere from "Oph-north"
+
+            // Skip if this hemisphere isn't being displayed
+            if (!hemispheresToCheck.includes(hemisphere)) continue;
+
+            // Calculate center position for this hemisphere (same logic as rendering)
+            let centerX, centerY;
+
+            if (showBothHemispheres) {
+                centerX = isMobile
+                    ? hemisphereSize / 2 + edgePadding
+                    : (hemisphere === 'north'
+                        ? hemisphereSize / 2 + edgePadding
+                        : edgePadding + hemisphereSize + gapBetween + hemisphereSize / 2);
+
+                centerY = isMobile
+                    ? (hemisphere === 'north' ? hemisphereSize / 2 + 30 : hemisphereSize * 1.5 + 70)
+                    : hemisphereSize / 2 + 30;
+            } else {
+                centerX = hemisphereSize / 2 + edgePadding;
+                centerY = hemisphereSize / 2 + 30;
+            }
+
+            // Check if click is within this hemisphere's circular boundary
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+
+            if (distFromCenter > hemisphereSize / 2) {
+                continue; // Click is outside this hemisphere's circle
+            }
+
+            // Now check if click is inside this constellation's boundary
             if (ctx.isPointInPath(path, x, y)) {
                 const abbrev = key.split('-')[0];
                 onClick(abbrev, x, y);
