@@ -16,8 +16,6 @@ body {
 #root {
     max-width: 800px;
     margin: 0 auto;
-    position: relative;
-    z-index: 1;
 }
 
 #root:has(.sky-view-screen) {

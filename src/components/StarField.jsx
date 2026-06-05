@@ -161,7 +161,7 @@ function StarField({ constellationData }) {
                 borderRadius: 0,
                 border: 'none',
                 pointerEvents: 'none',
-                zIndex: 0,
+                zIndex: -1,
             }}
         />
     );
