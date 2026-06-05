@@ -7,10 +7,15 @@ import QuizResults from './components/QuizResults';
 import SkyView from './components/SkyView';
 import StudyPage from './components/StudyPage';
 import KeybindsPanel from './components/KeybindsPanel';
+import StarField from './components/StarField';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
 function App() {
     const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview', 'study'
+    const [starsEnabled, setStarsEnabled] = useState(() => {
+        const stored = localStorage.getItem('stars-enabled');
+        return stored === null ? true : stored === 'true';
+    });
     const [config, setConfig] = useState(null);
     const [savedConfig, setSavedConfig] = useState(null); // Persist settings when returning to menu
     const [skyViewConfig, setSkyViewConfig] = useState(null);
@@ -255,8 +260,45 @@ function App() {
         setScreen('skyview');
     };
 
+    const toggleStars = () => {
+        setStarsEnabled(prev => {
+            localStorage.setItem('stars-enabled', String(!prev));
+            return !prev;
+        });
+    };
+
     return (
         <>
+            {starsEnabled && <StarField constellationData={constellationData} />}
+            <button
+                onClick={toggleStars}
+                className="stars-toggle"
+                title={starsEnabled ? 'Disable starfield' : 'Enable starfield'}
+                style={{
+                    position: 'fixed',
+                    bottom: '1.5rem',
+                    left: '1.5rem',
+                    zIndex: 1000,
+                    width: '2.25rem',
+                    height: '2.25rem',
+                    minHeight: 'unset',
+                    padding: 0,
+                    borderRadius: '50%',
+                    background: starsEnabled ? 'rgba(59,130,246,0.25)' : 'rgba(71,85,105,0.25)',
+                    border: `1px solid ${starsEnabled ? 'rgba(59,130,246,0.5)' : 'rgba(100,116,139,0.4)'}`,
+                    fontSize: '1rem',
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(4px)',
+                    transition: 'background 0.2s, border-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: starsEnabled ? 1 : 0.55,
+                }}
+            >
+                ✦
+            </button>
             <KeybindsPanel screen={screen} />
 
             {screen === 'title' && (

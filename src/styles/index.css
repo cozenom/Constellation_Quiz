@@ -16,6 +16,8 @@ body {
 #root {
     max-width: 800px;
     margin: 0 auto;
+    position: relative;
+    z-index: 1;
 }
 
 #root:has(.sky-view-screen) {
@@ -528,6 +530,13 @@ canvas {
     .quiz-interaction-col>*:nth-child(2) {
         margin: auto 0;
     }
+}
+
+/* Starfield toggle button */
+.stars-toggle:hover {
+    background: rgba(59, 130, 246, 0.35) !important;
+    box-shadow: none !important;
+    transform: none !important;
 }
 
 /* Title Screen */
