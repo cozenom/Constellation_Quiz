@@ -60,6 +60,13 @@ body {
     position: relative;
 }
 
+/* Push card down so the absolute back button doesn't overlap it on desktop */
+@media (min-width: 768px) {
+    .back-button + .card {
+        margin-top: 3.5rem;
+    }
+}
+
 /* Sky view: add top margin to prevent overlap with back button */
 .sky-view-screen .card {
     margin-top: 3.5rem;
