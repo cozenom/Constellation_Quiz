@@ -13,46 +13,52 @@ function createStar(w, h) {
     };
 }
 
+function makeGroup(keys, constellationData, w, startAtTop = false) {
+    // Pick a random valid constellation
+    const shuffled = [...keys].sort(() => Math.random() - 0.5);
+    let c;
+    let key;
+    for (const k of shuffled) {
+        if (constellationData[k].stars?.length >= 3) { c = constellationData[k]; key = k; break; }
+    }
+    if (!c) return null;
+
+    const xs = c.stars.map(s => s.x);
+    const ys = c.stars.map(s => s.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const spanX = maxX - minX || 1;
+    const spanY = maxY - minY || 1;
+    const scale = Math.min(0.9 / spanX, 0.9 / spanY);
+    const ox = (1 - spanX * scale) / 2;
+    const oy = (1 - spanY * scale) / 2;
+
+    const size = 100 + Math.random() * 100;
+    const speed = Math.random() * 0.08 + 0.03;
+
+    const offsets = c.stars.map(s => ({
+        dx: ((s.x - minX) * scale + ox - 0.5) * size,
+        dy: -((s.y - minY) * scale + oy - 0.5) * size,
+        size: Math.max(0.6, 1.8 - (s.magnitude ?? 4) * 0.18),
+        opacity: Math.random() * 0.35 + 0.25,
+    }));
+
+    const dyMin = Math.min(...offsets.map(o => o.dy));
+    const dyMax = Math.max(...offsets.map(o => o.dy));
+
+    const h = window.innerHeight;
+    const cy = startAtTop ? -dyMax - 2 : Math.random() * h;
+
+    return { cx: Math.random() * w, cy, speed, offsets, dyMin, dyMax };
+}
+
 function buildGroups(constellationData, w, h) {
     if (!constellationData) return [];
     const keys = Object.keys(constellationData);
-    const shuffled = [...keys].sort(() => Math.random() - 0.5);
     const groups = [];
-
-    for (const key of shuffled) {
-        if (groups.length >= GROUP_COUNT) break;
-        const c = constellationData[key];
-        if (!c.stars || c.stars.length < 3) continue;
-
-        // Normalize star positions to 0-1
-        const xs = c.stars.map(s => s.x);
-        const ys = c.stars.map(s => s.y);
-        const minX = Math.min(...xs), maxX = Math.max(...xs);
-        const minY = Math.min(...ys), maxY = Math.max(...ys);
-        const spanX = maxX - minX || 1;
-        const spanY = maxY - minY || 1;
-        const scale = Math.min(0.9 / spanX, 0.9 / spanY);
-        const ox = (1 - spanX * scale) / 2;
-        const oy = (1 - spanY * scale) / 2;
-
-        const size = 100 + Math.random() * 100; // px width of the constellation box
-        const speed = Math.random() * 0.08 + 0.03;
-        const cx = Math.random() * w;
-        // Start at a random y so they aren't all at the top
-        const cy = Math.random() * h;
-
-        const offsets = c.stars.map(s => ({
-            dx: ((s.x - minX) * scale + ox - 0.5) * size,
-            dy: -((s.y - minY) * scale + oy - 0.5) * size,
-            size: Math.max(0.6, 1.8 - (s.magnitude ?? 4) * 0.18),
-            opacity: Math.random() * 0.35 + 0.25,
-        }));
-
-        // Vertical extent so we know when fully off-screen
-        const dyMin = Math.min(...offsets.map(o => o.dy));
-        const dyMax = Math.max(...offsets.map(o => o.dy));
-
-        groups.push({ cx, cy, speed, offsets, dyMin, dyMax });
+    for (let i = 0; i < GROUP_COUNT; i++) {
+        const g = makeGroup(keys, constellationData, w, false);
+        if (g) groups.push(g);
     }
     return groups;
 }
@@ -65,6 +71,8 @@ function StarField({ constellationData }) {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         let animId;
+
+        const keys = constellationData ? Object.keys(constellationData) : [];
 
         const resize = () => {
             canvas.width = window.innerWidth;
@@ -109,11 +117,12 @@ function StarField({ constellationData }) {
             }
 
             // Constellation groups drifting as units
-            for (const g of groups) {
+            for (let i = 0; i < groups.length; i++) {
+                const g = groups[i];
                 g.cy += g.speed;
                 if (g.cy + g.dyMin > canvas.height + 2) {
-                    g.cy = -g.dyMax - 2;
-                    g.cx = Math.random() * canvas.width;
+                    const next = makeGroup(keys, constellationData, canvas.width, true);
+                    if (next) { groups[i] = next; continue; }
                 }
 
                 for (const o of g.offsets) {
