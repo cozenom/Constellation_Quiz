@@ -310,6 +310,12 @@ button:disabled {
     gap: 0.5rem;
 }
 
+.checkbox-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+}
+
 input[type="checkbox"] {
     width: 20px;
     height: 20px;

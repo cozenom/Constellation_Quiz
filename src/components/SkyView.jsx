@@ -26,7 +26,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         if (!constellationData) return [];
 
         // Custom selection mode: use selected constellations
-        if (config.difficulty === 'custom') {
+        if (config.customSelection) {
             return config.selectedConstellations || [];
         }
 
@@ -36,20 +36,21 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         // Filter by hemisphere
         let filtered = allAbbrevs.filter(abbrev => {
             const constellation = constellationData[abbrev];
-            if (config.hemisphere === 'both') return true;
-            return constellation.hemisphere.toLowerCase() === config.hemisphere;
+            if (config.hemisphere.length === 2) return true;
+            return config.hemisphere.includes(constellation.hemisphere.toLowerCase());
         });
 
         // Filter by difficulty
-        if (config.difficulty !== 'all') {
-            filtered = filtered.filter(abbrev => {
-                const constellation = constellationData[abbrev];
-                return constellation.difficulty === config.difficulty;
-            });
-        }
+        filtered = filtered.filter(abbrev => {
+            const constellation = constellationData[abbrev];
+            return config.difficulty.includes(constellation.difficulty);
+        });
 
         return filtered;
-    }, [constellationData, config.hemisphere, config.difficulty, config.selectedConstellations]);
+    }, [constellationData, config.hemisphere, config.difficulty, config.customSelection, config.selectedConstellations]);
+
+    // Derive which hemisphere globe(s) to render from the selected hemisphere(s)
+    const hemisphereFilter = config.hemisphere.length === 1 ? config.hemisphere[0] : 'both';
 
     // Pick a new target based on mode
     const pickNewTarget = useCallback((isInitial = false) => {
@@ -245,7 +246,7 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
                     maxMagnitude={config.maxMagnitude}
                     backgroundStars={starCatalogData || []}
                     backgroundStarOpacity={config.showBackgroundStars ? config.backgroundStarOpacity : 0}
-                    hemisphereFilter={config.hemisphere}
+                    hemisphereFilter={hemisphereFilter}
                     onClick={handleTap}
                 />
             </div>

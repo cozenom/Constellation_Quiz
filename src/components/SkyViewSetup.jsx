@@ -4,8 +4,9 @@ import Footer from './Footer';
 function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     const [config, setConfig] = useState({
         mode: 'single',
-        hemisphere: 'both',
-        difficulty: 'all',
+        hemisphere: ['north', 'south'],
+        difficulty: ['easy', 'medium', 'hard'],
+        customSelection: false,
         showLines: true,
         showBoundaries: true,
         maxMagnitude: 6,
@@ -16,7 +17,6 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     });
 
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [lastDifficulty, setLastDifficulty] = useState('all');
 
     // Restore saved config if provided
     useEffect(() => {
@@ -34,39 +34,29 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
     // Get filtered constellations (by hemisphere/difficulty) - used for auto-selection
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
-        // Use lastDifficulty for filtering when in custom mode
-        const difficultyFilter = config.difficulty === 'custom' ? lastDifficulty : config.difficulty;
         return Object.entries(constellationData).filter(([abbrev, data]) => {
-            const matchesHemisphere = config.hemisphere === 'both' || data.hemisphere === config.hemisphere || data.hemisphere === 'both';
-            const matchesDifficulty = difficultyFilter === 'all' || data.difficulty === difficultyFilter;
+            const matchesHemisphere = config.hemisphere.length === 2 || config.hemisphere.includes(data.hemisphere) || data.hemisphere === 'both';
+            const matchesDifficulty = config.difficulty.includes(data.difficulty);
             return matchesHemisphere && matchesDifficulty;
         });
-    }, [constellationData, config.hemisphere, config.difficulty, lastDifficulty]);
+    }, [constellationData, config.hemisphere, config.difficulty]);
 
     // Calculate final count (custom selection or all filtered)
     const filteredCount = useMemo(() => {
-        if (config.difficulty === 'custom') {
+        if (config.customSelection) {
             return config.selectedConstellations.length;
         }
         return filteredConstellations.length;
-    }, [config.difficulty, config.selectedConstellations.length, filteredConstellations.length]);
+    }, [config.customSelection, config.selectedConstellations.length, filteredConstellations.length]);
 
-    // When switching to custom selection, pre-select constellations based on last difficulty
-    // Track if we've already initialized to avoid re-selecting after user deselects
-    const [hasInitialized, setHasInitialized] = useState(false);
-
+    // While custom selection is on, keep the checked constellations in sync with
+    // the hemisphere/difficulty filters live (any change to those re-syncs the list)
     useEffect(() => {
-        if (config.difficulty === 'custom') {
-            if (!hasInitialized) {
-                const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
-                setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
-                setHasInitialized(true);
-            }
-        } else {
-            // Reset initialization flag when leaving custom mode
-            setHasInitialized(false);
+        if (config.customSelection) {
+            const autoSelected = filteredConstellations.map(([abbrev]) => abbrev);
+            setConfig(prev => ({ ...prev, selectedConstellations: autoSelected }));
         }
-    }, [config.difficulty, filteredConstellations, hasInitialized]);
+    }, [config.customSelection, filteredConstellations]);
 
     // Toggle individual constellation
     const handleToggleConstellation = (abbrev, checked) => {
@@ -75,6 +65,26 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
             selectedConstellations: checked
                 ? [...prev.selectedConstellations, abbrev]
                 : prev.selectedConstellations.filter(a => a !== abbrev)
+        }));
+    };
+
+    // Toggle a hemisphere in the multiselect
+    const handleToggleHemisphere = (value, checked) => {
+        setConfig(prev => ({
+            ...prev,
+            hemisphere: checked
+                ? [...prev.hemisphere, value]
+                : prev.hemisphere.filter(h => h !== value)
+        }));
+    };
+
+    // Toggle a difficulty in the multiselect
+    const handleToggleDifficulty = (value, checked) => {
+        setConfig(prev => ({
+            ...prev,
+            difficulty: checked
+                ? [...prev.difficulty, value]
+                : prev.difficulty.filter(d => d !== value)
         }));
     };
 
@@ -134,38 +144,73 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
 
                 <div className="form-group">
                     <label>Hemisphere</label>
-                    <select
-                        value={config.hemisphere}
-                        onChange={(e) => setConfig({...config, hemisphere: e.target.value})}
-                    >
-                        <option value="both">Both</option>
-                        <option value="north">Northern</option>
-                        <option value="south">Southern</option>
-                    </select>
+                    <div className="checkbox-row">
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="hemisphere-north"
+                                checked={config.hemisphere.includes('north')}
+                                onChange={(e) => handleToggleHemisphere('north', e.target.checked)}
+                            />
+                            <label htmlFor="hemisphere-north">Northern</label>
+                        </div>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="hemisphere-south"
+                                checked={config.hemisphere.includes('south')}
+                                onChange={(e) => handleToggleHemisphere('south', e.target.checked)}
+                            />
+                            <label htmlFor="hemisphere-south">Southern</label>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="form-group">
                     <label>Difficulty</label>
-                    <select
-                        value={config.difficulty}
-                        onChange={(e) => {
-                            // Save the previous difficulty before switching to custom
-                            if (e.target.value === 'custom' && config.difficulty !== 'custom') {
-                                setLastDifficulty(config.difficulty);
-                            }
-                            setConfig({...config, difficulty: e.target.value});
-                        }}
-                    >
-                        <option value="all">All Difficulties</option>
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
-                        <option value="custom">Custom Selection</option>
-                    </select>
+                    <div className="checkbox-row">
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="difficulty-easy"
+                                checked={config.difficulty.includes('easy')}
+                                onChange={(e) => handleToggleDifficulty('easy', e.target.checked)}
+                            />
+                            <label htmlFor="difficulty-easy">Easy</label>
+                        </div>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="difficulty-medium"
+                                checked={config.difficulty.includes('medium')}
+                                onChange={(e) => handleToggleDifficulty('medium', e.target.checked)}
+                            />
+                            <label htmlFor="difficulty-medium">Medium</label>
+                        </div>
+                        <div className="checkbox-group">
+                            <input
+                                type="checkbox"
+                                id="difficulty-hard"
+                                checked={config.difficulty.includes('hard')}
+                                onChange={(e) => handleToggleDifficulty('hard', e.target.checked)}
+                            />
+                            <label htmlFor="difficulty-hard">Hard</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="checkbox-group full-width">
+                    <input
+                        type="checkbox"
+                        id="customSelection"
+                        checked={config.customSelection}
+                        onChange={(e) => setConfig({ ...config, customSelection: e.target.checked })}
+                    />
+                    <label htmlFor="customSelection">Use custom constellation selection</label>
                 </div>
 
                 {/* Custom Constellation Selection */}
-                {config.difficulty === 'custom' && (
+                {config.customSelection && (
                     <div className="full-width" style={{marginTop: '0.5rem'}}>
                         <div style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
                             <button
@@ -303,7 +348,7 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                 </div>
 
                 <div className="filter-count">
-                    {config.difficulty === 'custom'
+                    {config.customSelection
                         ? `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} selected`
                         : `${filteredCount} constellation${filteredCount !== 1 ? 's' : ''} match your filters`
                     }
