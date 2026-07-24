@@ -206,6 +206,26 @@ h2 {
     }
 }
 
+/* Groups a pair of form-groups onto their own row, independent of sibling counts */
+.setting-row {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .setting-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem 1.5rem;
+    }
+}
+
+/* Visually separates the custom-selection toggle from the filters above it */
+.custom-selection-toggle {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #334155;
+}
+
 /* Section headers for setup screens */
 .section-header {
     font-size: 0.75rem;

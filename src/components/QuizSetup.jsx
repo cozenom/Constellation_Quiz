@@ -132,88 +132,92 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig }) {
                     {/* Section: Basic Settings */}
                     <div className="section-header full-width">Quiz Settings</div>
 
-                    <div className="form-group">
-                        <label htmlFor="mode">Mode</label>
-                        <select
-                            id="mode"
-                            value={config.mode}
-                            onChange={(e) => setConfig({ ...config, mode: e.target.value })}
-                        >
-                            <option value="single">Single (each once)</option>
-                            <option value="endless">Endless</option>
-                        </select>
+                    <div className="setting-row full-width">
+                        <div className="form-group">
+                            <label htmlFor="mode">Mode</label>
+                            <select
+                                id="mode"
+                                value={config.mode}
+                                onChange={(e) => setConfig({ ...config, mode: e.target.value })}
+                            >
+                                <option value="single">Single (each once)</option>
+                                <option value="endless">Endless</option>
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="inputMode">Input Mode</label>
+                            <select
+                                id="inputMode"
+                                value={config.inputMode}
+                                onChange={(e) => setConfig({ ...config, inputMode: e.target.value })}
+                            >
+                                <option value="multiple-choice">Multiple Choice (4 options)</option>
+                                <option value="text">Text Input</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="inputMode">Input Mode</label>
-                        <select
-                            id="inputMode"
-                            value={config.inputMode}
-                            onChange={(e) => setConfig({ ...config, inputMode: e.target.value })}
-                        >
-                            <option value="multiple-choice">Multiple Choice (4 options)</option>
-                            <option value="text">Text Input</option>
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Hemisphere</label>
-                        <div className="checkbox-row">
-                            <div className="checkbox-group">
-                                <input
-                                    type="checkbox"
-                                    id="hemisphere-north"
-                                    checked={config.hemisphere.includes('north')}
-                                    onChange={(e) => handleToggleHemisphere('north', e.target.checked)}
-                                />
-                                <label htmlFor="hemisphere-north">Northern</label>
+                    <div className="setting-row full-width">
+                        <div className="form-group">
+                            <label>Hemisphere</label>
+                            <div className="checkbox-row">
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="hemisphere-north"
+                                        checked={config.hemisphere.includes('north')}
+                                        onChange={(e) => handleToggleHemisphere('north', e.target.checked)}
+                                    />
+                                    <label htmlFor="hemisphere-north">Northern</label>
+                                </div>
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="hemisphere-south"
+                                        checked={config.hemisphere.includes('south')}
+                                        onChange={(e) => handleToggleHemisphere('south', e.target.checked)}
+                                    />
+                                    <label htmlFor="hemisphere-south">Southern</label>
+                                </div>
                             </div>
-                            <div className="checkbox-group">
-                                <input
-                                    type="checkbox"
-                                    id="hemisphere-south"
-                                    checked={config.hemisphere.includes('south')}
-                                    onChange={(e) => handleToggleHemisphere('south', e.target.checked)}
-                                />
-                                <label htmlFor="hemisphere-south">Southern</label>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Difficulty</label>
+                            <div className="checkbox-row">
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="difficulty-easy"
+                                        checked={config.difficulty.includes('easy')}
+                                        onChange={(e) => handleToggleDifficulty('easy', e.target.checked)}
+                                    />
+                                    <label htmlFor="difficulty-easy">Easy</label>
+                                </div>
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="difficulty-medium"
+                                        checked={config.difficulty.includes('medium')}
+                                        onChange={(e) => handleToggleDifficulty('medium', e.target.checked)}
+                                    />
+                                    <label htmlFor="difficulty-medium">Medium</label>
+                                </div>
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="difficulty-hard"
+                                        checked={config.difficulty.includes('hard')}
+                                        onChange={(e) => handleToggleDifficulty('hard', e.target.checked)}
+                                    />
+                                    <label htmlFor="difficulty-hard">Hard</label>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Difficulty</label>
-                        <div className="checkbox-row">
-                            <div className="checkbox-group">
-                                <input
-                                    type="checkbox"
-                                    id="difficulty-easy"
-                                    checked={config.difficulty.includes('easy')}
-                                    onChange={(e) => handleToggleDifficulty('easy', e.target.checked)}
-                                />
-                                <label htmlFor="difficulty-easy">Easy</label>
-                            </div>
-                            <div className="checkbox-group">
-                                <input
-                                    type="checkbox"
-                                    id="difficulty-medium"
-                                    checked={config.difficulty.includes('medium')}
-                                    onChange={(e) => handleToggleDifficulty('medium', e.target.checked)}
-                                />
-                                <label htmlFor="difficulty-medium">Medium</label>
-                            </div>
-                            <div className="checkbox-group">
-                                <input
-                                    type="checkbox"
-                                    id="difficulty-hard"
-                                    checked={config.difficulty.includes('hard')}
-                                    onChange={(e) => handleToggleDifficulty('hard', e.target.checked)}
-                                />
-                                <label htmlFor="difficulty-hard">Hard</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="checkbox-group full-width">
+                    <div className="checkbox-group full-width custom-selection-toggle">
                         <input
                             type="checkbox"
                             id="customSelection"
