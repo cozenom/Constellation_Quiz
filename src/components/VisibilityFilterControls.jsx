@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 
 const LOCATION_STORAGE_KEY = 'visibility-location';
 
@@ -23,11 +23,19 @@ function getLocalTimeZoneAbbrev(date) {
 // QuizSetup and SkyViewSetup. `config`/`onChange` follow the same shape as
 // the parent's own useState config (onChange accepts a functional updater).
 function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) {
-    const [citySearch, setCitySearch] = useState('');
+    const [citySearch, setCitySearch] = useState(config.visibilityCityLabel || '');
     const [showCityResults, setShowCityResults] = useState(false);
     const [geoLoading, setGeoLoading] = useState(false);
     const [geoError, setGeoError] = useState(null);
     const restoredLocation = useRef(false);
+
+    // The parent (QuizSetup/SkyViewSetup) restores initialConfig via its own
+    // effect a render *after* mount - a lazy useState init here would only see
+    // the pre-restore default. Syncing on every change instead of just at mount
+    // catches that late-arriving restore too.
+    useEffect(() => {
+        setCitySearch(config.visibilityCityLabel || '');
+    }, [config.visibilityCityLabel]);
 
     const update = (fields) => onChange((prev) => ({ ...prev, ...fields }));
 
@@ -35,9 +43,9 @@ function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) 
     // search box keeps showing its name; any other change (manual lat/lon edit,
     // "use my location") clears it since it's no longer describing the location.
     const setLocation = (lat, lon, cityLabel = null) => {
-        update({ visibilityLat: lat, visibilityLon: lon });
+        update({ visibilityLat: lat, visibilityLon: lon, visibilityCityLabel: cityLabel });
         if (lat != null && lon != null) {
-            localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({ lat, lon }));
+            localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({ lat, lon, cityLabel }));
         }
         setCitySearch(cityLabel ?? '');
     };
@@ -53,9 +61,11 @@ function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) 
                 const stored = localStorage.getItem(LOCATION_STORAGE_KEY);
                 if (stored) {
                     try {
-                        const { lat, lon } = JSON.parse(stored);
+                        const { lat, lon, cityLabel } = JSON.parse(stored);
                         fields.visibilityLat = lat;
                         fields.visibilityLon = lon;
+                        fields.visibilityCityLabel = cityLabel ?? null;
+                        setCitySearch(cityLabel ?? '');
                     } catch {
                         // ignore malformed stored value
                     }

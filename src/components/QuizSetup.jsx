@@ -3,7 +3,7 @@ import Footer from './Footer';
 import VisibilityFilterControls from './VisibilityFilterControls';
 import { getMatchingAbbrevs } from '../utils/quizHelpers';
 
-function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData }) {
+function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData, loadStarCatalog }) {
     const [config, setConfig] = useState({
         hemisphere: ['north', 'south'],
         difficulty: ['easy', 'medium', 'hard'],
@@ -22,6 +22,7 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData
         visibilityDateTime: '',
         visibilityLat: null,
         visibilityLon: null,
+        visibilityCityLabel: null,
         visibilityMinAltitude: 10,
     });
 
@@ -33,6 +34,13 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData
             setConfig(prev => ({ ...prev, ...initialConfig }));
         }
     }, [initialConfig]);
+
+    // Prefetch the (large) background star catalog while the user is still
+    // configuring, so it's already cached by the time they hit Start Quiz.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (loadStarCatalog) loadStarCatalog();
+    }, []);
 
     // Get all constellations sorted alphabetically
     const allConstellations = useMemo(() => {

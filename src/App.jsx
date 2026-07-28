@@ -344,6 +344,7 @@ function App() {
                     initialConfig={savedConfig}
                     cityData={cityData}
                     loadCityData={loadCityData}
+                    loadStarCatalog={loadStarCatalog}
                 />
             )}
             {screen === 'skyview-setup' && (
@@ -354,6 +355,7 @@ function App() {
                     initialConfig={savedSkyViewConfig}
                     cityData={cityData}
                     loadCityData={loadCityData}
+                    loadSkyViewStars={loadSkyViewStars}
                 />
             )}
             {screen === 'quiz' && (

@@ -3,7 +3,7 @@ import Footer from './Footer';
 import VisibilityFilterControls from './VisibilityFilterControls';
 import { getMatchingAbbrevs } from '../utils/quizHelpers';
 
-function SkyViewSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData }) {
+function SkyViewSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData, loadSkyViewStars }) {
     const [config, setConfig] = useState({
         mode: 'single',
         hemisphere: ['north', 'south'],
@@ -20,6 +20,7 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig, cityD
         visibilityDateTime: '',
         visibilityLat: null,
         visibilityLon: null,
+        visibilityCityLabel: null,
         visibilityMinAltitude: 10,
     });
 
@@ -31,6 +32,13 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig, cityD
             setConfig(initialConfig);
         }
     }, [initialConfig]);
+
+    // Prefetch the (large) star catalog while the user is still configuring,
+    // so it's already cached by the time they hit Start Sky View.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (loadSkyViewStars) loadSkyViewStars();
+    }, []);
 
     // Get all constellations sorted alphabetically
     const allConstellations = useMemo(() => {
