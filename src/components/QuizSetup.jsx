@@ -5,7 +5,7 @@ import { getMatchingAbbrevs } from '../utils/quizHelpers';
 
 function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData, loadStarCatalog }) {
     const [config, setConfig] = useState({
-        hemisphere: ['north', 'south'],
+        hemisphere: ['north', 'south', 'both'],
         difficulty: ['easy', 'medium', 'hard'],
         customSelection: false,
         mode: 'single',
@@ -191,6 +191,15 @@ function QuizSetup({ onStart, onBack, constellationData, initialConfig, cityData
                                         onChange={(e) => handleToggleHemisphere('south', e.target.checked)}
                                     />
                                     <label htmlFor="hemisphere-south">Southern</label>
+                                </div>
+                                <div className="checkbox-group">
+                                    <input
+                                        type="checkbox"
+                                        id="hemisphere-both"
+                                        checked={config.hemisphere.includes('both')}
+                                        onChange={(e) => handleToggleHemisphere('both', e.target.checked)}
+                                    />
+                                    <label htmlFor="hemisphere-both">Equatorial</label>
                                 </div>
                             </div>
                         </div>

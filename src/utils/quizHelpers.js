@@ -8,7 +8,7 @@ export function getMatchingAbbrevs(constellationData, config) {
 
     let abbrevs = Object.keys(constellationData).filter((abbrev) => {
         const data = constellationData[abbrev];
-        const matchesHemisphere = hemisphere.length === 2 || hemisphere.includes(data.hemisphere) || data.hemisphere === 'both';
+        const matchesHemisphere = hemisphere.includes(data.hemisphere);
         const matchesDifficulty = difficulty.includes(data.difficulty);
         return matchesHemisphere && matchesDifficulty;
     });
