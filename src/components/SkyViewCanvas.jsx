@@ -137,6 +137,8 @@ function SkyViewCanvas({
             : (showBothHemispheres ? ['north', 'south'] : [hemisphereFilter]);
 
         // Check each constellation's boundary path, but only within hemisphere circles
+        let insideAnyHemisphere = false;
+
         for (const [key, path] of boundaryPathsRef.current.entries()) {
             const hemisphere = key.split('-')[1]; // Extract hemisphere from "Oph-north"
 
@@ -170,6 +172,8 @@ function SkyViewCanvas({
                 continue; // Click is outside this hemisphere's circle
             }
 
+            insideAnyHemisphere = true;
+
             // Now check if click is inside this constellation's boundary
             if (ctx.isPointInPath(path, x, y)) {
                 const abbrev = key.split('-')[0];
@@ -178,7 +182,10 @@ function SkyViewCanvas({
             }
         }
 
-        // No constellation found
+        // Ignore clicks outside the hemisphere circle(s) entirely - not a real guess
+        if (!insideAnyHemisphere) return;
+
+        // Inside the sky but no constellation found there
         onClick(null, x, y);
     };
 
