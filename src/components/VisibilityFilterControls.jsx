@@ -25,6 +25,7 @@ function getLocalTimeZoneAbbrev(date) {
 function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) {
     const [citySearch, setCitySearch] = useState(config.visibilityCityLabel || '');
     const [showCityResults, setShowCityResults] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [geoLoading, setGeoLoading] = useState(false);
     const [geoError, setGeoError] = useState(null);
     const restoredLocation = useRef(false);
@@ -108,6 +109,34 @@ function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) 
     const handleSelectCity = (city) => {
         setLocation(city.lat, city.lon, `${city.name}, ${city.country}`);
         setShowCityResults(false);
+        setHighlightedIndex(-1);
+    };
+
+    // Arrow-key/Enter/Escape navigation for the suggestion list. Setup screens
+    // have global window-level Escape (back) and Enter (start) shortcuts, so
+    // stopPropagation is used here whenever this input handles the key itself -
+    // otherwise picking a suggestion with Enter would also fire "Start Quiz".
+    const handleSearchKeyDown = (e) => {
+        if (!showCityResults || cityMatches.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex((i) => (i + 1) % cityMatches.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex((i) => (i - 1 + cityMatches.length) % cityMatches.length);
+        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSelectCity(cityMatches[highlightedIndex]);
+            e.target.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowCityResults(false);
+            setHighlightedIndex(-1);
+            e.target.blur();
+        }
     };
 
     return (
@@ -162,9 +191,13 @@ function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) 
                                     type="text"
                                     placeholder="Search for a city..."
                                     value={citySearch}
-                                    onChange={(e) => { setCitySearch(e.target.value); setShowCityResults(true); }}
+                                    onChange={(e) => { setCitySearch(e.target.value); setShowCityResults(true); setHighlightedIndex(-1); }}
                                     onFocus={handleCitySearchFocus}
+                                    onKeyDown={handleSearchKeyDown}
                                     onBlur={() => setTimeout(() => setShowCityResults(false), 150)}
+                                    role="combobox"
+                                    aria-expanded={showCityResults && cityMatches.length > 0}
+                                    aria-activedescendant={highlightedIndex >= 0 ? `city-option-${highlightedIndex}` : undefined}
                                     style={{ width: '100%' }}
                                 />
                                 {showCityResults && cityMatches.length > 0 && (
@@ -183,8 +216,14 @@ function VisibilityFilterControls({ config, onChange, cityData, loadCityData }) 
                                         {cityMatches.map((city, i) => (
                                             <div
                                                 key={`${city.name}-${city.country}-${i}`}
+                                                id={`city-option-${i}`}
                                                 onClick={() => handleSelectCity(city)}
-                                                style={{ padding: '0.4rem 0.6rem', cursor: 'pointer' }}
+                                                onMouseEnter={() => setHighlightedIndex(i)}
+                                                style={{
+                                                    padding: '0.4rem 0.6rem',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: i === highlightedIndex ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
+                                                }}
                                             >
                                                 {city.name}, {city.country}
                                             </div>
