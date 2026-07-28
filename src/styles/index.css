@@ -254,18 +254,23 @@ label {
 }
 
 select,
-input[type="text"] {
+input[type="text"],
+input[type="number"],
+input[type="datetime-local"] {
     padding: 0.75rem;
     background: #1e293b;
     border: 1px solid #475569;
     border-radius: 8px;
     color: #e2e8f0;
     font-size: 1rem;
+    font-family: inherit;
     transition: all 0.2s;
 }
 
 select:focus,
-input[type="text"]:focus {
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="datetime-local"]:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);

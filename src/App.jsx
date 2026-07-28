@@ -25,6 +25,7 @@ function App() {
     const [constellationStudy, setConstellationStudy] = useState(null);
     const [starCatalogData, setStarCatalogData] = useState(null);
     const [skyViewStars, setSkyViewStars] = useState(null);
+    const [cityData, setCityData] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -115,6 +116,33 @@ function App() {
             .catch(error => {
                 console.error('Error loading sky view stars:', error);
                 setSkyViewStars(null);
+                return null;
+            });
+    };
+
+    // Lazy load city list (for the visibility filter's city search) only when needed
+    const loadCityData = () => {
+        // Return early if already loaded or loading
+        if (cityData !== null) {
+            return Promise.resolve(cityData);
+        }
+
+        const filename = `${import.meta.env.BASE_URL}data/cities.json`;
+
+        return fetch(filename)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load city data: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setCityData(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading city data:', error);
+                setCityData(null);
                 return null;
             });
     };
@@ -314,6 +342,8 @@ function App() {
                     onBack={backToTitle}
                     constellationData={constellationData}
                     initialConfig={savedConfig}
+                    cityData={cityData}
+                    loadCityData={loadCityData}
                 />
             )}
             {screen === 'skyview-setup' && (
@@ -322,6 +352,8 @@ function App() {
                     onBack={backToTitle}
                     constellationData={constellationData}
                     initialConfig={savedSkyViewConfig}
+                    cityData={cityData}
+                    loadCityData={loadCityData}
                 />
             )}
             {screen === 'quiz' && (

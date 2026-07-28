@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SkyViewCanvas from './SkyViewCanvas';
 import SkyViewResults from './SkyViewResults';
-import { shuffleArray } from '../utils/quizHelpers';
+import { shuffleArray, getFilteredAbbrevs } from '../utils/quizHelpers';
 import Footer from './Footer';
 
 function SkyView({ constellationData, starCatalogData, config, onBack }) {
@@ -21,36 +21,25 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
         return constellation.name;
     };
 
-    // Filter constellations by hemisphere and difficulty (or custom selection)
+    // Filter constellations by hemisphere/difficulty/visibility (or custom selection)
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
-
-        // Custom selection mode: use selected constellations
-        if (config.customSelection) {
-            return config.selectedConstellations || [];
-        }
-
-        // Normal mode: filter by hemisphere and difficulty
-        const allAbbrevs = Object.keys(constellationData);
-
-        // Filter by hemisphere
-        let filtered = allAbbrevs.filter(abbrev => {
-            const constellation = constellationData[abbrev];
-            if (config.hemisphere.length === 2) return true;
-            return config.hemisphere.includes(constellation.hemisphere.toLowerCase());
-        });
-
-        // Filter by difficulty
-        filtered = filtered.filter(abbrev => {
-            const constellation = constellationData[abbrev];
-            return config.difficulty.includes(constellation.difficulty);
-        });
-
-        return filtered;
-    }, [constellationData, config.hemisphere, config.difficulty, config.customSelection, config.selectedConstellations]);
+        return getFilteredAbbrevs(constellationData, config);
+    }, [constellationData, config.hemisphere, config.difficulty, config.customSelection, config.selectedConstellations, config.visibilityEnabled, config.visibilityDateTime, config.visibilityLat, config.visibilityLon, config.visibilityMinAltitude]);
 
     // Derive which hemisphere globe(s) to render from the selected hemisphere(s)
     const hemisphereFilter = config.hemisphere.length === 1 ? config.hemisphere[0] : 'both';
+
+    // When the visibility filter is on and a location has been set, render the
+    // real horizon-oriented sky (SkyViewCanvas's horizonMode) instead of the
+    // static pole-centered globes.
+    const horizonMode = Boolean(config.visibilityEnabled && config.visibilityLat != null && config.visibilityLon != null);
+    // Memoized on the underlying string so SkyViewCanvas's redraw effect isn't
+    // triggered by object-identity churn on every unrelated re-render (score, feedback, etc).
+    const horizonDate = useMemo(
+        () => (horizonMode ? new Date(config.visibilityDateTime) : null),
+        [horizonMode, config.visibilityDateTime]
+    );
 
     // Pick a new target based on mode
     const pickNewTarget = useCallback((isInitial = false) => {
@@ -247,6 +236,10 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
                     backgroundStars={starCatalogData || []}
                     backgroundStarOpacity={config.showBackgroundStars ? config.backgroundStarOpacity : 0}
                     hemisphereFilter={hemisphereFilter}
+                    horizonMode={horizonMode}
+                    horizonDate={horizonDate}
+                    horizonLat={config.visibilityLat}
+                    horizonLon={config.visibilityLon}
                     onClick={handleTap}
                 />
             </div>

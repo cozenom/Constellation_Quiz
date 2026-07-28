@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Footer from './Footer';
+import VisibilityFilterControls from './VisibilityFilterControls';
+import { getMatchingAbbrevs } from '../utils/quizHelpers';
 
-function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
+function SkyViewSetup({ onStart, onBack, constellationData, initialConfig, cityData, loadCityData }) {
     const [config, setConfig] = useState({
         mode: 'single',
         hemisphere: ['north', 'south'],
@@ -14,6 +16,11 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         backgroundStarOpacity: 100,
         showEnglishNames: true,
         selectedConstellations: [],
+        visibilityEnabled: false,
+        visibilityDateTime: '',
+        visibilityLat: null,
+        visibilityLon: null,
+        visibilityMinAltitude: 10,
     });
 
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -31,15 +38,12 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
         return Object.entries(constellationData).sort((a, b) => a[1].name.localeCompare(b[1].name));
     }, [constellationData]);
 
-    // Get filtered constellations (by hemisphere/difficulty) - used for auto-selection
+    // Get filtered constellations (by hemisphere/difficulty/visibility) - used for auto-selection
     const filteredConstellations = useMemo(() => {
         if (!constellationData) return [];
-        return Object.entries(constellationData).filter(([abbrev, data]) => {
-            const matchesHemisphere = config.hemisphere.length === 2 || config.hemisphere.includes(data.hemisphere) || data.hemisphere === 'both';
-            const matchesDifficulty = config.difficulty.includes(data.difficulty);
-            return matchesHemisphere && matchesDifficulty;
-        });
-    }, [constellationData, config.hemisphere, config.difficulty]);
+        const abbrevs = getMatchingAbbrevs(constellationData, config);
+        return abbrevs.map((abbrev) => [abbrev, constellationData[abbrev]]);
+    }, [constellationData, config.hemisphere, config.difficulty, config.visibilityEnabled, config.visibilityDateTime, config.visibilityLat, config.visibilityLon, config.visibilityMinAltitude]);
 
     // Calculate final count (custom selection or all filtered)
     const filteredCount = useMemo(() => {
@@ -202,6 +206,8 @@ function SkyViewSetup({ onStart, onBack, constellationData, initialConfig }) {
                         </div>
                     </div>
                 </div>
+
+                <VisibilityFilterControls config={config} onChange={setConfig} cityData={cityData} loadCityData={loadCityData} />
 
                 <div className="checkbox-group full-width custom-selection-toggle">
                     <input

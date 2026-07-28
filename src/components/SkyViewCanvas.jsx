@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { getAltAz, stereographicFromAltAz } from '../utils/visibility';
 
 function SkyViewCanvas({
     constellations,           // All constellation data
@@ -11,6 +12,10 @@ function SkyViewCanvas({
     backgroundStars = [],     // Background stars from Hipparcos catalog
     backgroundStarOpacity = 100, // Background star opacity (0-100)
     hemisphereFilter = 'both', // Which hemisphere(s) to show: 'north', 'south', or 'both'
+    horizonMode = false,      // If true, render the real horizon-oriented sky instead of pole-centered globes
+    horizonDate,              // Date object for the horizon observer (required when horizonMode is true)
+    horizonLat,               // Observer latitude in degrees (required when horizonMode is true)
+    horizonLon,               // Observer longitude in degrees, east-positive (required when horizonMode is true)
     onClick                   // Click handler: (abbrev, x, y) => void
 }) {
     const canvasRef = useRef(null);
@@ -25,7 +30,7 @@ function SkyViewCanvas({
     }, []);
 
     const hemisphereSize = 750;  // Each hemisphere circle size (sized so both hemispheres fit in 1500px container)
-    const showBothHemispheres = hemisphereFilter === 'both';
+    const showBothHemispheres = !horizonMode && hemisphereFilter === 'both';
     const edgePadding = 1;      // Padding on outer edges
     const gapBetween = 1;       // Gap between hemispheres
 
@@ -80,6 +85,32 @@ function SkyViewCanvas({
         };
     };
 
+    // Real-horizon zenith-centered stereographic projection (ported from the
+    // sibling project's plot.py:44-50 stereographic_from_altaz). Used instead of
+    // projectToHemisphere when horizonMode is on, so the chart reflects the
+    // actual sky as seen from horizonLat/horizonLon at horizonDate.
+    const projectToHorizon = (ra, dec, centerX, centerY) => {
+        const { alt, az } = getAltAz(horizonDate, horizonLat, horizonLon, ra, dec);
+        const { x: rawX, y: rawY } = stereographicFromAltAz(alt, az);
+
+        // Horizon (alt=0) is the edge of the dome, same edgeR math as projectToHemisphere
+        const edgeR = 2.0 * Math.tan((90 * Math.PI / 180) / 2);
+        const scale = (hemisphereSize / 2) / edgeR;
+
+        const projX = rawX * scale;
+        const projY = rawY * scale;
+
+        return {
+            x: centerX + projX,
+            y: centerY - projY,
+            visible: alt >= 0
+        };
+    };
+
+    // Dispatches to the horizon or pole-centered projection depending on horizonMode
+    const project = (ra, dec, hemisphere, centerX, centerY) =>
+        horizonMode ? projectToHorizon(ra, dec, centerX, centerY) : projectToHemisphere(ra, dec, hemisphere, centerX, centerY);
+
     // Check which hemisphere a constellation belongs to (by center dec)
     const getHemisphere = (dec) => dec >= 0 ? 'north' : 'south';
 
@@ -101,9 +132,9 @@ function SkyViewCanvas({
         const y = (e.clientY - rect.top) * scaleY;
 
         // Determine which hemisphere(s) to check based on current filter
-        const hemispheresToCheck = showBothHemispheres
-            ? ['north', 'south']
-            : [hemisphereFilter];
+        const hemispheresToCheck = horizonMode
+            ? ['horizon']
+            : (showBothHemispheres ? ['north', 'south'] : [hemisphereFilter]);
 
         // Check each constellation's boundary path, but only within hemisphere circles
         for (const [key, path] of boundaryPathsRef.current.entries()) {
@@ -166,7 +197,12 @@ function SkyViewCanvas({
         ctx.font = '14px -apple-system, sans-serif';
         ctx.textAlign = 'center';
 
-        if (showBothHemispheres) {
+        if (horizonMode) {
+            const label = horizonDate
+                ? `Sky at ${horizonLat.toFixed(1)}°, ${horizonLon.toFixed(1)}° — ${horizonDate.toLocaleString()}`
+                : 'Sky at your location';
+            ctx.fillText(label, hemisphereSize / 2 + edgePadding, 20);
+        } else if (showBothHemispheres) {
             if (isMobile) {
                 // Vertical layout - labels above each hemisphere
                 ctx.fillText('Northern Hemisphere', hemisphereSize / 2 + edgePadding, 20);
@@ -192,9 +228,9 @@ function SkyViewCanvas({
         const filteredSet = new Set(filteredConstellations || []);
 
         // Determine which hemisphere(s) to render
-        const hemispheresToShow = showBothHemispheres
-            ? ['north', 'south']
-            : [hemisphereFilter];
+        const hemispheresToShow = horizonMode
+            ? ['horizon']
+            : (showBothHemispheres ? ['north', 'south'] : [hemisphereFilter]);
 
         // Draw each hemisphere
         for (const hemisphere of hemispheresToShow) {
@@ -235,7 +271,7 @@ function SkyViewCanvas({
                     const mag = star.magnitude || 5;
                     if (mag > maxMagnitude) continue;
 
-                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere, centerX, centerY);
+                    const pt = project(star.ra, star.dec, hemisphere, centerX, centerY);
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
@@ -264,7 +300,7 @@ function SkyViewCanvas({
 
                     // Check if any point in this polygon is visible in this hemisphere
                     const polygonVisible = polygon.some(([ra, dec]) => {
-                        const pt = projectToHemisphere(ra, dec, hemisphere, centerX, centerY);
+                        const pt = project(ra, dec, hemisphere, centerX, centerY);
                         return pt.visible;
                     });
 
@@ -272,11 +308,11 @@ function SkyViewCanvas({
                     anyPartVisible = true;
 
                     // Add this polygon to the combined path
-                    const first = projectToHemisphere(polygon[0][0], polygon[0][1], hemisphere, centerX, centerY);
+                    const first = project(polygon[0][0], polygon[0][1], hemisphere, centerX, centerY);
                     combinedPath.moveTo(first.x, first.y);
 
                     for (let i = 1; i < polygon.length; i++) {
-                        const pt = projectToHemisphere(polygon[i][0], polygon[i][1], hemisphere, centerX, centerY);
+                        const pt = project(polygon[i][0], polygon[i][1], hemisphere, centerX, centerY);
                         combinedPath.lineTo(pt.x, pt.y);
                     }
                     combinedPath.closePath();
@@ -346,8 +382,8 @@ function SkyViewCanvas({
                         const star1 = stars[idx1];
                         const star2 = stars[idx2];
 
-                        const p1 = projectToHemisphere(star1.ra, star1.dec, hemisphere, centerX, centerY);
-                        const p2 = projectToHemisphere(star2.ra, star2.dec, hemisphere, centerX, centerY);
+                        const p1 = project(star1.ra, star1.dec, hemisphere, centerX, centerY);
+                        const p2 = project(star2.ra, star2.dec, hemisphere, centerX, centerY);
 
                         // Draw if at least one point is visible (clipping handles the rest)
                         if (p1.visible || p2.visible) {
@@ -368,7 +404,7 @@ function SkyViewCanvas({
                     const mag = star.magnitude || 5;
                     if (mag > maxMagnitude) continue;
 
-                    const pt = projectToHemisphere(star.ra, star.dec, hemisphere, centerX, centerY);
+                    const pt = project(star.ra, star.dec, hemisphere, centerX, centerY);
                     if (!pt.visible) continue;
 
                     const { x, y } = pt;
@@ -404,7 +440,7 @@ function SkyViewCanvas({
             ctx.stroke();
         }
 
-    }, [constellations, filteredConstellations, highlightedAbbrev, tappedFeedback, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity, isMobile, hemisphereFilter]);
+    }, [constellations, filteredConstellations, highlightedAbbrev, tappedFeedback, showBoundaries, showLines, maxMagnitude, backgroundStars, backgroundStarOpacity, isMobile, hemisphereFilter, horizonMode, horizonDate, horizonLat, horizonLon]);
 
     return (
         <canvas
