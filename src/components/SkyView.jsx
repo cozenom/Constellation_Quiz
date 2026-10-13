@@ -209,20 +209,23 @@ function SkyView({ constellationData, starCatalogData, config, onBack }) {
                         )}
                     </div>
 
-                    {!feedback ? (
-                        <div className="sky-view-prompt">
-                            Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
-                        </div>
-                    ) : (
-                        <div className="sky-view-feedback">
-                            <span className={feedback.correct ? 'correct' : 'incorrect'}>
-                                {feedback.correct ? '✓' : '✗'} {feedback.message}
-                            </span>
-                            <button className="button-primary" onClick={handleNext}>
-                                Next →
-                            </button>
-                        </div>
-                    )}
+                    {/* Fixed-height slot so swapping prompt ↔ feedback doesn't shift the canvas */}
+                    <div className="sky-view-status">
+                        {!feedback ? (
+                            <div className="sky-view-prompt">
+                                Tap on: <span style={{color: '#60a5fa'}}>{targetName}</span>
+                            </div>
+                        ) : (
+                            <div className="sky-view-feedback">
+                                <span className={feedback.correct ? 'correct' : 'incorrect'}>
+                                    {feedback.correct ? '✓' : '✗'} {feedback.message}
+                                </span>
+                                <button className="button-primary" onClick={handleNext}>
+                                    Next →
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <SkyViewCanvas

@@ -101,17 +101,41 @@ body {
     color: #94a3b8;
 }
 
+/* Holds either the prompt or the feedback; min-height fits the taller of the
+   two so the canvas below doesn't move when one replaces the other. */
+.sky-view-status {
+    width: 100%;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .sky-view-prompt {
     font-size: 1.25rem;
     font-weight: 500;
+    line-height: 1.4;
 }
 
 .sky-view-feedback {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.25rem 1rem;
     flex-wrap: wrap;
     justify-content: center;
+    line-height: 1.4;
+}
+
+/* On narrow screens the feedback wraps (message, then Next button), so reserve
+   room for ~2 lines of message plus the button. */
+@media (max-width: 768px) {
+    .sky-view-status {
+        min-height: 5.25rem;
+    }
+
+    .sky-view-feedback {
+        font-size: 0.9rem;
+    }
 }
 
 .sky-view-feedback .correct {
@@ -126,6 +150,7 @@ body {
 
 .sky-view-feedback button {
     width: auto;
+    min-height: 2.25rem;
     padding: 0.4rem 0.75rem;
     font-size: 0.9rem;
     margin: 0;
