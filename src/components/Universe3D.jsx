@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPasses } from '../utils/layers3d';
 import {
     LY_PER_PARSEC,
     buildLineStarInfo,
@@ -14,6 +14,8 @@ import {
     constellationFocus,
     constellationLinePositions,
     formatBayer,
+    scaleBarAngle,
+    scaleBarDistance,
     starRecord,
 } from '../utils/universe3d';
 import StarInfoCard from './StarInfoCard';
@@ -162,8 +164,10 @@ function disposeObject(obj) {
     obj.material.dispose();
 }
 
-function formatDistance(ly) {
-    if (ly < 0.01) return 'Earth';
+// Camera readout; positions in ly from the Sun
+function formatDistance(cameraPosition, earthPosition) {
+    if (cameraPosition.distanceTo(earthPosition) < 0.01) return 'Earth';
+    const ly = cameraPosition.length();
     if (ly < 10) return `${ly.toFixed(2)} ly from the Sun`;
     return `${Math.round(ly).toLocaleString()} ly from the Sun`;
 }
@@ -186,6 +190,8 @@ function Universe3D({ constellationData, stars3d, onBack }) {
     const labelsRef = useRef(null);
     const tooltipRef = useRef(null);
     const distanceRef = useRef(null);
+    const scaleBarRef = useRef(null);
+    const scaleLabelRef = useRef(null);
     const sceneRef = useRef(null);  // three.js objects + helpers, set up once
     const optionsRef = useRef({});  // current toggles, read by the render loop
 
@@ -222,9 +228,18 @@ function Universe3D({ constellationData, stars3d, onBack }) {
         renderer.setClearColor(0x02040a);
         mount.appendChild(renderer.domElement);
 
-        const scene = new THREE.Scene();
+        // Master camera: ly from the Sun, driven by OrbitControls, never
+        // rendered. Each layer derives its own camera from it (utils/layers3d).
         const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.0001, 1e6);
         camera.up.set(0, 1, 0);  // celestial north
+
+        // Far -> near. Only the star layer for now; the solar system (AU) and
+        // Earth (km) layers come with planets and satellites.
+        const starLayer = createLayer({ name: 'universe', unit: 1, near: 0.0001, far: 1e6 });
+        const layers = [starLayer];
+        const scene = starLayer.scene;
+        const starCamera = starLayer.camera;  // for picking and labels
+        const syncCameras = () => layers.forEach(layer => syncLayerCamera(layer, camera));
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -255,7 +270,7 @@ function Universe3D({ constellationData, stars3d, onBack }) {
 
         // Haze: bloom post-processing, used when s.haze is on
         const composer = new EffectComposer(renderer);
-        composer.addPass(new RenderPass(scene, camera));
+        const layerPasses = addLayerPasses(composer, layers);
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.4, 0.6);
         composer.addPass(bloomPass);
         composer.addPass(new OutputPass());
@@ -263,6 +278,9 @@ function Universe3D({ constellationData, stars3d, onBack }) {
         const s = {
             scene, camera, controls, hoverRing, selectedRing,
             selectedLines: null, allLines: null, flight: null, mode: 'orbit', haze: false,
+            // Earth in ly from the Sun. At the Sun until planets give it a
+            // real (moving) position; everything Earth-relative reads this.
+            earthPosition: new THREE.Vector3(),
         };
         s.setHaze = (on) => {
             s.haze = on;
@@ -299,45 +317,65 @@ function Universe3D({ constellationData, stars3d, onBack }) {
         renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
 
         // ---------- Camera flights ----------
+        // Positions are in ly from the Sun (master camera space)
         s.flyTo = (toPosition, toTarget) => {
+            const toPos = new THREE.Vector3(...toPosition);
+            const toTgt = new THREE.Vector3(...toTarget);
             s.flight = {
-                fromPosition: camera.position.clone(),
                 fromTarget: controls.target.clone(),
-                toPosition: new THREE.Vector3(...toPosition),
-                toTarget: new THREE.Vector3(...toTarget),
+                toTarget: toTgt,
+                fromOffset: camera.position.clone().sub(controls.target),
+                toOffset: toPos.sub(toTgt),
                 start: performance.now(),
             };
         };
         // Any drag/zoom by the user cancels a flight in progress
         controls.addEventListener('start', () => { s.flight = null; });
 
-        // The target swings around the Sun (direction slerped, distance
-        // interpolated in log space) instead of moving in a straight line,
-        // which would pass near the camera when switching between
-        // constellations on opposite sides of the sky.
-        const fromDir = new THREE.Vector3();
-        const toDir = new THREE.Vector3();
+        // Move from a to b by swinging around a pivot: direction slerped,
+        // distance interpolated in log space, so a flight covering many
+        // orders of magnitude spends equal time at each scale. Falls back to
+        // a straight line when either end sits on the pivot (log(0)).
+        const relA = new THREE.Vector3();
+        const relB = new THREE.Vector3();
         const identity = new THREE.Quaternion();
         const fullRotation = new THREE.Quaternion();
         const rotation = new THREE.Quaternion();
+        const swing = (out, a, b, k, pivot) => {
+            relA.subVectors(a, pivot);
+            relB.subVectors(b, pivot);
+            const r0 = relA.length();
+            const r1 = relB.length();
+            if (r0 < 1e-12 || r1 < 1e-12) return out.lerpVectors(a, b, k);
+            relA.divideScalar(r0);
+            relB.divideScalar(r1);
+            fullRotation.setFromUnitVectors(relA, relB);
+            rotation.slerpQuaternions(identity, fullRotation, k);
+            return out.copy(relA).applyQuaternion(rotation)
+                .multiplyScalar(r0 * Math.pow(r1 / r0, k))
+                .add(pivot);
+        };
+
+        // The target swings around the Sun, so switching between
+        // constellations on opposite sides of the sky doesn't pass near the
+        // camera. The camera follows as target + offset, the offset swinging
+        // the same way: at Earth both swing together and the camera stays
+        // put; flying to a star, the distance to it shrinks smoothly in log
+        // space instead of a straight line that is far out most of the time.
+        const origin = new THREE.Vector3();
+        const offset = new THREE.Vector3();
         const updateFlight = (now) => {
             const f = s.flight;
             if (!f) return;
             const t = Math.min(1, (now - f.start) / (FLIGHT_SECONDS * 1000));
             const k = easeInOutCubic(t);
-            camera.position.lerpVectors(f.fromPosition, f.toPosition, k);
-
-            const r0 = f.fromTarget.length();
-            const r1 = f.toTarget.length();
-            fromDir.copy(f.fromTarget).normalize();
-            toDir.copy(f.toTarget).normalize();
-            fullRotation.setFromUnitVectors(fromDir, toDir);
-            rotation.slerpQuaternions(identity, fullRotation, k);
-            controls.target.copy(fromDir).applyQuaternion(rotation)
-                .multiplyScalar(Math.exp(Math.log(r0) + (Math.log(r1) - Math.log(r0)) * k));
+            swing(controls.target, f.fromTarget, f.toTarget, k, origin);
+            swing(offset, f.fromOffset, f.toOffset, k, origin);
+            camera.position.copy(controls.target).add(offset);
 
             if (t === 1) {
                 controls.target.copy(f.toTarget);
+                camera.position.copy(f.toTarget).add(f.toOffset);
                 s.flight = null;
             }
         };
@@ -351,10 +389,11 @@ function Universe3D({ constellationData, stars3d, onBack }) {
             const rect = renderer.domElement.getBoundingClientRect();
             const mx = clientX - rect.left;
             const my = clientY - rect.top;
-            camera.updateMatrixWorld();
-            viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+            // The view may have moved since the last frame
+            syncLayerCamera(starLayer, camera);
+            viewProjection.multiplyMatrices(starCamera.projectionMatrix, starCamera.matrixWorldInverse);
             const e = viewProjection.elements;
-            const cam = camera.position;
+            const cam = starCamera.position;
             let best = null;
             let bestScore = Infinity;
             for (let i = 0; i < count; i++) {
@@ -448,7 +487,7 @@ function Universe3D({ constellationData, stars3d, onBack }) {
 
         const projected = new THREE.Vector3();
         const toScreen = (position, width, height) => {
-            projected.copy(position).project(camera);
+            projected.copy(position).project(starCamera);
             if (projected.z > 1 || Math.abs(projected.x) > 1.05 || Math.abs(projected.y) > 1.05) return null;
             return [(projected.x + 1) / 2 * width, (1 - projected.y) / 2 * height];
         };
@@ -469,7 +508,7 @@ function Universe3D({ constellationData, stars3d, onBack }) {
                 let screenPos = null;
                 if (opts.showLabels) {
                     starPosition.fromArray(positions, label.index * 3);
-                    const distPc = Math.max(starPosition.distanceTo(camera.position) / LY_PER_PARSEC, 1e-4);
+                    const distPc = Math.max(starPosition.distanceTo(starCamera.position) / LY_PER_PARSEC, 1e-4);
                     const mag = absMags[label.index] + 5 * Math.log10(distPc) - 5;
                     const inFigure = opts.selectedHips.has(label.hip);
                     if (mag <= LABEL_MAG_LIMIT || (inFigure && mag <= PICK_MAG_LIMIT)) {
@@ -499,16 +538,54 @@ function Universe3D({ constellationData, stars3d, onBack }) {
         const resizeObserver = new ResizeObserver(resize);
         resizeObserver.observe(mount);
 
+        // ---------- Scale bar ----------
+        // Measured at the orbit point (screen centre): things nearer or
+        // farther are drawn bigger or smaller. In free look the target is
+        // just in front of the camera, so it shows an angle on the sky.
+        let lastScale = '';
+        const updateScaleBar = () => {
+            const bar = scaleBarRef.current;
+            const label = scaleLabelRef.current;
+            if (!bar || !label) return;
+            const { clientWidth: width, clientHeight: height } = mount;
+            if (!height) return;
+            const maxPx = Math.min(120, width * 0.25);
+            let px, text;
+            if (s.mode === 'free') {
+                const degPerPx = camera.fov / height;
+                const { lengthDeg, label: l } = scaleBarAngle(maxPx * degPerPx);
+                px = lengthDeg / degPerPx;
+                text = l;
+            } else {
+                const dist = camera.position.distanceTo(controls.target);
+                const lyPerPx = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / height;
+                const { lengthLy, label: l } = scaleBarDistance(maxPx * lyPerPx);
+                px = lengthLy / lyPerPx;
+                text = l;
+            }
+            const key = `${Math.round(px)}|${text}`;
+            if (key === lastScale) return;
+            lastScale = key;
+            bar.style.width = `${Math.round(px)}px`;
+            label.textContent = text;
+        };
+
         let frameId;
         let lastDistanceLabel = '';
         const animate = (now) => {
             updateFlight(now);
             controls.update();
-            if (s.haze) composer.render();
-            else renderer.render(scene, camera);
+            syncCameras();
+            if (s.haze) {
+                syncLayerPasses(layerPasses, layers);
+                composer.render();
+            } else {
+                renderLayers(renderer, layers);
+            }
             updateLabels();
+            updateScaleBar();
             // Update the distance readout directly to avoid a React render per frame
-            const distanceLabel = formatDistance(camera.position.length());
+            const distanceLabel = formatDistance(camera.position, s.earthPosition);
             if (distanceLabel !== lastDistanceLabel && distanceRef.current) {
                 distanceRef.current.textContent = distanceLabel;
                 lastDistanceLabel = distanceLabel;
@@ -545,11 +622,13 @@ function Universe3D({ constellationData, stars3d, onBack }) {
         const s = sceneRef.current;
         if (!s) return;
         const focus = constellationFocus(constellationData[selectedAbbrev], starBuffers);
+        const earth = s.earthPosition.toArray();
         if (mode === 'free') {
-            const len = Math.hypot(...focus);
-            s.flyTo([0, 0, 0], focus.map(v => v / len * FREE_LOOK_RADIUS));
+            const dir = focus.map((v, i) => v - earth[i]);
+            const len = Math.hypot(...dir);
+            s.flyTo(earth, dir.map((v, i) => earth[i] + v / len * FREE_LOOK_RADIUS));
         } else {
-            s.flyTo([0, 0, 0], focus);
+            s.flyTo(earth, focus);
         }
         s.setFov(DEFAULT_FOV);
     };
@@ -586,7 +665,7 @@ function Universe3D({ constellationData, stars3d, onBack }) {
             const len = Math.hypot(...dir);
             s.flyTo(cam.toArray(), dir.map((v, i) => cam.getComponent(i) + v / len * FREE_LOOK_RADIUS));
         } else {
-            s.flyTo([0, 0, 0], [p[0], p[1], p[2]]);
+            s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]]);
         }
     };
 
@@ -615,10 +694,12 @@ function Universe3D({ constellationData, stars3d, onBack }) {
             skipModeReset.current = true;
             setViewMode('orbit');
         }
-        const p = starBuffers.positions.subarray(index * 3, index * 3 + 3);
-        const dist = Math.hypot(p[0], p[1], p[2]);
+        const p = Array.from(starBuffers.positions.subarray(index * 3, index * 3 + 3));
+        const earth = s.earthPosition.toArray();
+        const dir = p.map((v, i) => v - earth[i]);
+        const dist = Math.hypot(...dir);
         const keep = 1 - Math.min(Math.max(dist * 0.05, 0.3), 15) / dist;
-        s.flyTo([p[0] * keep, p[1] * keep, p[2] * keep], [p[0], p[1], p[2]]);
+        s.flyTo(dir.map((v, i) => earth[i] + v * keep), p);
     };
 
     // Draw the selected constellation's stick figure and fly to it from Earth
@@ -777,6 +858,14 @@ function Universe3D({ constellationData, stars3d, onBack }) {
                     onFlyTo={() => flyToStar(selectedStar)}
                 />
             )}
+
+            <div
+                className="universe-3d-scale"
+                title={viewMode === 'free' ? 'Angle on the sky' : 'Scale at the orbit point (screen centre)'}
+            >
+                <div ref={scaleLabelRef} className="universe-3d-scale-label" />
+                <div ref={scaleBarRef} className="universe-3d-scale-bar" />
+            </div>
 
             <div className="universe-3d-footer">
                 <div className="universe-3d-title">{selected.name}</div>

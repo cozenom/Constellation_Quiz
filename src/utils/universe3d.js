@@ -3,7 +3,48 @@
 // north (Dec +90) along +Y.
 
 export const LY_PER_PARSEC = 3.26156;
+export const AU_PER_LY = 63241.077;
+export const KM_PER_AU = 149597870.7;
 const SUN_ABS_MAG_V = 4.83;
+
+// Largest 1, 2 or 5 x 10^n that fits under max
+function niceNumber(max) {
+    const base = Math.pow(10, Math.floor(Math.log10(max)));
+    return [5, 2, 1].map(m => m * base).find(v => v <= max) ?? base;
+}
+
+const formatNice = (v) => v.toLocaleString(undefined, { maximumSignificantDigits: 1 });
+
+// Scale bar: the longest round distance that fits in maxLy, in a unit that
+// suits it. Returns {lengthLy, label}.
+export function scaleBarDistance(maxLy) {
+    const au = maxLy * AU_PER_LY;
+    if (maxLy >= 0.1) {
+        const v = niceNumber(maxLy);
+        return { lengthLy: v, label: `${formatNice(v)} ly` };
+    }
+    if (au >= 0.1) {
+        const v = niceNumber(au);
+        return { lengthLy: v / AU_PER_LY, label: `${formatNice(v)} AU` };
+    }
+    const v = niceNumber(au * KM_PER_AU);
+    return { lengthLy: v / KM_PER_AU / AU_PER_LY, label: `${formatNice(v)} km` };
+}
+
+// Scale bar in free look: the longest round angle that fits in maxDeg.
+// Returns {lengthDeg, label}.
+export function scaleBarAngle(maxDeg) {
+    if (maxDeg >= 1) {
+        const v = niceNumber(maxDeg);
+        return { lengthDeg: v, label: `${formatNice(v)}°` };
+    }
+    if (maxDeg * 60 >= 1) {
+        const v = niceNumber(maxDeg * 60);
+        return { lengthDeg: v / 60, label: `${formatNice(v)}′` };
+    }
+    const v = niceNumber(maxDeg * 3600);
+    return { lengthDeg: v / 3600, label: `${formatNice(v)}″` };
+}
 
 // Equatorial (RA hours, Dec degrees, distance ly) -> scene xyz.
 // Mapping x = cos(ra), z = -sin(ra) keeps the sky un-mirrored when viewed
