@@ -45,6 +45,9 @@ const ORBIT_MIN_DISTANCE = 0.01;
 const EARTH_RADIUS_LY = 6378 / KM_PER_AU / AU_PER_LY;
 // Planet labels and picking only while the solar system is at least this visible
 const BODY_MIN_FADE = 0.3;
+// Moons are only picked once drawn this far (px) from their planet's edge
+// (their dots fade in from about there; see solarSystem3d)
+const MOON_PICK_SEPARATION_PX = 10;
 const FOV = 60;
 
 // Points shader: each star stores its absolute magnitude, and the apparent
@@ -194,7 +197,7 @@ function formatDistance(target, earthPosition) {
 
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
+function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack }) {
     // Constellation picked in search (abbrev), or null: none drawn
     const [selectedAbbrev, setSelectedAbbrev] = useState(null);
     const [showLines, setShowLines] = useState(true);
@@ -202,6 +205,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
     const [showLabels, setShowLabels] = useState(true);
     const [showPlanets, setShowPlanets] = useState(true);
     const [showOrbits, setShowOrbits] = useState(true);
+    const [showSmallMoons, setShowSmallMoons] = useState(true);
     // At most one of these is set: a star index, or a solar system body id
     const [selectedStar, setSelectedStar] = useState(null);
     const [selectedBody, setSelectedBody] = useState(null);
@@ -225,8 +229,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
     const starBuffers = useMemo(() => (stars3d ? buildStarBuffers(stars3d) : null), [stars3d]);
     const lineStarInfo = useMemo(() => buildLineStarInfo(constellationData), [constellationData]);
     const searchItems = useMemo(
-        () => (starBuffers ? buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts) : []),
-        [constellationData, starBuffers, lineStarInfo, planetFacts]
+        () => (starBuffers ? buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData) : []),
+        [constellationData, starBuffers, lineStarInfo, planetFacts, moonsData]
     );
 
     const selectedHips = useMemo(
@@ -274,7 +278,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
         // Planets at today's positions (a clock comes later). Without
         // planets.json the layer stays empty and Earth stays at the Sun.
-        const solar = planetFacts ? buildSolarSystem(solarLayer.scene, planetFacts, pixelRatio) : null;
+        const solar = planetFacts ? buildSolarSystem(solarLayer.scene, planetFacts, moonsData, pixelRatio) : null;
         solar?.update(new Date());
         const earthPosition = new THREE.Vector3();
         if (solar?.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
@@ -357,8 +361,6 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             earthPosition,
             bodyPose,
         };
-        // A body's position in ly from the Sun, as an array
-        s.bodyPositionLy = (id) => solar.byId.get(id).position.toArray().map(v => v / AU_PER_LY);
         s.setHaze = (on) => {
             s.haze = on;
             solar?.setHaze(on);
@@ -522,10 +524,20 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             let best = null;
             let bestDist = Infinity;
             for (const body of solar.bodies) {
+                // Small moons only while their cloud is shown (zoomed in)
+                if (body.major === false && solar.minorMoonFade(body.parentId) < 0.5) continue;
                 const p = bodyOnScreen(body, rect.width, rect.height);
                 if (!p) continue;
-                const d = Math.hypot(p.x - mx, p.y - my);
-                if (d <= Math.max(p.radiusPx, 0) + radiusPx && d < bestDist) {
+                let d = Math.hypot(p.x - mx, p.y - my);
+                if (d > Math.max(p.radiusPx, 0) + radiusPx) continue;
+                if (body.parentId) {
+                    // A moon still drawn on top of its planet isn't shown, so it
+                    // can't be picked; one just clear of it loses close calls
+                    const parent = bodyOnScreen(solar.byId.get(body.parentId), rect.width, rect.height);
+                    if (parent && Math.hypot(p.x - parent.x, p.y - parent.y) < MOON_PICK_SEPARATION_PX + parent.radiusPx) continue;
+                    d += 3;
+                }
+                if (d < bestDist) {
                     bestDist = d;
                     best = body.id;
                 }
@@ -612,7 +624,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             shown: false,
         }));
         // Sun first, Moon last: a label overlapping an earlier one is hidden
-        const bodyLabels = (solar?.bodies ?? []).map(body => ({
+        // Minor moons get no label (hover names them)
+        const bodyLabels = (solar?.bodies ?? []).filter(body => body.major !== false).map(body => ({
             body,
             el: makeLabelEl(body.name, 'universe-3d-label universe-3d-label-planet'),
             shown: false,
@@ -719,6 +732,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             solar?.setFade(solarFade);
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
             syncCameras();
+            solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
             if (s.haze) {
                 syncLayerPasses(layerPasses, layers);
                 composer.render();
@@ -756,7 +770,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             labelsEl.replaceChildren();
             sceneRef.current = null;
         };
-    }, [starBuffers, lineStarInfo, constellationData, planetFacts]);
+    }, [starBuffers, lineStarInfo, constellationData, planetFacts, moonsData]);
 
     // Fly back to Earth and orbit a constellation, so you see its figure as
     // in the night sky; dragging then shows it in 3D
@@ -782,19 +796,6 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             s.flyTo([0, 0, 0], [0, 0, -500]);
             setFocus({ type: 'none' });
         }
-    };
-
-    // Look at a planet from Earth, like lookAtStar. Earth itself can't be
-    // seen from Earth, so that one flies out to it instead.
-    const lookAtBody = (id) => {
-        const s = sceneRef.current;
-        if (!s?.solar) return;
-        if (id === 'Earth') {
-            flyToBody(id);
-            return;
-        }
-        s.flyTo(s.earthPosition.toArray(), s.bodyPositionLy(id), s.bodyPose(id).minDistance);
-        setFocus({ type: 'body', id });
     };
 
     // Fly out to a planet (see bodyPose in the setup)
@@ -823,8 +824,9 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             selectStar(item.starIndex);
             lookAtStar(item.starIndex);
         } else if (item.type === 'planet') {
+            // Planets and moons: fly straight in (stars are shown from Earth)
             selectBody(item.id);
-            lookAtBody(item.id);
+            flyToBody(item.id);
         }
     };
 
@@ -881,7 +883,11 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
     useEffect(() => {
         sceneRef.current?.solar?.setShowOrbits(showOrbits);
-    }, [showOrbits, starBuffers, planetFacts]);
+    }, [showOrbits, starBuffers, planetFacts, moonsData]);
+
+    useEffect(() => {
+        sceneRef.current?.solar?.setShowMinorMoons(showSmallMoons);
+    }, [showSmallMoons, starBuffers, planetFacts, moonsData]);
 
     // Ring around the selected star or planet
     useEffect(() => {
@@ -890,7 +896,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         const i = selectedStar;
         placeRing(s.selectedRing, i === null ? null : starBuffers.positions.subarray(i * 3, i * 3 + 3));
         placeRing(s.bodySelectedRing, selectedBody && s.solar ? s.solar.byId.get(selectedBody).position.toArray() : null);
-    }, [selectedStar, selectedBody, starBuffers, planetFacts]);
+        s.solar?.setHighlightOrbit(selectedBody);
+    }, [selectedStar, selectedBody, starBuffers, planetFacts, moonsData]);
 
     // Keyboard: Esc closes the card, then goes back. L lines, N names, R reset.
     useEffect(() => {
@@ -928,6 +935,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
     const bodyDistances = body && {
         sun: body.position.length(),
         earth: body.position.distanceTo(solar.byId.get('Earth').position),
+        parent: body.parentId ? body.position.distanceTo(solar.byId.get(body.parentId).position) : null,
     };
 
     // Footer: what the view is centred on
@@ -1010,6 +1018,20 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
                             />
                             Orbits
                         </label>
+                        {moonsData && (
+                            <label
+                                className={`universe-3d-checkbox universe-3d-sub-option ${showPlanets ? '' : 'disabled'}`}
+                                title="Hundreds of tiny moons, shown when zoomed in on their planet"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={showSmallMoons}
+                                    disabled={!showPlanets}
+                                    onChange={(e) => setShowSmallMoons(e.target.checked)}
+                                />
+                                Small moons
+                            </label>
+                        )}
                     </>
                 )}
                 <label className="universe-3d-checkbox">

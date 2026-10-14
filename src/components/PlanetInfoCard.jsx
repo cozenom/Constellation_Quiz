@@ -40,38 +40,62 @@ function PlanetInfoCard({ body, distances, onClose, onFlyTo }) {
             <div className="star-info-subtitle">{subtitle}</div>
 
             <dl className="star-info-facts">
-                {!isSun && body.id !== 'Earth' && (
+                {!isSun && body.id !== 'Earth' && f.parent !== 'Earth' && (
                     <>
                         <dt>From Earth</dt>
                         <dd>{formatAu(distances.earth)} <span className="star-info-muted">now</span></dd>
                     </>
                 )}
-                {!isSun && (
+                {f.parent && (
+                    <>
+                        <dt>From {f.parent}</dt>
+                        <dd>
+                            {formatAu(distances.parent)} <span className="star-info-muted">now</span>
+                            <div className="star-info-muted">
+                                {fmt(f.orbit_radius_km ?? f.distance_mkm * 1e6)} km on average
+                            </div>
+                        </dd>
+                    </>
+                )}
+                {!isSun && !f.parent && (
                     <>
                         <dt>From the Sun</dt>
-                        <dd>
-                            {formatAu(distances.sun)} <span className="star-info-muted">now</span>
-                            {f.parent && <div className="star-info-muted">{fmt(f.distance_mkm * 1e6)} km from {f.parent} on average</div>}
-                        </dd>
+                        <dd>{formatAu(distances.sun)} <span className="star-info-muted">now</span></dd>
                     </>
                 )}
 
                 <dt>Diameter</dt>
                 <dd>
-                    {fmt(f.diameter_km, 4)} km
-                    {body.id !== 'Earth' && <div className="star-info-muted">{fmt(f.diameter_km / 12756, 2)}× Earth</div>}
+                    {f.diameter_km ? (
+                        <>
+                            {fmt(f.diameter_km, f.diameter_km < 100 ? 2 : 4)} km
+                            {body.id !== 'Earth' && f.diameter_km > 1000 && (
+                                <div className="star-info-muted">{fmt(f.diameter_km / 12756, 2)}× Earth</div>
+                            )}
+                        </>
+                    ) : (
+                        <>Unknown <span className="star-info-muted">(likely a few km)</span></>
+                    )}
                 </dd>
 
-                <dt>Mass</dt>
-                <dd>{body.id === 'Earth' ? '5.97 × 10²⁴ kg' : `${fmt(f.mass_earth, 3)}× Earth`}</dd>
+                {f.mass_earth != null && (
+                    <>
+                        <dt>Mass</dt>
+                        <dd>{body.id === 'Earth' ? '5.97 × 10²⁴ kg' : `${fmt(f.mass_earth, 3)}× Earth`}</dd>
+                    </>
+                )}
 
-                <dt>Gravity</dt>
-                <dd>
-                    {f.gravity_ms2} m/s²
-                    {body.id !== 'Earth' && <span className="star-info-muted"> ({fmt(f.gravity_ms2 / 9.8, 2)}× Earth)</span>}
-                </dd>
+                {f.gravity_ms2 != null && (
+                    <>
+                        <dt>Gravity</dt>
+                        <dd>
+                            {f.gravity_ms2} m/s²
+                            {body.id !== 'Earth' && <span className="star-info-muted"> ({fmt(f.gravity_ms2 / 9.8, 2)}× Earth)</span>}
+                        </dd>
+                    </>
+                )}
 
-                {f.day_h !== null && (
+                {f.day_h != null && (
                     <>
                         <dt>Day</dt>
                         <dd>
@@ -81,28 +105,39 @@ function PlanetInfoCard({ body, distances, onClose, onFlyTo }) {
                     </>
                 )}
 
-                {f.orbit_days !== null && (
+                {f.orbit_days != null && (
                     <>
                         <dt>{f.parent ? 'Orbit' : 'Year'}</dt>
-                        <dd>{formatDays(f.orbit_days)}</dd>
+                        <dd>{f.orbit_days < 2 ? formatHours(f.orbit_days * 24) : formatDays(f.orbit_days)}</dd>
                     </>
                 )}
 
-                <dt>{isSun ? 'Surface' : 'Temperature'}</dt>
-                <dd>
-                    {f.temp_c} °C
-                    {['Jupiter', 'Saturn', 'Uranus', 'Neptune'].includes(body.id) && (
-                        <div className="star-info-muted">at the cloud tops (1 bar)</div>
-                    )}
-                </dd>
+                {f.temp_c != null && (
+                    <>
+                        <dt>{isSun ? 'Surface' : 'Temperature'}</dt>
+                        <dd>
+                            {f.temp_c} °C
+                            {['Jupiter', 'Saturn', 'Uranus', 'Neptune'].includes(body.id) && (
+                                <div className="star-info-muted">at the cloud tops (1 bar)</div>
+                            )}
+                        </dd>
+                    </>
+                )}
 
-                {f.moons !== null && (
+                {f.moons != null && (
                     <>
                         <dt>Moons</dt>
                         <dd>{f.moons}{f.rings && <span className="star-info-muted"> · has rings</span>}</dd>
                     </>
                 )}
             </dl>
+
+            {f.approximate && (
+                <p className="star-info-muted star-info-origin">
+                    Small and far from {f.parent}, so the Sun keeps tugging its orbit around:
+                    its position here is approximate.
+                </p>
+            )}
 
             <button className="button-primary star-info-fly" onClick={onFlyTo}>
                 {isSun ? 'View the Solar System' : `Fly to ${body.name}`}

@@ -1,7 +1,9 @@
-// Checks src/utils/planets.js against Skyfield + JPL DE421.
+// Checks src/utils/planets.js against Skyfield + JPL DE421, and
+// src/utils/moons.js (with public/data/moons.json) against JPL Horizons.
 //
 // Reference positions come from Star_Data (run there first, skypy env):
 //   python scripts/tools/planet_reference.py
+//   python scripts/tools/moon_reference.py
 // Then here:
 //   node scripts/check-planets.js
 //
@@ -10,6 +12,7 @@
 // also checks that planets line up with the stars (raDecToXYZ).
 
 import { readFileSync } from 'node:fs';
+import { moonPosition } from '../src/utils/moons.js';
 import { geocentricMoon, heliocentricPosition, SOLAR_SYSTEM_BODIES } from '../src/utils/planets.js';
 
 const REF = '../../Star_Data/output/planet_reference.json';  // relative to this file
@@ -63,4 +66,31 @@ ref.dates.forEach((iso, d) => {
 });
 
 console.log(`\nWorst: ${worst.toFixed(2)}"`);
+
+// ---------- Moons (utils/moons.js) vs JPL Horizons ----------
+// Reference: Star_Data scripts/tools/moon_reference.py. Moons are fitted
+// at a 2026 epoch, so the 2026 column must be within MOON_LIMIT_DEG; the
+// other years are shown to see the drift (soonest for the distant
+// irregular moons the Sun perturbs). 5 deg because Phobos's orbit turns
+// round every ~1-2 years (Mars's bulge), which a fixed ellipse can't
+// follow: ~3.5 deg (570 km) off in 2026. The rest are within ~1.5 deg.
+const MOON_LIMIT_DEG = 5;
+const moonRef = JSON.parse(readFileSync(new URL('../../Star_Data/output/moon_reference.json', import.meta.url)));
+const moonsData = JSON.parse(readFileSync(new URL('../public/data/moons.json', import.meta.url)));
+const moonByCode = new Map(moonsData.moons.map(m => [String(m.code), m]));
+const jdToDate = (jd) => new Date((jd - 2440587.5) * 86400000);
+const years = moonRef.dates.map(jd => jdToDate(jd).getUTCFullYear());
+
+console.log(`\nMoons, angle seen from the planet (limit ${MOON_LIMIT_DEG} deg in 2026):`);
+console.log(`  ${''.padEnd(13)}${years.map(y => String(y).padStart(9)).join('')}`);
+for (const [code, refs] of Object.entries(moonRef.moons)) {
+    const m = moonByCode.get(code);
+    if (!m) continue;
+    const errs = refs.map((ref, d) => separationArcsec(sceneToIcrs(moonPosition(m, jdToDate(moonRef.dates[d]))), ref) / 3600);
+    const now = errs[years.indexOf(2026)];
+    const ok = now <= MOON_LIMIT_DEG;
+    if (!ok) failed = true;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${m.name.padEnd(8)}${errs.map(e => `${e.toFixed(2)}°`.padStart(9)).join('')}`);
+}
+
 process.exit(failed ? 1 : 0);

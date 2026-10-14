@@ -31,6 +31,7 @@ function App() {
     const [cityData, setCityData] = useState(null);
     const [stars3d, setStars3d] = useState(null);
     const [planetFacts, setPlanetFacts] = useState(null);
+    const [moonsData, setMoonsData] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -203,6 +204,29 @@ function App() {
             });
     };
 
+    // Moons of the other planets (orbits from JPL). Optional like planets.json.
+    const loadMoons = () => {
+        if (moonsData !== null) {
+            return Promise.resolve(moonsData);
+        }
+
+        return fetch(`${import.meta.env.BASE_URL}data/moons.json`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load moons: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setMoonsData(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading moons:', error);
+                return null;
+            });
+    };
+
     const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
@@ -294,7 +318,7 @@ function App() {
     };
 
     const goToUniverse3d = async () => {
-        await Promise.all([loadStars3d(), loadPlanetFacts()]);
+        await Promise.all([loadStars3d(), loadPlanetFacts(), loadMoons()]);
         setScreen('universe3d');
     };
 
@@ -458,6 +482,7 @@ function App() {
                         constellationData={constellationData}
                         stars3d={stars3d}
                         planetFacts={planetFacts}
+                        moonsData={moonsData}
                         onBack={backToTitle}
                     />
                 </Suspense>

@@ -221,8 +221,9 @@ export function normalizeSearchText(text) {
 // Everything the 3D search box can find. Items are
 // {type: 'constellation' | 'star', label, sublabel, terms, sortKey, ...}
 // where `terms` are normalized strings to match against. Type 'planet'
-// covers every Solar System body (planetFacts = planets.json, optional).
-export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts) {
+// covers every Solar System body (planetFacts = planets.json, moonsData =
+// moons.json; both optional). Moon ids match solarSystem3d ('moon-<code>').
+export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData) {
     const items = [];
 
     for (const body of planetFacts?.bodies ?? []) {
@@ -239,6 +240,16 @@ export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, p
             sublabel,
             terms: [body.name, body.id === 'Sun' ? 'Solar System' : null].filter(Boolean).map(normalizeSearchText),
             sortKey: -20,  // before constellations ("Sun" vs "Sculptor")
+        });
+    }
+    for (const m of moonsData?.moons ?? []) {
+        items.push({
+            type: 'planet',
+            id: `moon-${m.code}`,
+            label: m.name,
+            sublabel: `Moon of ${m.planet}`,
+            terms: [normalizeSearchText(m.name)],
+            sortKey: m.major ? -15 : 20,  // big moons first, small ones after stars
         });
     }
 
