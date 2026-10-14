@@ -1,0 +1,126 @@
+/* Full-screen 3D view, above the decorative starfield */
+.universe-3d-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: #02040a;
+}
+
+.universe-3d-canvas {
+    position: absolute;
+    inset: 0;
+    touch-action: none;
+}
+
+/* Undo the global canvas styles meant for the 2D quiz canvases */
+.universe-3d-canvas canvas {
+    display: block;
+    max-width: none;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+}
+
+/* Back button stays floating on mobile too (index.css makes it static there) */
+.universe-3d-screen .back-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+}
+
+.universe-3d-panel {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 14rem;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+}
+
+.universe-3d-panel select {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.universe-3d-panel button {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.universe-3d-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.universe-3d-sub-option {
+    padding-left: 1.5rem;
+}
+
+.universe-3d-checkbox.disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.universe-3d-footer {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+}
+
+.universe-3d-title {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.universe-3d-subtitle {
+    font-size: 0.9rem;
+    color: #cbd5e1;
+}
+
+.universe-3d-distance {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    min-height: 1.4em;
+}
+
+.universe-3d-hint {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.universe-3d-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
+}
+
+@media (max-width: 767px) {
+    .universe-3d-panel {
+        top: auto;
+        bottom: 6.5rem;
+        right: 50%;
+        transform: translateX(50%);
+    }
+
+    .universe-3d-hint {
+        display: none;
+    }
+}

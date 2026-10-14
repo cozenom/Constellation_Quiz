@@ -39,6 +39,15 @@ function KeybindsPanel({ screen }) {
                     { keys: ['Esc'], label: 'Back to menu' }
                 ];
 
+            case 'universe3d':
+                return [
+                    { keys: ['Drag'], label: 'Rotate around the constellation' },
+                    { keys: ['Scroll'], label: 'Zoom in/out' },
+                    { keys: ['Right-drag'], label: 'Pan' },
+                    { keys: ['L'], label: 'Show/hide lines' },
+                    { keys: ['Esc'], label: 'Back to menu' }
+                ];
+
             case 'results':
             case 'skyview-results':
                 return [

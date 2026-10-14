@@ -11,7 +11,7 @@ const FACTS = [
     "European astronomers proposed constellations for the southern sky and filled gaps between traditional ones. Eugène Joseph Delporte drew precise boundaries in 1928 so astronomers could specify exact celestial positions."
 ];
 
-function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
+function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy, onSelectUniverse3d }) {
     const [currentFact, setCurrentFact] = useState('');
     const [showAbout, setShowAbout] = useState(false);
 
@@ -49,6 +49,10 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                     <div className="mode-title">Sky View Mode</div>
                     <div className="mode-description">Identify constellations in a realistic night sky</div>
                 </button>
+                <button className="mode-button" onClick={onSelectUniverse3d}>
+                    <div className="mode-title">3D Universe</div>
+                    <div className="mode-description">Fly through the constellations and see how far away their stars really are</div>
+                </button>
                 <button className="mode-button mode-button-secondary" onClick={onSelectStudy}>
                     <div className="mode-title">Study Guide</div>
                     <div className="mode-description">Complete reference with mythology, history, and data</div>
@@ -73,6 +77,7 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy }) {
                         <ul>
                             <li>Constellation lines: <a href="https://github.com/Stellarium/stellarium" target="_blank" rel="noopener noreferrer">Stellarium</a></li>
                             <li>Star positions: Hipparcos catalog via <a href="https://rhodesmill.org/skyfield/" target="_blank" rel="noopener noreferrer">Skyfield</a></li>
+                            <li>Star distances: Hipparcos (ESA) and <a href="https://www.cosmos.esa.int/gaia" target="_blank" rel="noopener noreferrer">Gaia DR3</a> (ESA/Gaia/DPAC)</li>
                             <li>Stereographic projections & rendering: David Pan</li>
                             <li>Mythology & history: <a href="https://en.wikipedia.org/" target="_blank" rel="noopener noreferrer">Wikipedia</a></li>
                         </ul>

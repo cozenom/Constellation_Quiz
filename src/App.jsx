@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Title from './components/Title';
 import QuizSetup from './components/QuizSetup';
 import SkyViewSetup from './components/SkyViewSetup';
@@ -6,12 +6,15 @@ import Quiz from './components/Quiz';
 import QuizResults from './components/QuizResults';
 import SkyView from './components/SkyView';
 import StudyPage from './components/StudyPage';
-import KeybindsPanel from './components/KeybindsPanel';
-import StarField from './components/StarField';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
 
+// Split out so three.js is only downloaded when 3D mode opens
+const Universe3D = lazy(() => import('./components/Universe3D'));
+import KeybindsPanel from './components/KeybindsPanel';
+import StarField from './components/StarField';
+
 function App() {
-    const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview', 'study'
+    const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview', 'study', 'universe3d'
     const [starsEnabled, setStarsEnabled] = useState(() => {
         const stored = localStorage.getItem('stars-enabled');
         return stored === null ? true : stored === 'true';
@@ -26,6 +29,7 @@ function App() {
     const [starCatalogData, setStarCatalogData] = useState(null);
     const [skyViewStars, setSkyViewStars] = useState(null);
     const [cityData, setCityData] = useState(null);
+    const [stars3d, setStars3d] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -147,6 +151,33 @@ function App() {
             });
     };
 
+    // Lazy load the 3D star catalogue (distances, colours) only for 3D mode
+    const loadStars3d = () => {
+        // Return early if already loaded
+        if (stars3d !== null) {
+            return Promise.resolve(stars3d);
+        }
+
+        const filename = `${import.meta.env.BASE_URL}data/stars_3d.json`;
+
+        return fetch(filename)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load 3D stars: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setStars3d(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading 3D stars:', error);
+                setStars3d(null);
+                return null;
+            });
+    };
+
     const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
@@ -235,6 +266,11 @@ function App() {
 
     const goToStudy = () => {
         setScreen('study');
+    };
+
+    const goToUniverse3d = async () => {
+        await loadStars3d();
+        setScreen('universe3d');
     };
 
     const backToTitle = () => {
@@ -334,6 +370,7 @@ function App() {
                     onSelectRegularQuiz={goToSetup}
                     onSelectSkyView={goToSkyViewSetup}
                     onSelectStudy={goToStudy}
+                    onSelectUniverse3d={goToUniverse3d}
                 />
             )}
             {screen === 'setup' && (
@@ -389,6 +426,15 @@ function App() {
                     constellationData={constellationData}
                     constellationStudy={constellationStudy}
                 />
+            )}
+            {screen === 'universe3d' && (
+                <Suspense fallback={<div className="loading">Loading 3D view...</div>}>
+                    <Universe3D
+                        constellationData={constellationData}
+                        stars3d={stars3d}
+                        onBack={backToTitle}
+                    />
+                </Suspense>
             )}
         </>
     );
