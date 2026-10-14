@@ -31,21 +31,6 @@ export function scaleBarDistance(maxLy) {
     return { lengthLy: v / KM_PER_AU / AU_PER_LY, label: `${formatNice(v)} km` };
 }
 
-// Scale bar in free look: the longest round angle that fits in maxDeg.
-// Returns {lengthDeg, label}.
-export function scaleBarAngle(maxDeg) {
-    if (maxDeg >= 1) {
-        const v = niceNumber(maxDeg);
-        return { lengthDeg: v, label: `${formatNice(v)}°` };
-    }
-    if (maxDeg * 60 >= 1) {
-        const v = niceNumber(maxDeg * 60);
-        return { lengthDeg: v / 60, label: `${formatNice(v)}′` };
-    }
-    const v = niceNumber(maxDeg * 3600);
-    return { lengthDeg: v / 3600, label: `${formatNice(v)}″` };
-}
-
 // Equatorial (RA hours, Dec degrees, distance ly) -> scene xyz.
 // Mapping x = cos(ra), z = -sin(ra) keeps the sky un-mirrored when viewed
 // from the origin: with north up, RA increases to the left (east).

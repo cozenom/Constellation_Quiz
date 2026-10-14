@@ -17,7 +17,6 @@ import {
     constellationFocus,
     constellationLinePositions,
     formatBayer,
-    scaleBarAngle,
     scaleBarDistance,
     starRecord,
 } from '../utils/universe3d';
@@ -35,21 +34,18 @@ const PICK_MAG_LIMIT = 7.0;
 // named stars are always labelled
 const LABEL_MAG_LIMIT = 2.5;
 const FLIGHT_SECONDS = 1.6;
+// OrbitControls zoom: each wheel notch scales the distance by 0.95^ZOOM_SPEED
+// (~23% at 5). Earth close-up to Orion is ~11 orders of magnitude, so the
+// default of 1 (5% a notch) took hundreds of notches.
+const ZOOM_SPEED = 5;
 
-// Free look orbits a target this close in front of the camera, so dragging
-// turns the view instead of moving around the scene. 1e-11 ly is ~95 km:
-// the camera stays inside Earth and the Moon shifts by under 0.02 deg.
-// (0.001 ly was ~63 AU, which swung the camera past Neptune.)
-const FREE_LOOK_RADIUS = 1e-11;
 // Closest the camera may get to an orbit target that is a star or a
 // constellation (ly). Planets use a multiple of their radius instead.
 const ORBIT_MIN_DISTANCE = 0.01;
 const EARTH_RADIUS_LY = 6378 / KM_PER_AU / AU_PER_LY;
 // Planet labels and picking only while the solar system is at least this visible
 const BODY_MIN_FADE = 0.3;
-const DEFAULT_FOV = 60;
-const MIN_FOV = 5;
-const MAX_FOV = 100;
+const FOV = 60;
 
 // Points shader: each star stores its absolute magnitude, and the apparent
 // magnitude is recomputed from the camera distance every frame. From Earth
@@ -190,8 +186,7 @@ function formatLength(ly) {
 }
 
 // Readout: how far the centre point (orbit target) is from the Sun, so it
-// stays put while rotating. In free look the centre is just in front of
-// the camera, so this is where you are. Positions in ly from the Sun.
+// stays put while rotating. Positions in ly from the Sun.
 function formatDistance(target, earthPosition) {
     if (target.distanceTo(earthPosition) < EARTH_RADIUS_LY) return 'Earth';
     return `${formatLength(target.length())} from the Sun`;
@@ -200,7 +195,8 @@ function formatDistance(target, earthPosition) {
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
-    const [selectedAbbrev, setSelectedAbbrev] = useState('Ori');
+    // Constellation picked in search (abbrev), or null: none drawn
+    const [selectedAbbrev, setSelectedAbbrev] = useState(null);
     const [showLines, setShowLines] = useState(true);
     const [showAllLines, setShowAllLines] = useState(false);
     const [showLabels, setShowLabels] = useState(true);
@@ -211,11 +207,12 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
     const [selectedBody, setSelectedBody] = useState(null);
     // On phones the options panel starts collapsed so it doesn't cover the sky
     const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 767);
-    // Starts in free look: standing on Earth, looking at the sky
-    const [viewMode, setViewMode] = useState('free');  // 'orbit' | 'free'
+    // What the view is centred on, for the footer title. Starts orbiting
+    // Earth from outside (see bodyPose / resetView).
+    // {type: 'body', id} | {type: 'star', index} | {type: 'constellation'} | {type: 'none'}
+    const [focus, setFocus] = useState(() => (planetFacts ? { type: 'body', id: 'Earth' } : { type: 'none' }));
     // Bloom haze: on by default except on touch devices (heavy for phone GPUs)
     const [showHaze, setShowHaze] = useState(() => !window.matchMedia('(pointer: coarse)').matches);
-    const skipModeReset = useRef(false);
     const mountRef = useRef(null);
     const labelsRef = useRef(null);
     const tooltipRef = useRef(null);
@@ -232,14 +229,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         [constellationData, starBuffers, lineStarInfo, planetFacts]
     );
 
-    const sortedAbbrevs = useMemo(
-        () => Object.keys(constellationData).sort((a, b) =>
-            constellationData[a].name.localeCompare(constellationData[b].name)),
-        [constellationData]
-    );
-
     const selectedHips = useMemo(
-        () => new Set(constellationData[selectedAbbrev].stars.map(s => Number(s.hip))),
+        () => new Set(selectedAbbrev ? constellationData[selectedAbbrev].stars.map(s => Number(s.hip)) : []),
         [constellationData, selectedAbbrev]
     );
 
@@ -269,7 +260,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
         // Master camera: ly from the Sun, driven by OrbitControls, never
         // rendered. Each layer derives its own camera from it (utils/layers3d).
-        const camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.0001, 1e6);
+        const camera = new THREE.PerspectiveCamera(FOV, 1, 0.0001, 1e6);
         camera.up.set(0, 1, 0);  // celestial north
 
         // Far -> near. The Earth layer (km) comes with satellites.
@@ -288,17 +279,48 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         const earthPosition = new THREE.Vector3();
         if (solar?.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
 
+        // Camera pose for viewing a body, in ly: a few radii out on its
+        // sunlit side, a little above the ecliptic. The Sun gets a view of
+        // the whole Solar System. {position, target, minDistance} or null.
+        const bodyPose = (id) => {
+            const body = solar?.byId.get(id);
+            if (!body) return null;
+            const p = body.position.clone().divideScalar(AU_PER_LY);
+            let offset;
+            if (id === 'Sun') {
+                // Above the ecliptic on Earth's side, far enough to see Neptune's orbit
+                offset = earthPosition.clone().normalize().add(ECLIPTIC_NORTH.clone().multiplyScalar(1.2))
+                    .normalize().multiplyScalar(60 / AU_PER_LY);
+            } else {
+                const distance = body.radiusAu * (id === 'Saturn' ? 9 : 6) / AU_PER_LY;
+                offset = p.clone().normalize().negate().add(ECLIPTIC_NORTH.clone().multiplyScalar(0.35))
+                    .normalize().multiplyScalar(distance);
+            }
+            return {
+                position: p.clone().add(offset).toArray(),
+                target: p.toArray(),
+                // How close you may zoom: just above the surface
+                minDistance: body.radiusAu * 1.2 / AU_PER_LY,
+            };
+        };
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
         controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = ZOOM_SPEED;
         controls.minDistance = ORBIT_MIN_DISTANCE;
         controls.maxDistance = 50000;
-        // Start at Earth looking at the selected constellation
-        camera.position.copy(earthPosition);
-        controls.target.set(...constellationFocus(
-            constellationData[optionsRef.current.selectedAbbrev], starBuffers
-        ));
+        // Start orbiting Earth (the home view). Without planets: at the Sun,
+        // looking at the sky 500 ly out.
+        const home = bodyPose('Earth');
+        if (home) {
+            camera.position.set(...home.position);
+            controls.target.set(...home.target);
+            controls.minDistance = home.minDistance;
+        } else {
+            controls.target.set(0, 0, -500);
+        }
 
         const stars = makeStarPoints(starBuffers.positions, starBuffers.colors, starBuffers.absMags, pixelRatio);
         scene.add(stars);
@@ -330,9 +352,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
         const s = {
             scene, camera, controls, selectedRing, bodySelectedRing, solar,
-            selectedLines: null, allLines: null, flight: null, mode: 'orbit', haze: false,
+            selectedLines: null, allLines: null, flight: null, haze: false,
             // Earth in ly from the Sun; everything Earth-relative reads this
             earthPosition,
+            bodyPose,
         };
         // A body's position in ly from the Sun, as an array
         s.bodyPositionLy = (id) => solar.byId.get(id).position.toArray().map(v => v / AU_PER_LY);
@@ -344,40 +367,12 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         };
         sceneRef.current = s;
 
-        // Free look: scroll / pinch change the field of view (OrbitControls zoom
-        // is off). Drag speed scales with the FOV so the sky stays under the cursor.
-        s.setFov = (fov) => {
-            camera.fov = THREE.MathUtils.clamp(fov, MIN_FOV, MAX_FOV);
-            camera.updateProjectionMatrix();
-            if (s.mode === 'free') controls.rotateSpeed = -0.2 * camera.fov / DEFAULT_FOV;
-        };
-        const onWheel = (e) => {
-            if (s.mode !== 'free') return;
-            e.preventDefault();
-            s.setFov(camera.fov * Math.exp(e.deltaY * 0.001));
-        };
-        let pinchDistance = null;
-        const touchDistance = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-        const onTouchStart = (e) => {
-            pinchDistance = e.touches.length === 2 ? touchDistance(e.touches) : null;
-        };
-        const onTouchMove = (e) => {
-            if (s.mode !== 'free' || e.touches.length !== 2 || !pinchDistance) return;
-            const d = touchDistance(e.touches);
-            s.setFov(camera.fov * pinchDistance / d);
-            pinchDistance = d;
-        };
-        renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
-        renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
-        renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
-
         // ---------- Camera flights ----------
         // Positions are in ly from the Sun (master camera space).
-        // minDistance: how close the user may then zoom to the new target;
-        // defaults to the current mode's. OrbitControls enforces it every
-        // frame, so during the flight it is the smaller of old and new.
-        s.defaultMinDistance = () => (s.mode === 'free' ? FREE_LOOK_RADIUS / 2 : ORBIT_MIN_DISTANCE);
-        s.flyTo = (toPosition, toTarget, minDistance = s.defaultMinDistance()) => {
+        // minDistance: how close the user may then zoom to the new target.
+        // OrbitControls enforces it every frame, so during the flight it is
+        // the smaller of old and new.
+        s.flyTo = (toPosition, toTarget, minDistance = ORBIT_MIN_DISTANCE) => {
             const toPos = new THREE.Vector3(...toPosition);
             const toTgt = new THREE.Vector3(...toTarget);
             controls.minDistance = Math.min(controls.minDistance, minDistance);
@@ -694,8 +689,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
         // ---------- Scale bar ----------
         // Measured at the orbit point (screen centre): things nearer or
-        // farther are drawn bigger or smaller. In free look the target is
-        // just in front of the camera, so it shows an angle on the sky.
+        // farther are drawn bigger or smaller.
         let lastScale = '';
         const updateScaleBar = () => {
             const bar = scaleBarRef.current;
@@ -704,19 +698,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             const { clientWidth: width, clientHeight: height } = mount;
             if (!height) return;
             const maxPx = Math.min(120, width * 0.25);
-            let px, text;
-            if (s.mode === 'free') {
-                const degPerPx = camera.fov / height;
-                const { lengthDeg, label: l } = scaleBarAngle(maxPx * degPerPx);
-                px = lengthDeg / degPerPx;
-                text = l;
-            } else {
-                const dist = camera.position.distanceTo(controls.target);
-                const lyPerPx = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / height;
-                const { lengthLy, label: l } = scaleBarDistance(maxPx * lyPerPx);
-                px = lengthLy / lyPerPx;
-                text = l;
-            }
+            const dist = camera.position.distanceTo(controls.target);
+            const lyPerPx = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / height;
+            const { lengthLy, label: text } = scaleBarDistance(maxPx * lyPerPx);
+            const px = lengthLy / lyPerPx;
             const key = `${Math.round(px)}|${text}`;
             if (key === lastScale) return;
             lastScale = key;
@@ -760,9 +745,6 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             canvas.removeEventListener('pointerup', onPointerUp);
             canvas.removeEventListener('pointermove', onPointerMove);
             canvas.removeEventListener('pointerleave', onPointerLeave);
-            canvas.removeEventListener('wheel', onWheel);
-            canvas.removeEventListener('touchstart', onTouchStart);
-            canvas.removeEventListener('touchmove', onTouchMove);
             controls.dispose();
             [stars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, s.selectedLines, s.allLines]
                 .forEach(disposeObject);
@@ -776,61 +758,34 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         };
     }, [starBuffers, lineStarInfo, constellationData, planetFacts]);
 
-    // Fly back to Earth, looking at the selected constellation. In free look
-    // the target sits just in front of the camera, in that direction.
-    const resetToEarthView = (mode = viewMode) => {
+    // Fly back to Earth and orbit a constellation, so you see its figure as
+    // in the night sky; dragging then shows it in 3D
+    const viewConstellation = (abbrev) => {
         const s = sceneRef.current;
         if (!s) return;
-        const focus = constellationFocus(constellationData[selectedAbbrev], starBuffers);
-        const earth = s.earthPosition.toArray();
-        if (mode === 'free') {
-            const dir = focus.map((v, i) => v - earth[i]);
-            const len = Math.hypot(...dir);
-            s.flyTo(earth, dir.map((v, i) => earth[i] + v / len * FREE_LOOK_RADIUS));
+        s.flyTo(s.earthPosition.toArray(), constellationFocus(constellationData[abbrev], starBuffers));
+        setFocus({ type: 'constellation' });
+    };
+
+    // R / Reset view: back home, orbiting Earth (without planets: at the
+    // Sun, looking at the selected constellation or the default direction)
+    const resetView = () => {
+        const s = sceneRef.current;
+        if (!s) return;
+        const home = s.bodyPose('Earth');
+        if (home) {
+            s.flyTo(home.position, home.target, home.minDistance);
+            setFocus({ type: 'body', id: 'Earth' });
+        } else if (selectedAbbrev) {
+            viewConstellation(selectedAbbrev);
         } else {
-            s.flyTo(earth, focus);
+            s.flyTo([0, 0, 0], [0, 0, -500]);
+            setFocus({ type: 'none' });
         }
-        s.setFov(DEFAULT_FOV);
     };
 
-    // Orbit: drag circles the target, scroll zooms toward it.
-    // Free look: the camera sits at Earth; drag turns the view, scroll changes the FOV.
-    useEffect(() => {
-        const s = sceneRef.current;
-        if (!s) return;
-        if (skipModeReset.current) {
-            skipModeReset.current = false;
-            return;
-        }
-        const free = viewMode === 'free';
-        s.mode = viewMode;
-        s.controls.enableZoom = !free;
-        s.controls.enablePan = !free;
-        // minDistance is set by the flight (s.defaultMinDistance). In free
-        // look the speed is negative (drag the sky, like a planetarium);
-        // resetToEarthView -> setFov sets it
-        s.controls.rotateSpeed = 0.5;
-        resetToEarthView(viewMode);
-    }, [viewMode]);
-
-    // Leave free look without the reset flight the mode effect would start
-    const switchToOrbitMode = () => {
-        const s = sceneRef.current;
-        if (viewMode !== 'free') return;
-        s.mode = 'orbit';
-        s.controls.enableZoom = true;
-        s.controls.enablePan = true;
-        s.controls.rotateSpeed = 0.5;
-        s.setFov(DEFAULT_FOV);
-        skipModeReset.current = true;
-        setViewMode('orbit');
-    };
-
-    // How close you may zoom to a planet: just above its surface
-    const bodyMinDistance = (id) => sceneRef.current.solar.byId.get(id).radiusAu * 1.2 / AU_PER_LY;
-
-    // Turn to face a planet, like lookAtStar. Earth itself can't be seen
-    // from Earth, so that one flies out to it instead.
+    // Look at a planet from Earth, like lookAtStar. Earth itself can't be
+    // seen from Earth, so that one flies out to it instead.
     const lookAtBody = (id) => {
         const s = sceneRef.current;
         if (!s?.solar) return;
@@ -838,58 +793,32 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             flyToBody(id);
             return;
         }
-        const p = s.bodyPositionLy(id);
-        if (viewMode === 'free') {
-            const cam = s.camera.position;
-            const dir = [p[0] - cam.x, p[1] - cam.y, p[2] - cam.z];
-            const len = Math.hypot(...dir);
-            s.flyTo(cam.toArray(), dir.map((v, i) => cam.getComponent(i) + v / len * FREE_LOOK_RADIUS));
-        } else {
-            s.flyTo(s.earthPosition.toArray(), p, bodyMinDistance(id));
-        }
+        s.flyTo(s.earthPosition.toArray(), s.bodyPositionLy(id), s.bodyPose(id).minDistance);
+        setFocus({ type: 'body', id });
     };
 
-    // Fly out to a planet: a few radii away on its sunlit side, a little
-    // above the ecliptic. The Sun gets a view of the whole Solar System.
+    // Fly out to a planet (see bodyPose in the setup)
     const flyToBody = (id) => {
         const s = sceneRef.current;
-        if (!s?.solar) return;
-        switchToOrbitMode();
-        const body = s.solar.byId.get(id);
-        const p = new THREE.Vector3(...s.bodyPositionLy(id));
-        let offset;
-        if (id === 'Sun') {
-            // Above the ecliptic on Earth's side, far enough to see Neptune's orbit
-            offset = s.earthPosition.clone().normalize().add(ECLIPTIC_NORTH.clone().multiplyScalar(1.2))
-                .normalize().multiplyScalar(60 / AU_PER_LY);
-        } else {
-            const distance = body.radiusAu * (id === 'Saturn' ? 9 : 6) / AU_PER_LY;
-            offset = p.clone().normalize().negate().add(ECLIPTIC_NORTH.clone().multiplyScalar(0.35))
-                .normalize().multiplyScalar(distance);
-        }
-        s.flyTo(p.clone().add(offset).toArray(), p.toArray(), bodyMinDistance(id));
+        const pose = s?.bodyPose(id);
+        if (!pose) return;
+        s.flyTo(pose.position, pose.target, pose.minDistance);
+        setFocus({ type: 'body', id });
     };
 
-    // Turn to face a star. Free look turns in place; orbit goes back to Earth
-    // and orbits the star, so you see where it is in the night sky.
+    // Go back to Earth and orbit the star, so you see where it is in the night sky
     const lookAtStar = (index) => {
         const s = sceneRef.current;
         if (!s) return;
         const p = starBuffers.positions.subarray(index * 3, index * 3 + 3);
-        if (viewMode === 'free') {
-            const cam = s.camera.position;
-            const dir = [p[0] - cam.x, p[1] - cam.y, p[2] - cam.z];
-            const len = Math.hypot(...dir);
-            s.flyTo(cam.toArray(), dir.map((v, i) => cam.getComponent(i) + v / len * FREE_LOOK_RADIUS));
-        } else {
-            s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]]);
-        }
+        s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]]);
+        setFocus({ type: 'star', index });
     };
 
     const handleSearchSelect = (item) => {
         if (item.type === 'constellation') {
-            if (item.abbrev === selectedAbbrev) resetToEarthView();
-            else setSelectedAbbrev(item.abbrev);
+            setSelectedAbbrev(item.abbrev);
+            viewConstellation(item.abbrev);
         } else if (item.type === 'star') {
             selectStar(item.starIndex);
             lookAtStar(item.starIndex);
@@ -903,23 +832,26 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
     const flyToStar = (index) => {
         const s = sceneRef.current;
         if (!s) return;
-        switchToOrbitMode();
         const p = Array.from(starBuffers.positions.subarray(index * 3, index * 3 + 3));
         const earth = s.earthPosition.toArray();
         const dir = p.map((v, i) => v - earth[i]);
         const dist = Math.hypot(...dir);
         const keep = 1 - Math.min(Math.max(dist * 0.05, 0.3), 15) / dist;
         s.flyTo(dir.map((v, i) => earth[i] + v * keep), p, ORBIT_MIN_DISTANCE);
+        setFocus({ type: 'star', index });
     };
 
-    // Draw the selected constellation's stick figure and fly to it from Earth
+    // Draw the selected constellation's stick figure (the flight to it is
+    // started by whatever selected it)
     useEffect(() => {
         const s = sceneRef.current;
         if (!s) return;
         if (s.selectedLines) {
             s.scene.remove(s.selectedLines);
             disposeObject(s.selectedLines);
+            s.selectedLines = null;
         }
+        if (!selectedAbbrev) return;
         s.selectedLines = makeLines(
             constellationLinePositions(constellationData[selectedAbbrev], starBuffers),
             0x60a5fa,
@@ -927,8 +859,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         );
         s.selectedLines.visible = showLines;
         s.scene.add(s.selectedLines);
-        resetToEarthView();
-    }, [selectedAbbrev, starBuffers]);
+    }, [selectedAbbrev, starBuffers, planetFacts]);
 
     // Line visibility. All 88 stick figures are built on first use.
     useEffect(() => {
@@ -973,8 +904,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             }
             if (e.code === 'KeyL') setShowLines(prev => !prev);
             if (e.code === 'KeyN') setShowLabels(prev => !prev);
-            if (e.code === 'KeyR') resetToEarthView();
-            if (e.code === 'KeyF') setViewMode(mode => (mode === 'free' ? 'orbit' : 'free'));
+            if (e.code === 'KeyR') resetView();
             if (e.code === 'KeyH') setShowHaze(prev => !prev);
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -990,7 +920,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         );
     }
 
-    const selected = constellationData[selectedAbbrev];
+    const selected = selectedAbbrev ? constellationData[selectedAbbrev] : null;
     const star = selectedStar !== null ? starRecord(starBuffers, selectedStar) : null;
     const solar = sceneRef.current?.solar;
     const body = selectedBody !== null && solar ? solar.byId.get(selectedBody) : null;
@@ -999,6 +929,23 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
         sun: body.position.length(),
         earth: body.position.distanceTo(solar.byId.get('Earth').position),
     };
+
+    // Footer: what the view is centred on
+    let title = '3D Universe';
+    let subtitle = null;
+    if (focus.type === 'constellation' && selected) {
+        title = selected.name;
+        subtitle = selected.name_english !== selected.name ? selected.name_english : null;
+    } else if (focus.type === 'body' && solar?.byId.has(focus.id)) {
+        const f = solar.byId.get(focus.id).facts;
+        title = f.name;
+        subtitle = { star: 'Our star', planet: 'Planet', 'dwarf planet': 'Dwarf planet', moon: `Moon of ${f.parent}` }[f.type];
+    } else if (focus.type === 'star') {
+        const rec = starRecord(starBuffers, focus.index);
+        const bayer = formatBayer(lineStarInfo.get(rec.hip)?.bayer);
+        title = rec.name || bayer || `HIP ${rec.hip}`;
+        subtitle = rec.name && bayer ? bayer : 'Star';
+    }
 
     return (
         <div className={`universe-3d-screen ${star || body ? 'has-card' : ''}`}>
@@ -1019,25 +966,6 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
             </button>
 
             <div className={`universe-3d-panel ${panelOpen ? 'open' : ''}`}>
-                <div className="universe-3d-segmented" role="group" aria-label="View mode">
-                    <button
-                        className={viewMode === 'orbit' ? 'active' : ''}
-                        onClick={() => setViewMode('orbit')}
-                    >
-                        Orbit
-                    </button>
-                    <button
-                        className={viewMode === 'free' ? 'active' : ''}
-                        onClick={() => setViewMode('free')}
-                    >
-                        Free look
-                    </button>
-                </div>
-                <select value={selectedAbbrev} onChange={(e) => setSelectedAbbrev(e.target.value)}>
-                    {sortedAbbrevs.map(abbrev => (
-                        <option key={abbrev} value={abbrev}>{constellationData[abbrev].name}</option>
-                    ))}
-                </select>
                 <label className="universe-3d-checkbox">
                     <input
                         type="checkbox"
@@ -1092,7 +1020,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
                     />
                     Haze
                 </label>
-                <button className="button-secondary" onClick={() => resetToEarthView()}>Reset to Earth view</button>
+                <button className="button-secondary" onClick={() => resetView()}>Reset view</button>
             </div>
 
             {star && (
@@ -1114,22 +1042,18 @@ function Universe3D({ constellationData, stars3d, planetFacts, onBack }) {
 
             <div
                 className="universe-3d-scale"
-                title={viewMode === 'free' ? 'Angle on the sky' : 'Scale at the orbit point (screen centre)'}
+                title="Scale at the orbit point (screen centre)"
             >
                 <div ref={scaleLabelRef} className="universe-3d-scale-label" />
                 <div ref={scaleBarRef} className="universe-3d-scale-bar" />
             </div>
 
             <div className="universe-3d-footer">
-                <div className="universe-3d-title">{selected.name}</div>
-                {selected.name_english && selected.name_english !== selected.name && (
-                    <div className="universe-3d-subtitle">{selected.name_english}</div>
-                )}
+                <div className="universe-3d-title">{title}</div>
+                {subtitle && <div className="universe-3d-subtitle">{subtitle}</div>}
                 <div ref={distanceRef} className="universe-3d-distance" />
                 <div className="universe-3d-hint">
-                    {viewMode === 'free'
-                        ? 'Click a star or planet for details · Drag to look around · Scroll to zoom'
-                        : 'Click a star or planet for details · Drag to rotate · Scroll to zoom'}
+                    Click a star or planet for details · Drag to rotate · Scroll to zoom
                 </div>
             </div>
         </div>

@@ -41,17 +41,16 @@ function KeybindsPanel({ screen }) {
 
             case 'universe3d':
                 return [
-                    { keys: ['Click'], label: 'Star details' },
+                    { keys: ['Click'], label: 'Star / planet details' },
                     { keys: ['/'], label: 'Search' },
-                    { keys: ['Drag'], label: 'Rotate around the constellation' },
+                    { keys: ['Drag'], label: 'Rotate around the centre' },
                     { keys: ['Scroll'], label: 'Zoom in/out' },
                     { keys: ['Right-drag'], label: 'Pan' },
                     { keys: ['L'], label: 'Show/hide lines' },
                     { keys: ['N'], label: 'Show/hide names' },
                     { keys: ['H'], label: 'Haze on/off' },
-                    { keys: ['F'], label: 'Free look / orbit' },
-                    { keys: ['R'], label: 'Reset to Earth view' },
-                    { keys: ['Esc'], label: 'Close star card / back to menu' }
+                    { keys: ['R'], label: 'Reset view (back to Earth)' },
+                    { keys: ['Esc'], label: 'Close card / back to menu' }
                 ];
 
             case 'results':

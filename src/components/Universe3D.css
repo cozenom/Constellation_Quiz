@@ -55,35 +55,6 @@
     font-size: 0.9rem;
 }
 
-.universe-3d-segmented {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    background: #1e293b;
-    border: 1px solid #475569;
-    border-radius: 8px;
-}
-
-.universe-3d-segmented button {
-    flex: 1;
-    min-height: 2rem;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.85rem;
-    background: transparent;
-    color: #94a3b8;
-}
-
-.universe-3d-segmented button:hover {
-    transform: none;
-    box-shadow: none;
-    background: rgba(71, 85, 105, 0.4);
-}
-
-.universe-3d-segmented button.active {
-    background: #3b82f6;
-    color: white;
-}
-
 /* Search box, top centre */
 .universe-3d-search {
     position: absolute;
