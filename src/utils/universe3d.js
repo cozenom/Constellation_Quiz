@@ -2,7 +2,8 @@
 // Scene units are light-years, with the Sun at the origin and celestial
 // north (Dec +90) along +Y.
 
-const LY_PER_PARSEC = 3.26156;
+export const LY_PER_PARSEC = 3.26156;
+const SUN_ABS_MAG_V = 4.83;
 
 // Equatorial (RA hours, Dec degrees, distance ly) -> scene xyz.
 // Mapping x = cos(ra), z = -sin(ra) keeps the sky un-mirrored when viewed
@@ -73,7 +74,80 @@ export function buildStarBuffers(stars3d) {
         hipToIndex.set(row[f.hip], i);
     });
 
-    return { positions, colors, absMags, hipToIndex, count };
+    return { positions, colors, absMags, hipToIndex, count, rows: stars3d.stars, fieldIndex: f };
+}
+
+// One star's catalogue row as an object ({hip, ra, dec, mag, dist, err, src, bv, spect, name})
+export function starRecord(starBuffers, index) {
+    const row = starBuffers.rows[index];
+    return Object.fromEntries(Object.entries(starBuffers.fieldIndex).map(([name, i]) => [name, row[i]]));
+}
+
+// hip -> what the constellation data knows about a line star
+// ({bayer, name, origin, culturalGroup, constellations: [names]})
+export function buildLineStarInfo(constellationData) {
+    const info = new Map();
+    for (const c of Object.values(constellationData)) {
+        for (const star of c.stars) {
+            const hip = Number(star.hip);
+            const entry = info.get(hip) || {
+                bayer: star.bayer,
+                name: star.name,
+                origin: star.origin,
+                culturalGroup: star.cultural_group,
+                constellations: [],
+            };
+            entry.constellations.push(c.name);
+            info.set(hip, entry);
+        }
+    }
+    return info;
+}
+
+// "ζ_Ori" -> "ζ Ori"
+export function formatBayer(bayer) {
+    return bayer ? bayer.replace(/_/g, ' ') : null;
+}
+
+const CLASS_COLOUR = {
+    O: 'blue', B: 'blue-white', A: 'white', F: 'yellow-white', G: 'yellow',
+    K: 'orange', M: 'red', C: 'red carbon', N: 'red carbon', R: 'red carbon', S: 'red', W: 'Wolf-Rayet',
+};
+
+// Checked in order, so longer codes come before their prefixes
+const LUMINOSITY_CLASSES = [
+    ['Ia0', 'hypergiant'], ['Ia+', 'hypergiant'], ['Iab', 'supergiant'], ['Ia', 'supergiant'],
+    ['Ib', 'supergiant'], ['IV', 'subgiant'], ['VI', 'subdwarf'], ['V', 'main-sequence star'],
+    ['III', 'giant'], ['II', 'bright giant'], ['I', 'supergiant'],
+];
+const LUMINOSITY_RE = new RegExp(LUMINOSITY_CLASSES.map(([code]) => code.replace('+', '\\+')).join('|'));
+
+// Spectral type ("M2Ib", "G8IIIvar", "sdM4") -> plain English ("red supergiant")
+export function describeSpectralType(spect) {
+    if (!spect) return null;
+    if (/^D/.test(spect)) return 'white dwarf';
+    const isSubdwarf = spect.startsWith('sd');
+    const letter = spect.replace(/^sd/, '')[0];
+    const colour = CLASS_COLOUR[letter];
+    if (!colour) return null;
+    if (isSubdwarf) return `${colour} subdwarf`;
+
+    const code = spect.slice(1).match(LUMINOSITY_RE)?.[0];
+    const kind = LUMINOSITY_CLASSES.find(([c]) => c === code)?.[1];
+    if (!kind) return `${colour} star`;
+    if (kind === 'main-sequence star' && (letter === 'K' || letter === 'M')) return `${colour} dwarf`;
+    return `${colour} ${kind}`;
+}
+
+// Parallax error is symmetric in parallax, so the distance range is
+// d / (1 + err) .. d / (1 - err). Above 100% error there is no upper bound.
+export function distanceRange(dist, err) {
+    return { low: dist / (1 + err), high: err < 1 ? dist / (1 - err) : null };
+}
+
+// How bright the star really is, in visible light, relative to the Sun
+export function luminosityVsSun(mag, dist) {
+    return Math.pow(10, -0.4 * (absoluteMagnitude(mag, dist) - SUN_ABS_MAG_V));
 }
 
 // Line segment endpoints (flat xyz array) for one constellation's stick figure.
@@ -93,17 +167,125 @@ export function constellationLinePositions(constellation, starBuffers) {
     return out;
 }
 
-// 3D centre of a constellation's line stars (the point the camera orbits).
-export function constellationCentroid(constellation, starBuffers) {
+// ---------- Search ----------
+
+// One decimal, without "-0.0" for magnitudes like -0.01
+const formatMag = (mag) => (Math.abs(mag) < 0.05 ? '0.0' : mag.toFixed(1));
+
+const GREEK_NAMES = {
+    α: 'alpha', β: 'beta', γ: 'gamma', δ: 'delta', ε: 'epsilon', ζ: 'zeta', η: 'eta', θ: 'theta',
+    ι: 'iota', κ: 'kappa', λ: 'lambda', μ: 'mu', ν: 'nu', ξ: 'xi', ο: 'omicron', π: 'pi',
+    ρ: 'rho', σ: 'sigma', τ: 'tau', υ: 'upsilon', φ: 'phi', χ: 'chi', ψ: 'psi', ω: 'omega',
+};
+const SUPERSCRIPT_DIGITS = { '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' };
+
+// Lowercase, Greek letters spelled out, accents and punctuation dropped:
+// "α¹ Cen" -> "alpha1 cen", "Achernar" -> "achernar"
+export function normalizeSearchText(text) {
+    return text
+        .toLowerCase()
+        .replace(/[α-ω]/g, ch => GREEK_NAMES[ch] ?? ch)
+        .replace(/[¹²³⁴⁵⁶⁷⁸⁹]/g, ch => SUPERSCRIPT_DIGITS[ch])
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[_'’.-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Everything the 3D search box can find. Items are
+// {type: 'constellation' | 'star', label, sublabel, terms, sortKey, ...}
+// where `terms` are normalized strings to match against. Planets can be
+// added later as another type.
+export function buildSearchIndex(constellationData, starBuffers, lineStarInfo) {
+    const items = [];
+
+    for (const c of Object.values(constellationData)) {
+        items.push({
+            type: 'constellation',
+            abbrev: c.abbrev,
+            label: c.name,
+            sublabel: c.name_english && c.name_english !== c.name ? `Constellation · ${c.name_english}` : 'Constellation',
+            terms: [c.name, c.name_english, c.abbrev].filter(Boolean).map(normalizeSearchText),
+            sortKey: -10,  // constellations first on equal matches
+        });
+    }
+
+    // Stars with an IAU name, or a Bayer designation from the line figures
+    for (let i = 0; i < starBuffers.count; i++) {
+        const rec = starRecord(starBuffers, i);
+        const info = lineStarInfo.get(rec.hip);
+        const bayer = formatBayer(info?.bayer);
+        if (!rec.name && !bayer) continue;
+        items.push({
+            type: 'star',
+            starIndex: i,
+            label: rec.name || bayer,
+            sublabel: [rec.name && bayer, info?.constellations.join(', '), `mag ${formatMag(rec.mag)}`]
+                .filter(Boolean).join(' · '),
+            // Bayer also without its component number, so "alpha cen" finds "α1 Cen"
+            terms: [rec.name, bayer, bayer?.replace(/[0-9¹²³⁴⁵⁶⁷⁸⁹]/g, '')]
+                .filter(Boolean).map(normalizeSearchText),
+            sortKey: rec.mag,  // brighter stars first on equal matches
+        });
+    }
+
+    return items;
+}
+
+// Best matches for a query: whole-term prefix, then word prefix, then
+// substring. "HIP 12345" or a bare number looks up a Hipparcos star.
+export function searchIndex(items, starBuffers, query, limit = 8) {
+    const q = normalizeSearchText(query);
+    if (!q) return [];
+
+    const hipMatch = q.match(/^(?:hip ?)?(\d+)$/);
+    if (hipMatch) {
+        const index = starBuffers.hipToIndex.get(Number(hipMatch[1]));
+        if (index === undefined) return [];
+        const rec = starRecord(starBuffers, index);
+        return [{
+            type: 'star',
+            starIndex: index,
+            label: rec.name || `HIP ${rec.hip}`,
+            sublabel: `HIP ${rec.hip} · mag ${rec.mag.toFixed(1)}`,
+        }];
+    }
+
+    const scored = [];
+    for (const item of items) {
+        let best = Infinity;
+        for (const term of item.terms) {
+            if (term === q) best = Math.min(best, 0);
+            else if (term.startsWith(q)) best = Math.min(best, 1);
+            else if (term.split(' ').some(word => word.startsWith(q))) best = Math.min(best, 2);
+            else if (term.includes(q)) best = Math.min(best, 3);
+        }
+        if (best < Infinity) scored.push({ item, score: best });
+    }
+    scored.sort((a, b) => a.score - b.score || a.item.sortKey - b.item.sortKey);
+    return scored.slice(0, limit).map(s => s.item);
+}
+
+// The point the camera orbits for a constellation: the average sky direction
+// of its line stars, at their median distance. A plain 3D average gets
+// dragged far off-centre by a single distant star (e.g. mu Sgr).
+export function constellationFocus(constellation, starBuffers) {
     const { positions, hipToIndex } = starBuffers;
-    let x = 0, y = 0, z = 0, n = 0;
+    let x = 0, y = 0, z = 0;
+    const dists = [];
     for (const star of constellation.stars) {
         const i = hipToIndex.get(Number(star.hip));
         if (i === undefined) continue;
-        x += positions[i * 3];
-        y += positions[i * 3 + 1];
-        z += positions[i * 3 + 2];
-        n++;
+        const px = positions[i * 3], py = positions[i * 3 + 1], pz = positions[i * 3 + 2];
+        const d = Math.hypot(px, py, pz);
+        x += px / d;
+        y += py / d;
+        z += pz / d;
+        dists.push(d);
     }
-    return n ? [x / n, y / n, z / n] : [0, 0, -1];
+    if (!dists.length) return [0, 0, -1];
+    dists.sort((a, b) => a - b);
+    const median = dists[Math.floor(dists.length / 2)];
+    const len = Math.hypot(x, y, z);
+    return [x / len * median, y / len * median, z / len * median];
 }

@@ -333,7 +333,7 @@ function App() {
 
     return (
         <>
-            {starsEnabled && <StarField constellationData={constellationData} />}
+            {starsEnabled && screen !== 'universe3d' && <StarField constellationData={constellationData} />}
             <button
                 onClick={toggleStars}
                 className="stars-toggle"

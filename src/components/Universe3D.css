@@ -55,6 +55,108 @@
     font-size: 0.9rem;
 }
 
+.universe-3d-segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
+
+.universe-3d-segmented button {
+    flex: 1;
+    min-height: 2rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    background: transparent;
+    color: #94a3b8;
+}
+
+.universe-3d-segmented button:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(71, 85, 105, 0.4);
+}
+
+.universe-3d-segmented button.active {
+    background: #3b82f6;
+    color: white;
+}
+
+/* Search box, top centre */
+.universe-3d-search {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(24rem, calc(100% - 34rem));
+    min-width: 14rem;
+}
+
+.universe-3d-search input {
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.9rem;
+    background: rgba(15, 23, 42, 0.85);
+    border-color: rgba(148, 163, 184, 0.3);
+    backdrop-filter: blur(4px);
+}
+
+.universe-3d-search-results {
+    list-style: none;
+    margin-top: 0.25rem;
+    padding: 0.25rem;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.universe-3d-search-results li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.universe-3d-search-results li.active {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+.universe-3d-search-icon {
+    width: 1rem;
+    text-align: center;
+    color: #60a5fa;
+}
+
+.universe-3d-search-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.universe-3d-search-label {
+    font-size: 0.9rem;
+}
+
+.universe-3d-search-sublabel {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.universe-3d-search-results li.universe-3d-search-empty {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    cursor: default;
+}
+
 .universe-3d-checkbox {
     display: flex;
     align-items: center;
@@ -105,6 +207,138 @@
     color: #64748b;
 }
 
+/* The starfield toggle does nothing here (the 3D view covers the starfield).
+   !important beats the button's inline display style. */
+body:has(.universe-3d-screen) .stars-toggle {
+    display: none !important;
+}
+
+/* Name labels, positioned every frame by the render loop */
+.universe-3d-labels {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.universe-3d-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 0.75rem;
+    color: rgba(226, 232, 240, 0.75);
+    white-space: nowrap;
+    text-shadow: 0 0 4px #02040a;
+    will-change: transform;
+}
+
+.universe-3d-label-constellation {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(96, 165, 250, 0.8);
+    translate: -50% -50%;
+}
+
+.universe-3d-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: none;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 6px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 2;
+}
+
+/* Star info card */
+.star-info {
+    position: absolute;
+    top: 4.5rem;
+    left: 1rem;
+    width: 20rem;
+    max-height: calc(100% - 6rem);
+    overflow-y: auto;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 12px;
+    backdrop-filter: blur(6px);
+}
+
+.star-info-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    font-size: 1.25rem;
+    line-height: 1;
+    background: transparent;
+    color: #94a3b8;
+}
+
+.star-info-close:hover {
+    background: rgba(71, 85, 105, 0.4);
+    box-shadow: none;
+}
+
+.star-info-title {
+    font-size: 1.25rem;
+    padding-right: 2rem;
+}
+
+.star-info-subtitle {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 0.75rem;
+}
+
+.star-info-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.star-info-facts dt {
+    color: #94a3b8;
+}
+
+.star-info-muted {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.star-info-approx {
+    display: inline-block;
+    margin-left: 0.25rem;
+    padding: 0 0.35rem;
+    font-size: 0.7rem;
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    border-radius: 4px;
+}
+
+.star-info-origin {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+}
+
+.star-info-fly {
+    margin-top: 0.75rem;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+}
+
 .universe-3d-error {
     display: flex;
     align-items: center;
@@ -112,15 +346,69 @@
     color: #cbd5e1;
 }
 
+/* Only shown on phones */
+.universe-3d-panel-toggle {
+    display: none;
+}
+
 @media (max-width: 767px) {
+    .universe-3d-panel-toggle {
+        display: block;
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        min-height: 2.5rem;
+        padding: 0.4rem 0.9rem;
+        font-size: 0.9rem;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
     .universe-3d-panel {
-        top: auto;
-        bottom: 6.5rem;
-        right: 50%;
-        transform: translateX(50%);
+        top: 4rem;
+        display: none;
+    }
+
+    /* Between the Back and Options buttons */
+    .universe-3d-search {
+        left: 6.75rem;
+        right: 7.5rem;
+        width: auto;
+        min-width: 0;
+        transform: none;
+    }
+
+    .universe-3d-search input {
+        padding: 0.55rem 0.6rem;
+    }
+
+    /* Results can be wider than the box */
+    .universe-3d-search-results {
+        position: fixed;
+        left: 0.5rem;
+        right: 0.5rem;
+    }
+
+    .universe-3d-panel.open {
+        display: flex;
     }
 
     .universe-3d-hint {
+        display: none;
+    }
+
+    /* Card becomes a bottom sheet; the panel and footer make room for it */
+    .star-info {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 50%;
+        border-radius: 12px 12px 0 0;
+    }
+
+    body:has(.universe-3d-screen.has-card) .keybinds-panel,
+    .universe-3d-screen.has-card .universe-3d-footer {
         display: none;
     }
 }
