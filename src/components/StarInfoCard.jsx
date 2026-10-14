@@ -59,7 +59,9 @@ function StarInfoCard({ star, lineInfo, onClose, onFlyTo }) {
                 <dd>
                     <DistanceValue dist={star.dist} err={star.err} />
                     <div className="star-info-muted">
-                        {star.src === 'gaia' ? 'Gaia DR3' : 'Hipparcos'} parallax
+                        {star.src === 'lit'
+                            ? 'Published estimate (its own parallax is too uncertain)'
+                            : `${star.src === 'gaia' ? 'Gaia DR3' : 'Hipparcos'} parallax`}
                     </div>
                 </dd>
 
