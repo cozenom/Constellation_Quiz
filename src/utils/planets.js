@@ -20,6 +20,7 @@ const ORBIT_DAYS = {
     Saturn: 10759.22, Uranus: 30688.5, Neptune: 60182, Pluto: 90560,
 };
 
+const MOON_ORBIT_DAYS = 27.32;  // sidereal month
 const DAY_MS = 86400000;
 
 // astronomy-engine EQJ vector -> scene [x, y, z]
@@ -45,15 +46,27 @@ export function geocentricMoon(date) {
     return toScene(GeoMoon(date));
 }
 
-// One orbit as a closed loop of `segments` points around `date`, flat
-// [x, y, z, ...] in AU (for a THREE.LineLoop). Sampled from the real
-// positions, so it matches where the planet is drawn.
-export function orbitPath(body, date, segments = 256) {
-    const periodMs = ORBIT_DAYS[body] * DAY_MS;
-    const start = date.getTime() - periodMs / 2;
+// One orbit as a closed loop of points, flat [x, y, z, ...] in AU (for a
+// THREE.LineLoop). Sampled from the real positions, so it matches where the
+// body is drawn. Points bunch up around `date` (time offset ~ u^3): the
+// line passes through the body, and seen up close evenly spaced straight
+// segments show visible corners. Far round the orbit they're sparse, but
+// also far away, so the corners are too small to see.
+function sampleOrbit(position, date, periodMs, segments) {
     const out = new Float32Array(segments * 3);
     for (let i = 0; i < segments; i++) {
-        out.set(heliocentricPosition(body, new Date(start + periodMs * i / segments)), i * 3);
+        const u = -1 + 2 * i / segments;
+        const offset = Math.sign(u) * Math.abs(u) ** 3 * periodMs / 2;
+        out.set(position(new Date(date.getTime() + offset)), i * 3);
     }
     return out;
+}
+
+export function orbitPath(body, date, segments = 512) {
+    return sampleOrbit(d => heliocentricPosition(body, d), date, ORBIT_DAYS[body] * DAY_MS, segments);
+}
+
+// The Moon's orbit around Earth (AU, Earth-centred), sampled like orbitPath
+export function moonOrbitPath(date, segments = 512) {
+    return sampleOrbit(geocentricMoon, date, MOON_ORBIT_DAYS * DAY_MS, segments);
 }

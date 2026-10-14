@@ -265,6 +265,11 @@ body:has(.universe-3d-screen) .stars-toggle {
     translate: -50% -50%;
 }
 
+.universe-3d-label-planet {
+    font-size: 0.8rem;
+    color: rgba(253, 230, 138, 0.9);
+}
+
 .universe-3d-tooltip {
     position: fixed;
     top: 0;

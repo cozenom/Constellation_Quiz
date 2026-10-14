@@ -30,6 +30,7 @@ function App() {
     const [skyViewStars, setSkyViewStars] = useState(null);
     const [cityData, setCityData] = useState(null);
     const [stars3d, setStars3d] = useState(null);
+    const [planetFacts, setPlanetFacts] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -178,6 +179,30 @@ function App() {
             });
     };
 
+    // Planet facts + display colours for the 3D solar system. Without them
+    // the 3D view still works, just without planets.
+    const loadPlanetFacts = () => {
+        if (planetFacts !== null) {
+            return Promise.resolve(planetFacts);
+        }
+
+        return fetch(`${import.meta.env.BASE_URL}data/planets.json`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load planets: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setPlanetFacts(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading planets:', error);
+                return null;
+            });
+    };
+
     const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
@@ -269,7 +294,7 @@ function App() {
     };
 
     const goToUniverse3d = async () => {
-        await loadStars3d();
+        await Promise.all([loadStars3d(), loadPlanetFacts()]);
         setScreen('universe3d');
     };
 
@@ -432,6 +457,7 @@ function App() {
                     <Universe3D
                         constellationData={constellationData}
                         stars3d={stars3d}
+                        planetFacts={planetFacts}
                         onBack={backToTitle}
                     />
                 </Suspense>

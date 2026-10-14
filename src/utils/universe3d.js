@@ -235,10 +235,27 @@ export function normalizeSearchText(text) {
 
 // Everything the 3D search box can find. Items are
 // {type: 'constellation' | 'star', label, sublabel, terms, sortKey, ...}
-// where `terms` are normalized strings to match against. Planets can be
-// added later as another type.
-export function buildSearchIndex(constellationData, starBuffers, lineStarInfo) {
+// where `terms` are normalized strings to match against. Type 'planet'
+// covers every Solar System body (planetFacts = planets.json, optional).
+export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts) {
     const items = [];
+
+    for (const body of planetFacts?.bodies ?? []) {
+        const sublabel = {
+            star: 'Our star',
+            planet: 'Planet',
+            'dwarf planet': 'Dwarf planet',
+            moon: `Moon of ${body.parent}`,
+        }[body.type];
+        items.push({
+            type: 'planet',
+            id: body.id,
+            label: body.name,
+            sublabel,
+            terms: [body.name, body.id === 'Sun' ? 'Solar System' : null].filter(Boolean).map(normalizeSearchText),
+            sortKey: -20,  // before constellations ("Sun" vs "Sculptor")
+        });
+    }
 
     for (const c of Object.values(constellationData)) {
         items.push({

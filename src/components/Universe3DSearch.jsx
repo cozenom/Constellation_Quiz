@@ -56,8 +56,8 @@ function Universe3DSearch({ items, starBuffers, onSelect }) {
                 ref={inputRef}
                 type="text"
                 value={query}
-                placeholder="Search stars or constellations  ( / )"
-                aria-label="Search stars or constellations"
+                placeholder="Search stars, planets, constellations  ( / )"
+                aria-label="Search stars, planets or constellations"
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setFocused(true)}
@@ -68,7 +68,7 @@ function Universe3DSearch({ items, starBuffers, onSelect }) {
                     {results.length === 0 && <li className="universe-3d-search-empty">No matches</li>}
                     {results.map((item, i) => (
                         <li
-                            key={`${item.type}-${item.abbrev ?? item.starIndex}`}
+                            key={`${item.type}-${item.abbrev ?? item.starIndex ?? item.id}`}
                             role="option"
                             aria-selected={i === activeIndex}
                             className={i === activeIndex ? 'active' : ''}
