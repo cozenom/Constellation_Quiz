@@ -1058,6 +1058,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             syncCameras();
             solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
             solar?.updateTextures(solarCamera.position, mount.clientHeight, camera.fov);
+            solar?.updateRingView(solarCamera.position);
             updateBodyRings();
             if (s.haze) {
                 syncLayerPasses(layerPasses, layers);

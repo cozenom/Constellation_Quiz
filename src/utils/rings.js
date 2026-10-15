@@ -13,11 +13,16 @@ import { raDecToXYZ } from './universe3d.js';
 // orbits) and the A ring's outer edge, and it is stretched linearly between
 // them. The rest are drawn from published ring edges (Burns et al.,
 // Esposito, de Pater et al.; as tabled on Wikipedia's ring articles):
-// bands [inner km, outer km, opacity].
-// Opacities are for display. The real faint rings are far darker (Jupiter's
-// would be invisible), so the dusty ones are exaggerated to be seen; the
+// bands [inner km, outer km, opacity, dust (0-1, default 0)].
+// Opacities are for display, as seen lit from the side. The real faint
+// rings are far fainter (the E ring blocks ~1e-5 of the light, the G ring
+// ~1e-6: at true values they'd vanish), so they're exaggerated. Their
+// dust, though, behaves realistically: micron grains scatter light
+// forwards, so dusty rings fade when lit from the front and glow when
+// backlit, like the E ring in Cassini's "In Saturn's Shadow" (see the
+// ring shader). Saturn's main rings are big ice chunks and don't. The
 // narrow Uranus rings are thinner than a texel and come out as faint lines.
-const band = (r, width, opacity) => [r - width / 2, r + width / 2, opacity];
+const band = (r, width, opacity, dust = 0) => [r - width / 2, r + width / 2, opacity, dust];
 
 // ---------- Moving edges (drawn by the ring shader in solarSystem3d.js) ----------
 // edges: ring edges pushed in and out by moons, km from the planet's centre
@@ -60,10 +65,10 @@ export const RING_SYSTEMS = {
         strips: [{
             km: [92000, 226000], color: '#8c7a66',
             bands: [
-                [92000, 122500, 0.05],    // halo
-                [122500, 129000, 0.22],   // main ring
-                [129000, 182000, 0.04],   // Amalthea gossamer ring
-                [182000, 226000, 0.02],   // Thebe gossamer ring
+                [92000, 122500, 0.05, 1],    // halo
+                [122500, 129000, 0.22, 1],   // main ring
+                [129000, 182000, 0.04, 1],   // Amalthea gossamer ring
+                [182000, 226000, 0.02, 1],   // Thebe gossamer ring
             ],
         }],
     },
@@ -100,9 +105,9 @@ export const RING_SYSTEMS = {
             {
                 km: [139500, 480000], color: '#c9c2b4',
                 bands: [
-                    band(140180, 50, 0.6),    // F ring (shepherded by Prometheus and Pandora)
-                    [166000, 175000, 0.05],   // G ring
-                    [180000, 480000, 0.015],  // E ring (from Enceladus' plumes)
+                    band(140180, 50, 0.6, 0.5),  // F ring (shepherded by Prometheus and Pandora)
+                    [166000, 175000, 0.05, 1],   // G ring
+                    [180000, 480000, 0.015, 1],  // E ring (from Enceladus' plumes)
                 ],
                 channels: { km: 140180, windowKm: 60, moon: 'Prometheus', spacingDeg: 3.2, count: 15 },
             },
@@ -114,7 +119,7 @@ export const RING_SYSTEMS = {
             {
                 km: [37000, 52000], color: '#77736c',
                 bands: [
-                    [37850, 41350, 0.05],     // zeta (dusty)
+                    [37850, 41350, 0.05, 1],  // zeta (dusty)
                     band(41837, 2, 0.7),      // 6
                     band(42234, 2.5, 0.7),    // 5
                     band(42571, 2.5, 0.7),    // 4
@@ -123,15 +128,15 @@ export const RING_SYSTEMS = {
                     band(47175, 1.5, 0.7),    // eta
                     band(47627, 2.5, 0.7),    // gamma
                     band(48300, 6, 0.7),      // delta
-                    band(50023, 1.5, 0.5),    // lambda
+                    band(50023, 1.5, 0.5, 1), // lambda (dusty)
                     band(51149, 58, 0.85),    // epsilon (19-96 km wide)
                 ],
             },
             {
                 km: [60000, 104000], color: '#8fa7c9',
                 bands: [
-                    [64200, 68000, 0.05],     // nu (dusty)
-                    [86000, 103000, 0.04],    // mu (dusty, blue; Mab's orbit)
+                    [64200, 68000, 0.05, 1],  // nu (dusty)
+                    [86000, 103000, 0.04, 1], // mu (dusty, blue; Mab's orbit)
                 ],
             },
         ],
@@ -141,11 +146,12 @@ export const RING_SYSTEMS = {
         strips: [{
             km: [40000, 64000], color: '#7a6f69',
             bands: [
-                [40900, 42900, 0.06],         // Galle
-                band(53200, 113, 0.35),       // Le Verrier
-                [53200, 57200, 0.04],         // Lassell
-                band(57200, 50, 0.25),        // Arago
-                band(62932, 35, 0.4),         // Adams (its arcs not drawn)
+                // 20-70% dust (Neptune's rings article): broad ones all dust
+                [40900, 42900, 0.06, 1],      // Galle
+                band(53200, 113, 0.35, 0.5),  // Le Verrier
+                [53200, 57200, 0.04, 1],      // Lassell
+                band(57200, 50, 0.25, 1),     // Arago
+                band(62932, 35, 0.4, 0.5),    // Adams (its arcs not drawn)
             ],
         }],
     },

@@ -257,18 +257,25 @@ function disposeLine(line) {
 
 // A 1-px-high strip across [innerKm, outerKm]: each texel's alpha is the
 // bands' opacity times how much of the texel they cover, so rings thinner
-// than a texel come out as faint lines instead of vanishing or flickering
+// than a texel come out as faint lines instead of vanishing or flickering.
+// Red holds the texel's dust fraction (opacity-weighted), which the ring
+// shader reads (uBandData); green and blue are unused.
 function makeBandTexture(bands, [innerKm, outerKm]) {
     const data = new Uint8Array(RING_TEXTURE_PX * 4);
     const texelKm = (outerKm - innerKm) / RING_TEXTURE_PX;
     for (let x = 0; x < RING_TEXTURE_PX; x++) {
         const a = innerKm + x * texelKm;
         let alpha = 0;
-        for (const [r0, r1, opacity] of bands) {
+        let dusty = 0;
+        for (const [r0, r1, opacity, dust = 0] of bands) {
             const overlap = Math.min(a + texelKm, r1) - Math.max(a, r0);
-            if (overlap > 0) alpha += opacity * overlap / texelKm;
+            if (overlap > 0) {
+                alpha += opacity * overlap / texelKm;
+                dusty += dust * opacity * overlap / texelKm;
+            }
         }
-        data.set([255, 255, 255, Math.round(Math.min(alpha, 1) * 255)], x * 4);
+        const dustFraction = alpha > 0 ? dusty / alpha : 0;
+        data.set([Math.round(dustFraction * 255), 255, 255, Math.round(Math.min(alpha, 1) * 255)], x * 4);
     }
     const texture = new THREE.DataTexture(data, RING_TEXTURE_PX, 1);
     texture.magFilter = THREE.LinearFilter;
@@ -300,6 +307,9 @@ const CHANNEL_WIDTH_DEG = 0.3;
 const CHANNEL_DEPTH = 0.85;
 // Shared by every ring material: how much the moving edges are exaggerated
 const ringEdgeScale = { value: 1 };
+// Forward-scattering strength of ring dust (Henyey-Greenstein g): relative
+// to side lighting, ~0.4x lit from the front and ~25x backlit
+const DUST_G = 0.6;
 const ringShaderCode = `
     #define RING_PI 3.141592653589793
     varying vec3 vRingPos;
@@ -315,6 +325,17 @@ const ringShaderCode = `
     uniform int uCarveCount;
     uniform vec4 uChannels;                   // (radius, window, newest channel's angle, count; 0 = none)
     uniform float uChannelSpacing;            // radians
+    uniform float uBandData;                  // 1: map is a band strip (red = dust, alpha = opacity)
+    uniform vec3 uCameraLocal;                // the camera, in this frame (set each frame)
+
+    // Henyey-Greenstein phase function relative to side lighting:
+    // cosScatter 1 = light passing straight on to the camera (backlit)
+    float dustPhase(float cosScatter) {
+        float g = ${DUST_G.toFixed(2)};
+        float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosScatter, 1.5);
+        float side = (1.0 - g * g) / pow(1.0 + g * g, 1.5);
+        return hg / side;
+    }
 
     float ringU(float r) {
         for (int i = 0; i < ${RING_MAX_STOPS - 1}; i++) {
@@ -379,6 +400,8 @@ function addRingShading(material, planetRadiusAu, strip) {
                 : new THREE.Vector4(),
         },
         uChannelSpacing: { value: (strip.channels?.spacingDeg ?? 1) * DEG_TO_RAD },
+        uBandData: { value: strip.bands ? 1 : 0 },
+        uCameraLocal: { value: new THREE.Vector3() },
     };
     material.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, uniforms);
@@ -391,7 +414,15 @@ function addRingShading(material, planetRadiusAu, strip) {
     float ringTheta = atan(vRingPos.y, vRingPos.x);
     float ringREff = ringR - edgeShift(ringR, ringTheta);
     #ifdef USE_MAP
-        diffuseColor *= texture2D(map, vec2(ringU(ringREff), 0.5));
+        vec4 ringTexel = texture2D(map, vec2(ringU(ringREff), 0.5));
+        if (uBandData > 0.5) {
+            // Dust scatters forwards: faint lit from the front, glowing backlit
+            vec3 toCamera = normalize(uCameraLocal - vRingPos);
+            float boost = mix(1.0, dustPhase(dot(-uSunDir, toCamera)), ringTexel.r);
+            diffuseColor.a *= min(1.0, ringTexel.a * boost);
+        } else {
+            diffuseColor *= ringTexel;
+        }
     #endif
     float ringW = fwidth(ringR);
     for (int i = 0; i < ${RING_MAX_CARVES}; i++) {
@@ -467,7 +498,8 @@ function moonFacts(m) {
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
 //   updateTextures(cameraAu, heightPx, fovDeg) (call each frame: lazy loading),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
-//   setShowMinorMoons(on), setRingWaveScale(scale), setHaze(on),
+//   setShowMinorMoons(on), setRingWaveScale(scale), updateRingView(cameraAu)
+//   (each frame), setHaze(on),
 //   setViewportHeight(px), dispose()
 export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const factsById = new Map(facts.bodies.map(b => [b.id, b]));
@@ -907,6 +939,13 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         setShowMinorMoons: (on) => { showMinorMoons = on; },
         // Exaggerate the moon-driven ring edges (1 = true size)
         setRingWaveScale: (scale) => { ringEdgeScale.value = scale; },
+        // The camera (AU, this layer) in each ring's frame, for how its
+        // dust scatters light. Call each frame.
+        updateRingView: (cameraAu) => {
+            for (const r of ringShading) {
+                r.uniforms.uCameraLocal.value.subVectors(cameraAu, r.position).applyQuaternion(r.inverse);
+            }
+        },
         // Draw the orbit of a selected minor moon (major ones always have one)
         setHighlightOrbit: (id) => {
             if (id !== highlightId) setHighlight(id);
