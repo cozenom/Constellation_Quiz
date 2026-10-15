@@ -49,6 +49,8 @@ const BODY_MIN_FADE = 0.3;
 // Moons are only picked once drawn this far (px) from their planet's edge
 // (their dots fade in from about there; see solarSystem3d)
 const MOON_PICK_SEPARATION_PX = 10;
+// Earth's marker ring (18 px across) counts as a click target
+const EARTH_RING_PICK_PX = 12;
 const FOV = 60;
 
 // Points shader: each star stores its absolute magnitude, and the apparent
@@ -110,12 +112,17 @@ const ringVertexShader = `
     }
 `;
 
+// The line keeps its width in pixels (uWidth) however big the ring is drawn
 const ringFragmentShader = `
     uniform vec3 uColor;
     uniform float uOpacity;
+    uniform float uSize;
+    uniform float uWidth;
     void main() {
-        float r = length(gl_PointCoord - 0.5) * 2.0;
-        float alpha = smoothstep(0.72, 0.8, r) * (1.0 - smoothstep(0.9, 0.98, r)) * uOpacity;
+        float d = length(gl_PointCoord - 0.5) * uSize;  // px from the centre
+        float outer = uSize * 0.47;
+        float inner = outer - uWidth;
+        float alpha = smoothstep(inner - 1.0, inner, d) * (1.0 - smoothstep(outer, outer + 1.0, d)) * uOpacity;
         if (alpha < 0.01) discard;
         gl_FragColor = vec4(uColor, alpha);
     }
@@ -137,12 +144,14 @@ function makeStarPoints(positions, colors, absMags, pixelRatio, maxSize = 24) {
     return new THREE.Points(geometry, material);
 }
 
+// sizePx: device pixels; the ring's minimum size (see sizeRingToBody)
 function makeRing(color, opacity, sizePx) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
     const material = new THREE.ShaderMaterial({
         uniforms: {
             uSize: { value: sizePx },
+            uWidth: { value: sizePx * 0.1 },
             // Raw hex values, like the star shader (no colour management)
             uColor: { value: new THREE.Color().setHex(color, THREE.LinearSRGBColorSpace) },
             uOpacity: { value: opacity },
@@ -157,7 +166,19 @@ function makeRing(color, opacity, sizePx) {
     ring.renderOrder = 10;
     ring.visible = false;
     ring.frustumCulled = false;
+    ring.userData = { minSize: sizePx, opacity };
     return ring;
+}
+
+// Around a planet the ring hugs its disc (minimum size when the planet is
+// small), and fades out once the planet fills much of the screen: by then
+// it's obvious what is selected. radiusPx: the disc's radius in CSS px.
+const RING_FADE_PX = [90, 150];
+function sizeRingToBody(ring, radiusPx, pixelRatio) {
+    const { minSize, opacity } = ring.userData;
+    const hug = (radiusPx * 2 * 1.25 + 10) * pixelRatio;
+    ring.material.uniforms.uSize.value = Math.max(minSize, hug);
+    ring.material.uniforms.uOpacity.value = opacity * (1 - THREE.MathUtils.smoothstep(radiusPx, ...RING_FADE_PX));
 }
 
 // Ring geometry sits at its own origin; the ring is placed by object
@@ -545,10 +566,15 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             return { x: (bodyProjected.x + 1) / 2 * width, y: (1 - bodyProjected.y) / 2 * height, radiusPx };
         };
         const bodiesActive = () => solar && solarLayer.visible && solarFade >= BODY_MIN_FADE;
+        // Earth's ring is showing (set each frame by updateLabels)
+        let earthMarked = false;
 
         // Nearest body (by screen distance) whose dot or disc is under the point
         const pickBody = (clientX, clientY, radiusPx) => {
-            if (!bodiesActive()) return null;
+            if (!solar) return null;
+            // From far out only Earth (marked by its ring) can be picked
+            const active = bodiesActive();
+            if (!active && !earthMarked) return null;
             const rect = renderer.domElement.getBoundingClientRect();
             const mx = clientX - rect.left;
             const my = clientY - rect.top;
@@ -556,12 +582,17 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             let best = null;
             let bestDist = Infinity;
             for (const body of solar.bodies) {
+                const isEarth = body.id === 'Earth';
+                if (!active && !isEarth) continue;
                 // Small moons only while their cloud is shown (zoomed in)
                 if (body.major === false && solar.minorMoonFade(body.parentId) < 0.5) continue;
                 const p = bodyOnScreen(body, rect.width, rect.height);
                 if (!p) continue;
                 let d = Math.hypot(p.x - mx, p.y - my);
-                if (d > Math.max(p.radiusPx, 0) + radiusPx) continue;
+                // Earth's ring is a click target too, and Earth wins close calls
+                const hitRadius = isEarth && earthMarked ? Math.max(p.radiusPx, EARTH_RING_PICK_PX) : Math.max(p.radiusPx, 0);
+                if (d > hitRadius + radiusPx) continue;
+                if (isEarth) d -= EARTH_RING_PICK_PX;
                 if (body.parentId) {
                     // A moon still drawn on top of its planet isn't shown, so it
                     // can't be picked; one just clear of it loses close calls
@@ -588,6 +619,20 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const showHover = (hit) => {
             placeRing(hoverRing, hit?.type === 'star' ? positions.subarray(hit.index * 3, hit.index * 3 + 3) : null);
             placeRing(bodyHoverRing, hit?.type === 'body' ? solar.byId.get(hit.id).position.toArray() : null);
+            s.hoverBodyId = hit?.type === 'body' ? hit.id : null;
+        };
+
+        // Planet rings follow their body (time runs) and hug its disc
+        const updateBodyRings = () => {
+            const { clientWidth: width, clientHeight: height } = mount;
+            for (const [ring, id] of [[bodySelectedRing, s.selectedBodyId], [bodyHoverRing, s.hoverBodyId]]) {
+                const body = ring.visible && id ? solar?.byId.get(id) : null;
+                if (!body) continue;
+                ring.position.copy(body.position);
+                const p = bodyOnScreen(body, width, height);
+                if (p) sizeRingToBody(ring, p.radiusPx, pixelRatio);
+                else ring.material.uniforms.uOpacity.value = 0;  // camera inside it, or off screen
+            }
         };
 
         // Click (not drag) selects a star or planet; empty space clears the selection
@@ -726,6 +771,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 }
                 setLabel(label, screenPos, 8, dy);
             }
+            earthMarked = earthRing;
             earthMarkerNear.visible = earthRing && solarLayer.visible;
             earthMarkerFar.visible = earthRing && !solarLayer.visible;
             if (earthRing) {
@@ -812,10 +858,6 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 moveSolarSystem(clock.time);
                 solarTime = clock.time;
             }
-            // The selected planet's ring moves with it
-            if (s.selectedBodyId && solar?.byId.has(s.selectedBodyId)) {
-                bodySelectedRing.position.copy(solar.byId.get(s.selectedBodyId).position);
-            }
             // The time bar (and card distances) re-render a few times a second
             if (now - lastPublished > 250) {
                 lastPublished = now;
@@ -847,6 +889,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
             syncCameras();
             solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
+            updateBodyRings();
             if (s.haze) {
                 syncLayerPasses(layerPasses, layers);
                 composer.render();
