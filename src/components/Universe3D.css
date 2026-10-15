@@ -319,6 +319,8 @@ body:has(.universe-3d-screen) .stars-toggle {
     inset: 0;
     overflow: hidden;
     pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .universe-3d-label {
@@ -353,6 +355,7 @@ body:has(.universe-3d-screen) .stars-toggle {
     font-style: italic;
     color: rgba(222, 205, 170, 0.85);
     pointer-events: auto;
+    touch-action: none;
     cursor: pointer;
 }
 

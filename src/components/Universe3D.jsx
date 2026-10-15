@@ -680,6 +680,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
 
         // Click (not drag) selects a star or planet; empty space clears the selection
         let downAt = null;
+        let pressedRing = null;  // ring feature id when the press began on its label
         const onPointerDown = (e) => {
             downAt = { x: e.clientX, y: e.clientY };
             // Hide the hover state while dragging; it is stale once the view moves
@@ -687,14 +688,17 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             tooltip.style.display = 'none';
         };
         const onPointerUp = (e) => {
+            const ringId = pressedRing;
+            pressedRing = null;
             if (!downAt || e.button !== 0) return;
             const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
             downAt = null;
             if (moved > 5) return;
-            const hit = pickAny(e.clientX, e.clientY, e.pointerType === 'touch' ? 24 : 14);
+            // Ring features are picked by their labels
+            const hit = ringId ? null : pickAny(e.clientX, e.clientY, e.pointerType === 'touch' ? 24 : 14);
             setSelectedStar(hit?.type === 'star' ? hit.index : null);
             setSelectedBody(hit?.type === 'body' ? hit.id : null);
-            setSelectedRing(null);  // ring features are picked by their labels
+            setSelectedRing(ringId);
         };
         // Hover: ring + name tooltip (mouse only, throttled to one pick per frame)
         let hoverRequest = null;
@@ -754,10 +758,14 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         // Rings and gaps: clickable labels (see placeRingLabel)
         const ringLabels = solar ? RING_FEATURES.filter(f => solar.byId.has(f.planet)).map(f => {
             const el = makeLabelEl(f.name, `universe-3d-label universe-3d-label-ring${f.kind === 'gap' ? ' universe-3d-label-gap' : ''}`);
-            el.addEventListener('click', () => {
-                setSelectedStar(null);
-                setSelectedBody(null);
-                setSelectedRing(f.id);
+            // Pressing a label hands the pointer to the canvas, so a drag
+            // that starts on it still turns the view; a press that doesn't
+            // move selects the ring (see onPointerUp)
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                pressedRing = f.id;
+                canvas.dispatchEvent(new PointerEvent('pointerdown', e));
+                if (!canvas.hasPointerCapture(e.pointerId)) canvas.setPointerCapture(e.pointerId);
             });
             // Scrolling over a label still zooms
             el.addEventListener('wheel', (e) => {
