@@ -279,19 +279,106 @@ function makeBandTexture(bands, [innerKm, outerKm]) {
     return texture;
 }
 
-// Ring shading, added to a ring strip's material: the planet's shadow (a
-// point is shadowed if its line to the Sun passes through the planet), and
-// a gap too narrow for the texture cut out at its real radii (carveKm:
-// [[inner, outer]], first one used). Works in the ring mesh's own frame,
-// where the planet is at the origin; uSunDir (that frame) is set by
-// update(). Returns the uniforms.
+// Ring shading, replacing a ring strip material's texture lookup. Works in
+// the ring mesh's own frame (planet at the origin, ring in the xy plane,
+// moons going round counterclockwise), in AU. Per fragment:
+//  - edges (rings.js) move ring material near them in and out: the
+//    texture is looked up at r - shift(r, angle), so the texture's own
+//    features move too. A moon's angle (uEdgeB.w) is set by update().
+//  - the texture position comes from the strip's stops (u at radius),
+//    linear between them
+//  - carve: gaps cut out (at the moved radius, so their edges wave)
+//  - channels: Prometheus' dark channels across the F ring
+//  - the planet's shadow: a point is shadowed if its line to the Sun
+//    (uSunDir, set by update()) passes through the planet
+// Returns the uniforms.
 const RING_SHADOW_DARKNESS = 0.9;
-function addRingShading(material, planetRadiusAu, carveKm = []) {
-    const carve = carveKm[0] ?? [0, 0];
+const RING_MAX_STOPS = 8;
+const RING_MAX_EDGES = 6;
+const RING_MAX_CARVES = 2;
+const CHANNEL_WIDTH_DEG = 0.3;
+const CHANNEL_DEPTH = 0.85;
+// Shared by every ring material: how much the moving edges are exaggerated
+const ringEdgeScale = { value: 1 };
+const ringShaderCode = `
+    #define RING_PI 3.141592653589793
+    varying vec3 vRingPos;
+    uniform vec3 uSunDir;
+    uniform float uPlanetRadius;
+    uniform vec2 uStops[${RING_MAX_STOPS}];   // (u, r)
+    uniform int uStopCount;
+    uniform vec4 uEdgeA[${RING_MAX_EDGES}];   // (radius, window, amplitude, kind: 1 resonance, 2 wake)
+    uniform vec4 uEdgeB[${RING_MAX_EDGES}];   // resonance: (m, -, -, moon angle); wake: (wavelength, damping, side, moon angle)
+    uniform int uEdgeCount;
+    uniform float uEdgeScale;                 // 1 = true size; more exaggerates (setRingWaveScale)
+    uniform vec2 uCarves[${RING_MAX_CARVES}];
+    uniform int uCarveCount;
+    uniform vec4 uChannels;                   // (radius, window, newest channel's angle, count; 0 = none)
+    uniform float uChannelSpacing;            // radians
+
+    float ringU(float r) {
+        for (int i = 0; i < ${RING_MAX_STOPS - 1}; i++) {
+            if (i + 2 >= uStopCount || r <= uStops[i + 1].y) {
+                return mix(uStops[i].x, uStops[i + 1].x, (r - uStops[i].y) / (uStops[i + 1].y - uStops[i].y));
+            }
+        }
+        return uStops[0].x;
+    }
+
+    float edgeShift(float r, float theta) {
+        float shift = 0.0;
+        for (int i = 0; i < ${RING_MAX_EDGES}; i++) {
+            if (i >= uEdgeCount) break;
+            vec4 a = uEdgeA[i];
+            vec4 b = uEdgeB[i];
+            float amplitude = a.z * uEdgeScale;
+            // The window grows with the amplitude so the moved material
+            // never folds over itself (shift changes slower than radius)
+            float window = 1.0 - smoothstep(0.0, max(a.y, 2.0 * amplitude), abs(r - a.x));
+            if (window <= 0.0 || amplitude == 0.0) continue;
+            float psi = mod(theta - b.w + RING_PI, 2.0 * RING_PI) - RING_PI;  // from the moon, forwards
+            float s = 0.0;
+            if (a.w < 1.5) {
+                s = -cos(b.x * psi);
+            } else {
+                float x = b.z * psi * a.x;  // downstream distance
+                if (x > 0.0) s = exp(-x / b.y) * sin(2.0 * RING_PI * x / b.x);
+            }
+            shift += window * amplitude * s;
+        }
+        return shift;
+    }
+`;
+function addRingShading(material, planetRadiusAu, strip) {
+    const au = (km) => km / KM_PER_AU;
+    const stops = strip.stops ?? [[0, strip.km[0]], [1, strip.km[1]]];
+    const edges = strip.edges ?? [];
+    const carves = strip.carve ?? [];
+    const pad = (list, n, make) => [...list, ...Array.from({ length: n - list.length }, make)];
     const uniforms = {
         uSunDir: { value: new THREE.Vector3(1, 0, 0) },
         uPlanetRadius: { value: planetRadiusAu },
-        uCarve: { value: new THREE.Vector2(carve[0] / KM_PER_AU, carve[1] / KM_PER_AU) },
+        uStops: { value: pad(stops.map(([u, km]) => new THREE.Vector2(u, au(km))), RING_MAX_STOPS, () => new THREE.Vector2()) },
+        uStopCount: { value: stops.length },
+        uEdgeA: {
+            value: pad(edges.map(e => new THREE.Vector4(au(e.km), au(e.windowKm), au(e.amplitudeKm), e.kind === 'wake' ? 2 : 1)),
+                RING_MAX_EDGES, () => new THREE.Vector4()),
+        },
+        uEdgeB: {
+            value: pad(edges.map(e => (e.kind === 'wake'
+                ? new THREE.Vector4(au(e.wavelengthKm), au(e.dampingKm), e.side, 0)
+                : new THREE.Vector4(e.m, 0, 0, 0))), RING_MAX_EDGES, () => new THREE.Vector4()),
+        },
+        uEdgeCount: { value: edges.length },
+        uEdgeScale: ringEdgeScale,
+        uCarves: { value: pad(carves.map(([a, b]) => new THREE.Vector2(au(a), au(b))), RING_MAX_CARVES, () => new THREE.Vector2()) },
+        uCarveCount: { value: carves.length },
+        uChannels: {
+            value: strip.channels
+                ? new THREE.Vector4(au(strip.channels.km), au(strip.channels.windowKm), 0, strip.channels.count)
+                : new THREE.Vector4(),
+        },
+        uChannelSpacing: { value: (strip.channels?.spacingDeg ?? 1) * DEG_TO_RAD },
     };
     material.onBeforeCompile = (shader) => {
         Object.assign(shader.uniforms, uniforms);
@@ -299,13 +386,28 @@ function addRingShading(material, planetRadiusAu, carveKm = []) {
             '#include <begin_vertex>',
             '#include <begin_vertex>\n    vRingPos = position;'
         );
-        shader.fragmentShader = 'varying vec3 vRingPos;\nuniform vec3 uSunDir;\nuniform float uPlanetRadius;\nuniform vec2 uCarve;\n'
-            + shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        shader.fragmentShader = ringShaderCode + shader.fragmentShader.replace('#include <map_fragment>', `
     float ringR = length(vRingPos.xy);
-    if (uCarve.y > 0.0) {
-        float w = fwidth(ringR);
-        diffuseColor.a *= 1.0 - smoothstep(uCarve.x - w, uCarve.x + w, ringR)
-            * (1.0 - smoothstep(uCarve.y - w, uCarve.y + w, ringR));
+    float ringTheta = atan(vRingPos.y, vRingPos.x);
+    float ringREff = ringR - edgeShift(ringR, ringTheta);
+    #ifdef USE_MAP
+        diffuseColor *= texture2D(map, vec2(ringU(ringREff), 0.5));
+    #endif
+    float ringW = fwidth(ringR);
+    for (int i = 0; i < ${RING_MAX_CARVES}; i++) {
+        if (i >= uCarveCount) break;
+        diffuseColor.a *= 1.0 - smoothstep(uCarves[i].x - ringW, uCarves[i].x + ringW, ringREff)
+            * (1.0 - smoothstep(uCarves[i].y - ringW, uCarves[i].y + ringW, ringREff));
+    }
+    if (uChannels.w > 0.0) {
+        float chNear = 1.0 - smoothstep(0.0, uChannels.y, abs(ringR - uChannels.x));
+        float chBack = mod(uChannels.z - ringTheta, 2.0 * RING_PI) / uChannelSpacing;  // channels behind the newest
+        float chK = floor(chBack + 0.5);
+        if (chNear > 0.0 && chK < uChannels.w) {
+            float chD = abs(chBack - chK) * uChannelSpacing / ${(CHANNEL_WIDTH_DEG * DEG_TO_RAD).toFixed(6)};
+            float chAge = min(1.0, (chK + 1.0) / 2.0) * exp(-chK / 10.0);  // newest still opening, oldest fading
+            diffuseColor.a *= 1.0 - ${CHANNEL_DEPTH.toFixed(2)} * chNear * chAge * exp(-chD * chD);
+        }
     }
     float along = dot(vRingPos, uSunDir);
     float off = length(vRingPos - along * uSunDir);
@@ -365,7 +467,8 @@ function moonFacts(m) {
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
 //   updateTextures(cameraAu, heightPx, fovDeg) (call each frame: lazy loading),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
-//   setShowMinorMoons(on), setHaze(on), setViewportHeight(px), dispose()
+//   setShowMinorMoons(on), setRingWaveScale(scale), setHaze(on),
+//   setViewportHeight(px), dispose()
 export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const factsById = new Map(facts.bodies.map(b => [b.id, b]));
     const disposables = [];
@@ -398,17 +501,18 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         });
     };
 
-    // Ring strips' shadow uniforms, kept pointing at the Sun by update()
-    const ringShading = [];  // {uniforms, position (the planet's, AU), inverse (mesh rotation, inverted)}
+    // Ring strips' shader uniforms, kept up to date by update(): the Sun's
+    // direction, and the angles of the moons that move their edges
+    const ringShading = [];  // {uniforms, strip, planetId, position (the planet's, AU), inverse (mesh rotation, inverted)}
 
     // One strip of a ring system: a loaded texture (shown as a translucent
     // flat colour until it arrives; its load is added to `loads`) or one
     // drawn from its bands. Shaded with the planet's shadow.
-    const makeRingStrip = (strip, pole, bodyColor, loads, planetRadiusAu, planetPosition) => {
+    const makeRingStrip = (strip, pole, bodyColor, loads, planetId, planetRadiusAu, planetPosition) => {
         const material = new THREE.MeshBasicMaterial({
             color: strip.color ?? bodyColor, transparent: true, side: THREE.DoubleSide, depthWrite: false,
         });
-        const uniforms = addRingShading(material, planetRadiusAu, strip.carve);
+        const uniforms = addRingShading(material, planetRadiusAu, strip);
         if (strip.texture) {
             material.opacity = 0.55;
             loads.push(() => applyTexture(material, strip.texture, (texture) => {
@@ -421,7 +525,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         }
         const stops = strip.stops ?? [[0, strip.km[0]], [1, strip.km[1]]];
         const mesh = track(makeRingMesh(stops, pole, material));
-        ringShading.push({ uniforms, position: planetPosition, inverse: mesh.quaternion.clone().invert() });
+        ringShading.push({ uniforms, strip, planetId, position: planetPosition, inverse: mesh.quaternion.clone().invert() });
         return mesh;
     };
 
@@ -438,7 +542,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         const rings = RING_SYSTEMS[id];
         let extentAu = radiusAu;
         for (const strip of rings?.strips ?? []) {
-            anchor.add(makeRingStrip(strip, rings.pole, color, loads, radiusAu, anchor.position));
+            anchor.add(makeRingStrip(strip, rings.pole, color, loads, id, radiusAu, anchor.position));
             if (strip.texture) extentAu = Math.max(extentAu, strip.stops.at(-1)[1] / KM_PER_AU);
         }
         if (loads.length) pendingTextures.push({ position: anchor.position, extentAu, loads });
@@ -638,14 +742,50 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const basis = new THREE.Matrix4();
     const xAxis = new THREE.Vector3(), yAxis = new THREE.Vector3(), zAxis = new THREE.Vector3();
     const fromPlanet = new THREE.Vector3(), step = new THREE.Vector3();
+
+    // Ring shader inputs (see addRingShading), in each ring mesh's own
+    // frame: the Sun's direction, the angles of the moons that move ring
+    // edges (off while an edge's `active` says so), and where Prometheus'
+    // newest F ring channel is
+    const moonsByName = new Map(bodies.filter(b => b.moon).map(b => [`${b.parentId}/${b.name}`, b]));
+    const ringLocal = new THREE.Vector3();
+    const ringAngle = (r, v) => {
+        ringLocal.copy(v).applyQuaternion(r.inverse);
+        return Math.atan2(ringLocal.y, ringLocal.x);
+    };
+    const updateRingShading = (date) => {
+        for (const r of ringShading) {
+            const u = r.uniforms;
+            u.uSunDir.value.copy(r.position).negate().normalize().applyQuaternion(r.inverse);
+            (r.strip.edges ?? []).forEach((e, i) => {
+                const moon = moonsByName.get(`${r.planetId}/${e.moon}`);
+                const on = moon && (!e.active || e.active(date));
+                u.uEdgeA.value[i].z = on ? e.amplitudeKm / KM_PER_AU : 0;
+                if (moon) u.uEdgeB.value[i].w = ringAngle(r, fromPlanet.subVectors(moon.position, r.position));
+            });
+            const ch = r.strip.channels;
+            const moon = ch && moonsByName.get(`${r.planetId}/${ch.moon}`);
+            if (moon) {
+                // A channel forms as Prometheus passes apoapse (closest to the
+                // F ring), then rides along with the F ring, which falls
+                // spacingDeg behind the moon each of its orbits
+                const m = moon.moon;
+                const jd = date.getTime() / 86400000 + 2440587.5;
+                const sinceApoDays = ((((m.M + m.n * (jd - m.epoch_jd) - 180) % 360) + 360) % 360) / m.n;
+                const atApo = moonPosition(m, new Date(date.getTime() - sinceApoDays * 86400000));
+                const ringRate = m.n * (1 - ch.spacingDeg / 360);  // F ring, deg/day
+                u.uChannels.value.z = ringAngle(r, ringLocal.set(atApo[0], atApo[1], atApo[2]))
+                    + ringRate * sinceApoDays * DEG_TO_RAD;
+            } else if (ch) {
+                u.uChannels.value.w = 0;
+            }
+        }
+    };
+
     const update = (date) => {
         for (const body of bodies) {
             if (body.id === 'Sun' || body.moon) continue;
             body.position.set(...heliocentricPosition(body.id, date));
-        }
-        // Ring shadows: the Sun's direction in each ring's own frame
-        for (const r of ringShading) {
-            r.uniforms.uSunDir.value.copy(r.position).negate().normalize().applyQuaternion(r.inverse);
         }
         for (const body of spinning) {
             const { pole, meridian } = bodyAxes(body.id, date);
@@ -677,6 +817,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             zAxis.crossVectors(xAxis, yAxis);
             body.mesh.quaternion.setFromRotationMatrix(basis.makeBasis(xAxis, yAxis, zAxis));
         }
+        updateRingShading(date);
         // Our Moon's dot fades by its separation from Earth too
         if (byId.has('Moon') && byId.has('Earth')) {
             parentOffset.subVectors(byId.get('Earth').position, byId.get('Moon').position);
@@ -764,6 +905,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         // How visible a planet's small-moon cloud is (0..1), for picking
         minorMoonFade: (planetId) => clouds.get(planetId)?.fade ?? 0,
         setShowMinorMoons: (on) => { showMinorMoons = on; },
+        // Exaggerate the moon-driven ring edges (1 = true size)
+        setRingWaveScale: (scale) => { ringEdgeScale.value = scale; },
         // Draw the orbit of a selected minor moon (major ones always have one)
         setHighlightOrbit: (id) => {
             if (id !== highlightId) setHighlight(id);

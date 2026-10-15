@@ -19,6 +19,41 @@ import { raDecToXYZ } from './universe3d.js';
 // narrow Uranus rings are thinner than a texel and come out as faint lines.
 const band = (r, width, opacity) => [r - width / 2, r + width / 2, opacity];
 
+// ---------- Moving edges (drawn by the ring shader in solarSystem3d.js) ----------
+// edges: ring edges pushed in and out by moons, km from the planet's centre
+// (windowKm: how far either side of the edge the ring material moves with it).
+//   resonance: m lobes turning with the moon, radius smallest towards it
+//     (Goldreich & Tremaine 1982). B ring outer edge, Mimas 2:1: the
+//     measured m=2 swing varies 4-71 km over 5.4 years as a free mode
+//     beats against Mimas' forced one (Nicholson et al. 2014); drawn as
+//     the forced part alone, ~37 km. A ring outer edge, Janus 7:6: ~12 km,
+//     one minimum within a few degrees of Janus (El Moutamid et al. 2016),
+//     only while Janus is the inner of the co-orbital pair (see janusInner).
+//   wake: waves an embedded moon raises on a gap edge as the edge's
+//     particles pass it: wavelength 3 pi x (moon to edge), fading
+//     downstream (dampingKm). Inner-edge particles are faster and overtake
+//     the moon, so their waves run ahead of it (side +1); the moon
+//     overtakes the outer edge, whose waves trail behind (side -1). Pan:
+//     ~2 km (Voyager, Cuzzi & Scargle 1985). Daphnis: ~1.5 km, a guess
+//     from Cassini's ~1 km tall vertical structure (Weiss et al. 2009).
+// carve: gaps cut out at their real radii (moved with the edges above).
+// channels: the dark channels Prometheus cuts in the F ring, one each
+//   14.7 h orbit, 3.2 deg apart; 10-15 show at once (Murray et al. 2005).
+const wake = (km, moon, side, moonToEdgeKm, amplitudeKm, windowKm) => {
+    const wavelengthKm = 3 * Math.PI * moonToEdgeKm;
+    return { kind: 'wake', km, moon, side, amplitudeKm, wavelengthKm, dampingKm: 4 * wavelengthKm, windowKm };
+};
+
+// Janus and Epimetheus swap orbits every ~4 years (January 2006, 2010,
+// 2014, 2018, 2022, 2026). Janus is the inner one, and its 7:6 resonance
+// shapes the A ring's edge, in 2006-10, 2014-18, 2022-26...
+const JANUS_SWAP_YEAR = 2006.06;
+export function janusInner(date) {
+    const year = 1970 + date.getTime() / (365.25 * 86400000);
+    const leg = Math.floor((year - JANUS_SWAP_YEAR) / 4);
+    return ((leg % 2) + 2) % 2 === 0;
+}
+
 export const RING_SYSTEMS = {
     Jupiter: {
         pole: [268.057, 64.495],
@@ -49,9 +84,18 @@ export const RING_SYSTEMS = {
                     [1926.5, 136780],   // A ring outer edge
                     [2048, 141016],
                 ].map(([px, km]) => [px / 2048, km]),
-                // Gaps too narrow for the texture (about one texel), cut out
-                // by the ring shader: the Keeler Gap, where Daphnis orbits
-                carve: [[136484, 136526]],
+                // The Keeler Gap (about one texel wide, so not in the
+                // texture) and the Encke Gap (in it, but cut at its real
+                // edges here so they can wave)
+                carve: [[136484, 136526], [133423, 133745]],
+                edges: [
+                    { kind: 'resonance', km: 117580, moon: 'Mimas', m: 2, amplitudeKm: 37, windowKm: 200 },
+                    { kind: 'resonance', km: 136780, moon: 'Janus', m: 7, amplitudeKm: 12, windowKm: 60, active: janusInner },
+                    wake(133423, 'Pan', 1, 161, 2, 80),
+                    wake(133745, 'Pan', -1, 161, 2, 80),
+                    wake(136484, 'Daphnis', 1, 21, 1.5, 12),
+                    wake(136526, 'Daphnis', -1, 21, 1.5, 12),
+                ],
             },
             {
                 km: [139500, 480000], color: '#c9c2b4',
@@ -60,6 +104,7 @@ export const RING_SYSTEMS = {
                     [166000, 175000, 0.05],   // G ring
                     [180000, 480000, 0.015],  // E ring (from Enceladus' plumes)
                 ],
+                channels: { km: 140180, windowKm: 60, moon: 'Prometheus', spacingDeg: 3.2, count: 15 },
             },
         ],
     },

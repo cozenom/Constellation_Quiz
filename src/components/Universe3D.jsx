@@ -65,6 +65,8 @@ const RING_GAP_LABEL_PX = 6;
 const RING_LABEL_MARGIN_PX = 24;
 // Points tried around a ring for its label when its right-hand end is off screen
 const RING_LABEL_SAMPLES = 48;
+// "Ring waves" option: how much the moon-driven ring edges are exaggerated
+const RING_WAVE_EXAGGERATION = 10;
 // Viewing a ring feature: this many times its size away, at least the minimum
 const RING_VIEW_SCALE = 5;
 const RING_VIEW_MIN_KM = 2000;
@@ -244,6 +246,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const [showPlanets, setShowPlanets] = useState(true);
     const [showOrbits, setShowOrbits] = useState(true);
     const [showSmallMoons, setShowSmallMoons] = useState(true);
+    const [exaggerateRingWaves, setExaggerateRingWaves] = useState(false);
     // At most one of these is set: a star index, a solar system body id, or
     // a ring feature id (utils/rings.js)
     const [selectedStar, setSelectedStar] = useState(null);
@@ -1239,6 +1242,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         sceneRef.current?.solar?.setShowMinorMoons(showSmallMoons);
     }, [showSmallMoons, starBuffers, planetFacts, moonsData]);
 
+    useEffect(() => {
+        sceneRef.current?.solar?.setRingWaveScale(exaggerateRingWaves ? RING_WAVE_EXAGGERATION : 1);
+    }, [exaggerateRingWaves, starBuffers, planetFacts, moonsData]);
+
     // Ring around the selected star or planet
     useEffect(() => {
         const s = sceneRef.current;
@@ -1396,6 +1403,18 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                                 Small moons
                             </label>
                         )}
+                        <label
+                            className={`universe-3d-checkbox universe-3d-sub-option ${showPlanets ? '' : 'disabled'}`}
+                            title={`Waves and lobes that moons raise on the edges of Saturn's rings, ${RING_WAVE_EXAGGERATION}× their real size`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={exaggerateRingWaves}
+                                disabled={!showPlanets}
+                                onChange={(e) => setExaggerateRingWaves(e.target.checked)}
+                            />
+                            Ring waves ×{RING_WAVE_EXAGGERATION}
+                        </label>
                     </>
                 )}
                 <label className="universe-3d-checkbox">
