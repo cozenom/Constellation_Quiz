@@ -66,17 +66,35 @@ const MOON_COLORS = {
 // (which re-centres them, fills unseen areas and tints the greyscale ones).
 // Bodies without one keep their colour. The info card shows `from` (what
 // the map is made of), `by` (who made it, linked) and `note`.
-const SSS = { by: 'Solar System Scope', href: 'https://www.solarsystemscope.com/textures/' };
-const USGS = { by: 'USGS Astrogeology', href: 'https://astrogeology.usgs.gov/' };
-const NASA_3D = { by: 'NASA 3D Resources', href: 'https://github.com/nasa/NASA-3D-Resources' };
+// widthPx: the maps' width, which sets how close the camera may come
+// (see minViewRadii)
+const SSS = { by: 'Solar System Scope', href: 'https://www.solarsystemscope.com/textures/', widthPx: 2048 };
+const USGS = { by: 'USGS Astrogeology', href: 'https://astrogeology.usgs.gov/', widthPx: 1024 };
+const NASA_3D = { by: 'NASA 3D Resources', href: 'https://github.com/nasa/NASA-3D-Resources', widthPx: 1440 };
 const TINTED = 'Greyscale map, tinted with its usual colour';
 const UNSEEN_NORTH = 'Voyager 2 saw only the southern half (the north was in darkness); the rest is filled in';
 const NEW_HORIZONS_SOUTH = 'South of about 30° S was in darkness during the flyby; it is filled in';
+// How close (in radii, from the centre) the camera may come to a body
+// before its surface map is blown up past MAX_TEXEL_PX screen pixels per
+// map pixel (at the point straight below). pxRadians: one screen pixel's
+// angle. Bodies without a map: just above the surface.
+const MAX_TEXEL_PX = 3;
+const MIN_VIEW_RADII = 1.2;
+export function minViewRadii(surfaceMap, pxRadians) {
+    if (!surfaceMap) return MIN_VIEW_RADII;
+    const fromSurface = 2 * Math.PI / (surfaceMap.widthPx * MAX_TEXEL_PX * pxRadians);
+    return Math.max(MIN_VIEW_RADII, 1 + fromSurface);
+}
+
 export const SURFACE_MAPS = {
     Sun: { file: '2k_sun.jpg', ...SSS, from: 'Artwork', note: 'The real surface changes by the minute' },
     Mercury: { file: '2k_mercury.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
     Venus: { file: '2k_venus_atmosphere.jpg', ...SSS, from: 'Based on NASA spacecraft images', note: 'The cloud tops: thick clouds hide the surface' },
-    Earth: { file: '2k_earth_daymap.jpg', ...SSS, from: 'Based on NASA satellite images', note: 'Cloud-free' },
+    Earth: {
+        file: '2k_earth_daymap.jpg', ...SSS, from: 'Based on NASA satellite images',
+        note: 'A cloud-free day map, with city lights from a night map. The clouds are a separate layer '
+            + 'from one snapshot, drifting slowly east: not the real weather',
+    },
     Moon: { file: '2k_moon.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
     Mars: { file: '2k_mars.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
     Jupiter: { file: '2k_jupiter.jpg', ...SSS, from: 'Based on NASA spacecraft images', note: 'Cloud bands: they shift over weeks' },
@@ -105,6 +123,22 @@ export const SURFACE_MAPS = {
     Triton: { file: 'triton.jpg', ...USGS, from: 'Voyager 2 colour mosaic (1989 flyby)', note: 'Voyager 2 saw mostly the southern half; the rest is filled in' },
     Charon: { file: 'charon.jpg', ...USGS, from: 'New Horizons mosaic (2015 flyby)', note: `${NEW_HORIZONS_SOUTH}. ${TINTED}` },
 };
+// Earth's extra maps (Solar System Scope, like its day map; the ocean mask
+// converted from their TIFF) and look (see setupEarth)
+const EARTH_TEXTURES = {
+    night: '2k_earth_nightmap.jpg',
+    clouds: '2k_earth_clouds.jpg',
+    ocean: '2k_earth_specular.jpg',  // white = water
+};
+const EARTH_NIGHT_LIGHTS = 1.5;     // city light brightness
+const EARTH_CLOUD_DIMMING = 0.8;    // how much clouds hide city lights
+const EARTH_GLINT = 0x262626;       // sunglint strength on water (a soft sheen)
+const EARTH_SHININESS = 30;         // sunglint tightness
+const EARTH_CLOUD_SCALE = 1.004;    // cloud layer radius (~25 km up)
+const EARTH_ATMOSPHERE_SCALE = 1.025;
+// The cloud map is one snapshot; it drifts east (with the mid-latitude
+// westerlies, ~10 m/s) so time-lapses look alive. Not real weather.
+const EARTH_CLOUD_DRIFT_DEG_PER_DAY = 8;
 // Not tidally locked (spins every ~12 h); has no map anyway
 const UNLOCKED_MOONS = new Set(['Nereid']);
 // Time step for a locked moon's direction of motion (its orbit's pole)
@@ -521,16 +555,114 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const textures = [];
     const pendingTextures = [];  // {position (Vector3, AU), extentAu, loads: [() => void]}
     let disposed = false;
-    const applyTexture = (material, file, onLoad) => {
+    // colorSpace: sRGB for pictures; NoColorSpace for data (masks)
+    const loadTexture = (file, onLoad, colorSpace = THREE.SRGBColorSpace) => {
         loader.load(textureUrl(file), (texture) => {
             if (disposed) { texture.dispose(); return; }
-            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.colorSpace = colorSpace;
             textures.push(texture);
-            material.map = texture;
-            material.color.set(0xffffff);
-            material.needsUpdate = true;
-            onLoad?.(texture);
+            onLoad(texture);
         });
+    };
+    const applyTexture = (material, file, onLoad) => loadTexture(file, (texture) => {
+        material.map = texture;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+        onLoad?.(texture);
+    });
+
+    // ---------- Earth: night lights, ocean glint, clouds, atmosphere ----------
+    // Earth gets a Phong material, so sunlight glints off the oceans (masked
+    // by the ocean map), and its shader adds city lights on the night side,
+    // fading in across the terminator and dimmed under clouds. A cloud layer
+    // sits just above the surface, turning with Earth and drifting east, and
+    // a thin atmosphere rim glows blue on the day side. update() sets the
+    // Sun's direction (uSunDir, world) and the clouds' drift.
+    const earthUniforms = {
+        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uNightMap: { value: null },
+        uCloudMap: { value: null },
+        uCloudShift: { value: 0 },  // cloud drift, as a fraction of a turn
+    };
+    let earthClouds = null;
+    const setupEarth = (material, mesh, anchor, radiusAu, loads) => {
+        material.onBeforeCompile = (shader) => {
+            Object.assign(shader.uniforms, earthUniforms);
+            shader.vertexShader = 'varying vec3 vWorldNormal;\n' + shader.vertexShader.replace(
+                '#include <beginnormal_vertex>',
+                '#include <beginnormal_vertex>\n    vWorldNormal = normalize(mat3(modelMatrix) * objectNormal);'
+            );
+            shader.fragmentShader = `
+                varying vec3 vWorldNormal;
+                uniform vec3 uSunDir;
+                uniform sampler2D uNightMap;
+                uniform sampler2D uCloudMap;
+                uniform float uCloudShift;
+            ` + shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+                #ifdef USE_MAP
+                    float sunHeight = dot(normalize(vWorldNormal), uSunDir);
+                    float night = 1.0 - smoothstep(-0.12, 0.08, sunHeight);
+                    float cloud = texture2D(uCloudMap, vec2(vMapUv.x - uCloudShift, vMapUv.y)).g;
+                    totalEmissiveRadiance += texture2D(uNightMap, vMapUv).rgb * night
+                        * (1.0 - ${EARTH_CLOUD_DIMMING.toFixed(2)} * cloud) * ${EARTH_NIGHT_LIGHTS.toFixed(2)};
+                #endif`);
+        };
+        loads.push(
+            () => loadTexture(EARTH_TEXTURES.night, (t) => { earthUniforms.uNightMap.value = t; }),
+            () => loadTexture(EARTH_TEXTURES.ocean, (t) => {
+                material.specularMap = t;
+                material.specular.set(EARTH_GLINT);
+                material.needsUpdate = true;
+            }, THREE.NoColorSpace),
+        );
+
+        // Clouds: invisible until their map arrives (it's their alpha)
+        const cloudMaterial = new THREE.MeshLambertMaterial({
+            color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
+        });
+        earthClouds = track(new THREE.Mesh(new THREE.SphereGeometry(radiusAu * EARTH_CLOUD_SCALE, 64, 32), cloudMaterial));
+        mesh.add(earthClouds);
+        loads.push(() => loadTexture(EARTH_TEXTURES.clouds, (t) => {
+            cloudMaterial.alphaMap = t;
+            cloudMaterial.opacity = 0.95;
+            cloudMaterial.needsUpdate = true;
+            earthUniforms.uCloudMap.value = t;
+        }, THREE.NoColorSpace));
+
+        // Atmosphere: a slightly bigger shell, added on top, brightest
+        // edge-on (where you look through the most air) and on the day side
+        const atmosphere = track(new THREE.Mesh(
+            new THREE.SphereGeometry(radiusAu * EARTH_ATMOSPHERE_SCALE, 64, 32),
+            new THREE.ShaderMaterial({
+                uniforms: { uSunDir: earthUniforms.uSunDir },
+                vertexShader: `
+                    varying vec3 vNormalView;
+                    varying vec3 vViewPos;
+                    void main() {
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        vViewPos = mv.xyz;
+                        vNormalView = normalize(normalMatrix * normal);
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uSunDir;
+                    varying vec3 vNormalView;
+                    varying vec3 vViewPos;
+                    void main() {
+                        vec3 n = normalize(vNormalView);
+                        float rim = pow(1.0 - max(dot(n, normalize(-vViewPos)), 0.0), 3.0);
+                        vec3 sun = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
+                        float lit = smoothstep(-0.25, 0.35, dot(n, sun));
+                        gl_FragColor = vec4(vec3(0.35, 0.6, 1.0) * rim * lit * 1.2, 1.0);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            })
+        ));
+        anchor.add(atmosphere);
     };
 
     // Ring strips' shader uniforms, kept up to date by update(): the Sun's
@@ -562,7 +694,11 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     };
 
     const makeBody = ({ id, name, type, facts: f, radiusAu, color, isSun = false, parentId = null, major = true }) => {
-        const material = isSun ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
+        const isEarth = id === 'Earth';
+        const material = isSun ? new THREE.MeshBasicMaterial({ color })
+            // No glint until the ocean map arrives (it would shine off land too)
+            : isEarth ? new THREE.MeshPhongMaterial({ color, specular: 0x000000, shininess: EARTH_SHININESS })
+            : new THREE.MeshLambertMaterial({ color });
         const surfaceMap = SURFACE_MAPS[name] ?? null;
         const loads = surfaceMap ? [() => applyTexture(material, surfaceMap.file)] : [];
         const anchor = new THREE.Group();
@@ -571,6 +707,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         anchor.add(mesh);
         const dot = isSun ? null : track(makeDot(color, radiusAu, pixelRatio, parentId !== null));
         if (dot) anchor.add(dot);
+        if (isEarth) setupEarth(material, mesh, anchor, radiusAu, loads);
         const rings = RING_SYSTEMS[id];
         let extentAu = radiusAu;
         for (const strip of rings?.strips ?? []) {
@@ -818,6 +955,15 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         for (const body of bodies) {
             if (body.id === 'Sun' || body.moon) continue;
             body.position.set(...heliocentricPosition(body.id, date));
+        }
+        if (byId.has('Earth')) earthUniforms.uSunDir.value.copy(byId.get('Earth').position).negate().normalize();
+        if (earthClouds) {
+            // Drift east about Earth's axis (the sphere's y); the night-light
+            // dimming shifts its cloud lookup to match
+            const turns = date.getTime() / 86400000 * EARTH_CLOUD_DRIFT_DEG_PER_DAY / 360;
+            const fraction = turns - Math.floor(turns);
+            earthClouds.rotation.y = fraction * 2 * Math.PI;
+            earthUniforms.uCloudShift.value = fraction;
         }
         for (const body of spinning) {
             const { pole, meridian } = bodyAxes(body.id, date);

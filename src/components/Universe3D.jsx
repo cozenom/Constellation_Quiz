@@ -5,7 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPasses } from '../utils/layers3d';
-import { buildSolarSystem, ECLIPTIC_NORTH } from '../utils/solarSystem3d';
+import { buildSolarSystem, ECLIPTIC_NORTH, minViewRadii } from '../utils/solarSystem3d';
 import {
     AU_PER_LY,
     KM_PER_AU,
@@ -341,21 +341,24 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             const body = solar?.byId.get(id);
             if (!body) return null;
             const p = body.position.clone().divideScalar(AU_PER_LY);
+            // How close you may zoom: before its map gets blurry (just
+            // above the surface if it has none)
+            const pxRadians = THREE.MathUtils.degToRad(camera.fov) / Math.max(mount.clientHeight, 1);
+            const minRadii = minViewRadii(body.surfaceMap, pxRadians);
             let offset;
             if (id === 'Sun') {
                 // Above the ecliptic on Earth's side, far enough to see Neptune's orbit
                 offset = earthPosition.clone().normalize().add(ECLIPTIC_NORTH.clone().multiplyScalar(1.2))
                     .normalize().multiplyScalar(60 / AU_PER_LY);
             } else {
-                const distance = body.radiusAu * (id === 'Saturn' ? 9 : 6) / AU_PER_LY;
+                const radii = Math.max(id === 'Saturn' ? 9 : 6, minRadii * 1.5);
                 offset = p.clone().normalize().negate().add(ECLIPTIC_NORTH.clone().multiplyScalar(0.35))
-                    .normalize().multiplyScalar(distance);
+                    .normalize().multiplyScalar(body.radiusAu * radii / AU_PER_LY);
             }
             return {
                 position: p.clone().add(offset).toArray(),
                 target: p.toArray(),
-                // How close you may zoom: just above the surface
-                minDistance: body.radiusAu * 1.2 / AU_PER_LY,
+                minDistance: body.radiusAu * minRadii / AU_PER_LY,
             };
         };
 
