@@ -103,6 +103,26 @@ export function buildStarBuffers(stars3d) {
     return { positions, colors, absMags, hipToIndex, count, rows: stars3d.stars, fieldIndex: f };
 }
 
+// stars_gaia.bin rows (float32: ra hours, dec deg, dist ly, V, B-V or NaN)
+// -> typed arrays for the GPU. These stars have no catalogue rows to pick.
+const GAIA_STRIDE = 5;
+
+export function buildGaiaBuffers(rows) {
+    const count = rows.length / GAIA_STRIDE;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const absMags = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+        const [ra, dec, dist, mag, bv] = rows.subarray(i * GAIA_STRIDE, (i + 1) * GAIA_STRIDE);
+        positions.set(raDecToXYZ(ra, dec, dist), i * 3);
+        colors.set(bvToColor(Number.isNaN(bv) ? null : bv), i * 3);
+        absMags[i] = absoluteMagnitude(mag, dist);
+    }
+
+    return { positions, colors, absMags, count };
+}
+
 // One star's catalogue row as an object ({hip, ra, dec, mag, dist, err, src, bv, spect, name})
 export function starRecord(starBuffers, index) {
     const row = starBuffers.rows[index];

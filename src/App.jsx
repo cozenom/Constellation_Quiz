@@ -153,7 +153,9 @@ function App() {
             });
     };
 
-    // Lazy load the 3D star catalogue (distances, colours) only for 3D mode
+    // Lazy load the 3D star catalogue (distances, colours) only for 3D mode.
+    // The Gaia nearby stars (stars_gaia.bin, raw float32 rows) come along as
+    // data.gaia; without them the view still works, just with fewer stars.
     const loadStars3d = () => {
         // Return early if already loaded
         if (stars3d !== null) {
@@ -161,6 +163,20 @@ function App() {
         }
 
         const filename = `${import.meta.env.BASE_URL}data/stars_3d.json`;
+        const gaiaFilename = `${import.meta.env.BASE_URL}data/stars_gaia.bin`;
+
+        const gaia = fetch(gaiaFilename)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load Gaia stars: ${response.statusText}`);
+                }
+                return response.arrayBuffer();
+            })
+            .then(buffer => new Float32Array(buffer))
+            .catch(error => {
+                console.error('Error loading Gaia stars:', error);
+                return null;
+            });
 
         return fetch(filename)
             .then(response => {
@@ -169,6 +185,7 @@ function App() {
                 }
                 return response.json();
             })
+            .then(data => gaia.then(rows => ({ ...data, gaia: rows })))
             .then(data => {
                 setStars3d(data);
                 return data;

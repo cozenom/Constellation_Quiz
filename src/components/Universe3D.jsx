@@ -10,6 +10,7 @@ import {
     AU_PER_LY,
     KM_PER_AU,
     LY_PER_PARSEC,
+    buildGaiaBuffers,
     buildLineStarInfo,
     buildSearchIndex,
     buildStarBuffers,
@@ -33,6 +34,8 @@ const SUN_BV = 0.65;
 
 // Stars fainter than this (seen from the camera) can't be picked or labelled
 const PICK_MAG_LIMIT = 7.0;
+// Opacity of stars too faint to see (see the star shader's uMinAlpha)
+const STAR_MIN_ALPHA = 0.12;
 // Named stars brighter than this get a label; the selected constellation's
 // named stars are always labelled
 const LABEL_MAG_LIMIT = 2.5;
@@ -80,12 +83,15 @@ const RING_VIEW_MIN_KM = 2000;
 // uMaxSize caps the sprite; the Sun gets a bigger cap so it still gets
 // brighter from Neptune to Mercury. The 1e-9 pc clamp (~0.0002 AU) only
 // guards log(0); the camera never gets that close to a star centre.
+// uMinAlpha keeps stars too faint for the eye as dim dots, so the shape of
+// the catalogue (the Gaia 100 pc sphere) shows from outside.
 const starVertexShader = `
     attribute float absMag;
     attribute vec3 color;
     uniform float uPixelRatio;
     uniform float uLinear;
     uniform float uMaxSize;
+    uniform float uMinAlpha;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vGlow;
@@ -98,7 +104,7 @@ const starVertexShader = `
         vGlow = clamp((2.0 - mag) / 5.0, 0.0, 1.0);
         float size = clamp(2.0 + (6.5 - mag) * 1.3, 1.5, uMaxSize) * (1.0 + vGlow * 2.0);
         gl_PointSize = size * uPixelRatio;
-        vAlpha = smoothstep(7.5, 5.0, mag);
+        vAlpha = max(smoothstep(7.5, 5.0, mag), uMinAlpha);
         vColor = mix(color, pow(color, vec3(2.2)), uLinear);  // sRGB tint -> linear for haze
         gl_Position = projectionMatrix * mvPosition;
     }
@@ -152,7 +158,12 @@ function makeStarPoints(positions, colors, absMags, pixelRatio, maxSize = 24) {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('absMag', new THREE.BufferAttribute(absMags, 1));
     const material = new THREE.ShaderMaterial({
-        uniforms: { uPixelRatio: { value: pixelRatio }, uLinear: { value: 0 }, uMaxSize: { value: maxSize } },
+        uniforms: {
+            uPixelRatio: { value: pixelRatio },
+            uLinear: { value: 0 },
+            uMaxSize: { value: maxSize },
+            uMinAlpha: { value: STAR_MIN_ALPHA },
+        },
         vertexShader: starVertexShader,
         fragmentShader: starFragmentShader,
         transparent: true,
@@ -206,11 +217,22 @@ function placeRing(ring, xyz) {
     if (xyz) ring.position.set(xyz[0], xyz[1], xyz[2]);
 }
 
-function makeLines(flatPositions, color, opacity) {
+// Line opacity is given as it looks with haze on, where lines blend in
+// linear light before the sRGB output. Without haze they blend after sRGB
+// encoding, where the same opacity looks about half as bright over the
+// dark sky; opacity^(1/2.2) matches it.
+function setLineHaze(lines, haze) {
+    if (lines) lines.material.opacity = haze ? lines.userData.opacity : Math.pow(lines.userData.opacity, 1 / 2.2);
+}
+
+function makeLines(flatPositions, color, opacity, haze) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(flatPositions, 3));
     const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
-    return new THREE.LineSegments(geometry, material);
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.userData.opacity = opacity;
+    setLineHaze(lines, haze);
+    return lines;
 }
 
 function disposeObject(obj) {
@@ -276,6 +298,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const optionsRef = useRef({});  // current toggles, read by the render loop
 
     const starBuffers = useMemo(() => (stars3d ? buildStarBuffers(stars3d) : null), [stars3d]);
+    const gaiaBuffers = useMemo(() => (stars3d?.gaia ? buildGaiaBuffers(stars3d.gaia) : null), [stars3d]);
     const lineStarInfo = useMemo(() => buildLineStarInfo(constellationData), [constellationData]);
     const searchItems = useMemo(
         () => (starBuffers ? buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData) : []),
@@ -405,6 +428,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const stars = makeStarPoints(starBuffers.positions, starBuffers.colors, starBuffers.absMags, pixelRatio);
         scene.add(stars);
 
+        // Gaia's nearby stars (within 100 pc, not in the catalogue above):
+        // drawn only, not picked or labelled
+        const gaiaStars = gaiaBuffers
+            ? makeStarPoints(gaiaBuffers.positions, gaiaBuffers.colors, gaiaBuffers.absMags, pixelRatio)
+            : null;
+        if (gaiaStars) scene.add(gaiaStars);
+
         // The Sun, so you can find home after flying away
         const sun = makeStarPoints(
             new Float32Array([0, 0, 0]),
@@ -461,8 +491,9 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         s.setHaze = (on) => {
             s.haze = on;
             solar?.setHaze(on);
-            stars.material.uniforms.uLinear.value = on ? 1 : 0;
-            sun.material.uniforms.uLinear.value = on ? 1 : 0;
+            [stars, gaiaStars, sun].forEach(obj => { if (obj) obj.material.uniforms.uLinear.value = on ? 1 : 0; });
+            setLineHaze(s.selectedLines, on);
+            setLineHaze(s.allLines, on);
         };
         sceneRef.current = s;
 
@@ -1090,7 +1121,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             canvas.removeEventListener('pointermove', onPointerMove);
             canvas.removeEventListener('pointerleave', onPointerLeave);
             controls.dispose();
-            [stars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, earthMarkerNear, earthMarkerFar, s.selectedLines, s.allLines]
+            [stars, gaiaStars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, earthMarkerNear, earthMarkerFar, s.selectedLines, s.allLines]
                 .forEach(disposeObject);
             solar?.dispose();
             bloomPass.dispose();
@@ -1100,7 +1131,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             labelsEl.replaceChildren();
             sceneRef.current = null;
         };
-    }, [starBuffers, lineStarInfo, constellationData, planetFacts, moonsData]);
+    }, [starBuffers, gaiaBuffers, lineStarInfo, constellationData, planetFacts, moonsData]);
 
     // Fly back to Earth and orbit a constellation, so you see its figure as
     // in the night sky; dragging then shows it in 3D
@@ -1214,7 +1245,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         s.selectedLines = makeLines(
             constellationLinePositions(constellationData[selectedAbbrev], starBuffers),
             0x60a5fa,
-            0.8
+            0.8,
+            s.haze
         );
         s.selectedLines.visible = showLines;
         s.scene.add(s.selectedLines);
@@ -1228,7 +1260,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         if (showLines && showAllLines && !s.allLines) {
             const flat = Object.values(constellationData)
                 .flatMap(c => constellationLinePositions(c, starBuffers));
-            s.allLines = makeLines(flat, 0x94a3b8, 0.25);
+            s.allLines = makeLines(flat, 0x94a3b8, 0.25, s.haze);
             s.scene.add(s.allLines);
         }
         if (s.allLines) s.allLines.visible = showLines && showAllLines;
