@@ -11,7 +11,7 @@
 // show the side really facing you at the clock's time. The other major
 // moons are tidally locked: longitude 0 faces their planet and their pole
 // is their orbit's. Each body is an anchor group at its place holding the
-// dot (and Saturn's rings), with the spinning sphere inside it.
+// dot (and the giants' rings), with the spinning sphere inside it.
 //
 // Moons: the major ones (moons.json `major`, plus our Moon) are bodies like
 // the planets, with orbit lines and labels. The minor ones are one cloud of
@@ -23,6 +23,7 @@
 // J2000, north = +Y).
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
 import { bodyAxes, heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
 import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
@@ -104,14 +105,108 @@ export const SURFACE_MAPS = {
 const UNLOCKED_MOONS = new Set(['Nereid']);
 // Time step for a locked moon's direction of motion (its orbit's pole)
 const LOCK_STEP_MS = 10 * 60 * 1000;
-// A strip across the rings, inner edge on the left; transparent in the gaps
-const RING_TEXTURE = '2k_saturn_ring_alpha.png';
 const textureUrl = (file) => `${import.meta.env.BASE_URL}textures/${file}`;
 
-// Saturn's north pole (IAU), for tilting its rings
-const SATURN_POLE = { raHours: 40.589 / 15, decDeg: 83.537 };
-// Saturn's main rings (C ring inner edge to A ring outer edge), km
-const SATURN_RINGS_KM = [74500, 136780];
+// ---------- Rings ----------
+// Each ring system lies in its planet's equator (pole: IAU north pole, RA
+// and Dec in degrees, J2000) and is drawn as flat strips, km from the
+// planet's centre. Saturn's main rings are the Solar System Scope texture,
+// which isn't evenly scaled: its `stops` pin texture positions (u) to the
+// real radii of the C and B ring inner edges, the Cassini Division, the
+// Encke Gap's centre (where Pan orbits) and the A ring's outer edge, and
+// it is stretched linearly between them. The rest are drawn from
+// published ring edges (Burns et al., Esposito, de Pater et al.; as tabled
+// on Wikipedia's ring articles): bands [inner km, outer km, opacity].
+// Opacities are for display. The real faint rings are far darker (Jupiter's
+// would be invisible), so the dusty ones are exaggerated to be seen; the
+// narrow Uranus rings are thinner than a texel and come out as faint lines.
+const band = (r, width, opacity) => [r - width / 2, r + width / 2, opacity];
+const RING_SYSTEMS = {
+    Jupiter: {
+        pole: [268.057, 64.495],
+        strips: [{
+            km: [92000, 226000], color: '#8c7a66',
+            bands: [
+                [92000, 122500, 0.05],    // halo
+                [122500, 129000, 0.22],   // main ring
+                [129000, 182000, 0.04],   // Amalthea gossamer ring
+                [182000, 226000, 0.02],   // Thebe gossamer ring
+            ],
+        }],
+    },
+    Saturn: {
+        pole: [40.589, 83.537],
+        strips: [
+            {
+                // C, B and A rings: [texture pixel / 2048, km]; the ends
+                // (clear margins) extrapolated from their neighbours
+                texture: '2k_saturn_ring_alpha.png',
+                stops: [
+                    [0, 70613],
+                    [107.5, 74490],     // C ring inner edge
+                    [592.5, 91980],     // B ring inner edge
+                    [1375.5, 117580],   // Cassini Division
+                    [1448.5, 122170],
+                    [1835, 133590],     // Encke Gap centre
+                    [1926.5, 136780],   // A ring outer edge
+                    [2048, 141016],
+                ].map(([px, km]) => [px / 2048, km]),
+            },
+            {
+                km: [139500, 480000], color: '#c9c2b4',
+                bands: [
+                    band(140180, 50, 0.6),    // F ring (shepherded by Prometheus and Pandora)
+                    [166000, 175000, 0.05],   // G ring
+                    [180000, 480000, 0.015],  // E ring (from Enceladus' plumes)
+                ],
+            },
+        ],
+    },
+    Uranus: {
+        pole: [257.311, -15.175],
+        strips: [
+            {
+                km: [37000, 52000], color: '#77736c',
+                bands: [
+                    [37850, 41350, 0.05],     // zeta (dusty)
+                    band(41837, 2, 0.7),      // 6
+                    band(42234, 2.5, 0.7),    // 5
+                    band(42571, 2.5, 0.7),    // 4
+                    band(44718, 7, 0.7),      // alpha
+                    band(45661, 8, 0.7),      // beta
+                    band(47175, 1.5, 0.7),    // eta
+                    band(47627, 2.5, 0.7),    // gamma
+                    band(48300, 6, 0.7),      // delta
+                    band(50023, 1.5, 0.5),    // lambda
+                    band(51149, 58, 0.85),    // epsilon (19-96 km wide)
+                ],
+            },
+            {
+                km: [60000, 104000], color: '#8fa7c9',
+                bands: [
+                    [64200, 68000, 0.05],     // nu (dusty)
+                    [86000, 103000, 0.04],    // mu (dusty, blue; Mab's orbit)
+                ],
+            },
+        ],
+    },
+    Neptune: {
+        pole: [299.36, 43.46],
+        strips: [{
+            km: [40000, 64000], color: '#7a6f69',
+            bands: [
+                [40900, 42900, 0.06],         // Galle
+                band(53200, 113, 0.35),       // Le Verrier
+                [53200, 57200, 0.04],         // Lassell
+                band(57200, 50, 0.25),        // Arago
+                band(62932, 35, 0.4),         // Adams (its arcs not drawn)
+            ],
+        }],
+    },
+};
+const RING_TEXTURE_PX = 2048;
+// Sharper rings seen at a slant (clamped to what the GPU supports)
+const RING_ANISOTROPY = 8;
 
 // Ecliptic north in the scene frame (RA 18h, Dec +66.56)
 export const ECLIPTIC_NORTH = new THREE.Vector3(...raDecToXYZ(18, 66.56, 1));
@@ -251,23 +346,55 @@ function disposeLine(line) {
     line.material.dispose();
 }
 
-function makeSaturnRings(radiusAu, color) {
-    const [inner, outer] = SATURN_RINGS_KM.map(km => km / KM_PER_AU);
-    const geometry = new THREE.RingGeometry(inner, outer, 128);
-    // Lay the texture strip across the rings: u from inner to outer edge
-    const pos = geometry.attributes.position;
-    const uv = geometry.attributes.uv;
-    for (let i = 0; i < pos.count; i++) {
-        uv.setXY(i, (Math.hypot(pos.getX(i), pos.getY(i)) - inner) / (outer - inner), 0.5);
+// A 1-px-high strip across [innerKm, outerKm]: each texel's alpha is the
+// bands' opacity times how much of the texel they cover, so rings thinner
+// than a texel come out as faint lines instead of vanishing or flickering
+function makeBandTexture(bands, [innerKm, outerKm]) {
+    const data = new Uint8Array(RING_TEXTURE_PX * 4);
+    const texelKm = (outerKm - innerKm) / RING_TEXTURE_PX;
+    for (let x = 0; x < RING_TEXTURE_PX; x++) {
+        const a = innerKm + x * texelKm;
+        let alpha = 0;
+        for (const [r0, r1, opacity] of bands) {
+            const overlap = Math.min(a + texelKm, r1) - Math.max(a, r0);
+            if (overlap > 0) alpha += opacity * overlap / texelKm;
+        }
+        data.set([255, 255, 255, Math.round(Math.min(alpha, 1) * 255)], x * 4);
     }
-    const material = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false,
-    });
-    const rings = new THREE.Mesh(geometry, material);
-    // RingGeometry lies in XY (normal +Z); turn the normal to Saturn's pole
-    const pole = new THREE.Vector3(...raDecToXYZ(SATURN_POLE.raHours, SATURN_POLE.decDeg, 1));
-    rings.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), pole);
-    return rings;
+    const texture = new THREE.DataTexture(data, RING_TEXTURE_PX, 1);
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.anisotropy = RING_ANISOTROPY;
+    texture.needsUpdate = true;
+    return texture;
+}
+
+// A flat ring in the plane whose normal is `pole`. stops: [[u, km], ...]
+// from the inner to the outer edge: texture position u lies at radius km,
+// linear in between. One ring of triangles per interval, so the stops sit
+// exactly on vertices.
+function makeRingMesh(stops, pole, material) {
+    const parts = [];
+    for (let i = 0; i + 1 < stops.length; i++) {
+        const [u0, km0] = stops[i], [u1, km1] = stops[i + 1];
+        const inner = km0 / KM_PER_AU, outer = km1 / KM_PER_AU;
+        const part = new THREE.RingGeometry(inner, outer, 256);
+        const pos = part.attributes.position;
+        const uv = part.attributes.uv;
+        for (let j = 0; j < pos.count; j++) {
+            const t = (Math.hypot(pos.getX(j), pos.getY(j)) - inner) / (outer - inner);
+            uv.setXY(j, u0 + t * (u1 - u0), 0.5);
+        }
+        parts.push(part);
+    }
+    const geometry = parts.length > 1 ? mergeGeometries(parts) : parts[0];
+    if (parts.length > 1) parts.forEach(p => p.dispose());
+    const mesh = new THREE.Mesh(geometry, material);
+    // RingGeometry lies in XY (normal +Z); turn the normal to the pole
+    const [raDeg, decDeg] = pole;
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(...raDecToXYZ(raDeg / 15, decDeg, 1)));
+    return mesh;
 }
 
 // The facts the info card shows for a moons.json moon
@@ -317,8 +444,28 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             material.map = texture;
             material.color.set(0xffffff);
             material.needsUpdate = true;
-            onLoad?.();
+            onLoad?.(texture);
         });
+    };
+
+    // One strip of a ring system: a loaded texture (shown as a translucent
+    // flat colour until it arrives) or one drawn from its bands
+    const makeRingStrip = (strip, pole, bodyColor) => {
+        const material = new THREE.MeshBasicMaterial({
+            color: strip.color ?? bodyColor, transparent: true, side: THREE.DoubleSide, depthWrite: false,
+        });
+        if (strip.texture) {
+            material.opacity = 0.55;
+            applyTexture(material, strip.texture, (texture) => {
+                texture.anisotropy = RING_ANISOTROPY;
+                material.opacity = 1;
+            });
+        } else {
+            material.map = makeBandTexture(strip.bands, strip.km);
+            textures.push(material.map);
+        }
+        const stops = strip.stops ?? [[0, strip.km[0]], [1, strip.km[1]]];
+        return track(makeRingMesh(stops, pole, material));
     };
 
     const makeBody = ({ id, name, type, facts: f, radiusAu, color, isSun = false, parentId = null, major = true }) => {
@@ -331,11 +478,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         anchor.add(mesh);
         const dot = isSun ? null : track(makeDot(color, radiusAu, pixelRatio, parentId !== null));
         if (dot) anchor.add(dot);
-        if (id === 'Saturn') {
-            const rings = track(makeSaturnRings(radiusAu, color));
-            applyTexture(rings.material, RING_TEXTURE, () => { rings.material.opacity = 1; });
-            anchor.add(rings);
-        }
+        const rings = RING_SYSTEMS[id];
+        for (const strip of rings?.strips ?? []) anchor.add(makeRingStrip(strip, rings.pole, color));
         return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: anchor.position, parentId, major, surfaceMap };
     };
 
