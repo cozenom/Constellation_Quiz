@@ -218,6 +218,13 @@ export function normalizeSearchText(text) {
         .trim();
 }
 
+// Other names a body can be searched by (Latin names; "Solar System" for the Sun)
+const BODY_ALIASES = {
+    Sun: ['Sol', 'Solar System'],
+    Earth: ['Terra'],
+    Moon: ['Luna'],
+};
+
 // Everything the 3D search box can find. Items are
 // {type: 'constellation' | 'star', label, sublabel, terms, sortKey, ...}
 // where `terms` are normalized strings to match against. Type 'planet'
@@ -238,7 +245,7 @@ export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, p
             id: body.id,
             label: body.name,
             sublabel,
-            terms: [body.name, body.id === 'Sun' ? 'Solar System' : null].filter(Boolean).map(normalizeSearchText),
+            terms: [body.name, ...(BODY_ALIASES[body.id] ?? [])].map(normalizeSearchText),
             sortKey: -20,  // before constellations ("Sun" vs "Sculptor")
         });
     }
