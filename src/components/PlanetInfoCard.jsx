@@ -31,6 +31,7 @@ function formatDays(d) {
 function PlanetInfoCard({ body, distances, onClose, onFlyTo }) {
     const f = body.facts;
     const isSun = body.id === 'Sun';
+    const map = body.surfaceMap;
     const subtitle = f.parent ? `${TYPE_LABELS[f.type]} of ${f.parent}` : TYPE_LABELS[f.type];
 
     return (
@@ -128,6 +129,19 @@ function PlanetInfoCard({ body, distances, onClose, onFlyTo }) {
                     <>
                         <dt>Moons</dt>
                         <dd>{f.moons}{f.rings && <span className="star-info-muted"> · has rings</span>}</dd>
+                    </>
+                )}
+
+                {map && (
+                    <>
+                        <dt>Surface map</dt>
+                        <dd>
+                            {map.from}
+                            <div className="star-info-muted">
+                                by <a href={map.href} target="_blank" rel="noopener noreferrer">{map.by}</a>
+                            </div>
+                            {map.note && <div className="star-info-muted">{map.note}</div>}
+                        </dd>
                     </>
                 )}
             </dl>

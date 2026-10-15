@@ -34,8 +34,10 @@ export function heliocentricPosition(body, date) {
 
 // A body's spin axis and prime meridian at a Date (IAU WGCCRE 2015), as
 // unit vectors in the scene frame: {pole, meridian}. pole is the IAU north
-// pole (the one north of the invariable plane, so Venus, Uranus and Pluto
-// spin backwards about it); meridian points from the centre to longitude 0
+// pole: for planets the one north of the invariable plane (Venus and Uranus
+// spin backwards about it), for Pluto the right-hand one (IAU dwarf-planet
+// rule, as in the New Horizons maps: Charon at longitude 0, Sputnik
+// Planitia in the north); meridian points from the centre to longitude 0
 // on the equator. Sun, planets, Pluto and the Moon.
 export function bodyAxes(body, date) {
     const { ra, spin, north } = RotationAxis(Body[body], date);

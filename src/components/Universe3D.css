@@ -427,6 +427,14 @@ body:has(.universe-3d-screen) .stars-toggle {
     color: #94a3b8;
 }
 
+.star-info-muted a {
+    color: #cbd5e1;
+}
+
+.star-info-muted a:hover {
+    color: #f1f5f9;
+}
+
 .star-info-approx {
     display: inline-block;
     margin-left: 0.25rem;

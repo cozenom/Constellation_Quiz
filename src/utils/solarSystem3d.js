@@ -8,9 +8,10 @@
 //
 // The Sun, planets, Pluto and our Moon turn on their real axes (IAU poles
 // and prime meridians, utils/planets.js bodyAxes), so their surface maps
-// show the side really facing you at the clock's time. Each body is an
-// anchor group at its place holding the dot (and Saturn's rings), with the
-// spinning sphere inside it. Other moons are flat-coloured and don't turn.
+// show the side really facing you at the clock's time. The other major
+// moons are tidally locked: longitude 0 faces their planet and their pole
+// is their orbit's. Each body is an anchor group at its place holding the
+// dot (and Saturn's rings), with the spinning sphere inside it.
 //
 // Moons: the major ones (moons.json `major`, plus our Moon) are bodies like
 // the planets, with orbit lines and labels. The minor ones are one cloud of
@@ -53,15 +54,56 @@ const MOON_COLORS = {
     Phobos: '#7d7268', Deimos: '#9a8f82', Charon: '#9b958f',
 };
 
-// Surface maps in public/textures (Solar System Scope, CC BY 4.0; credited
-// in the About box): equirectangular, longitude 0 in the middle, east to
-// the right. Bodies without one (Pluto, other moons) keep their colour.
-const TEXTURES = {
-    Sun: '2k_sun.jpg', Mercury: '2k_mercury.jpg', Venus: '2k_venus_atmosphere.jpg',
-    Earth: '2k_earth_daymap.jpg', Moon: '2k_moon.jpg', Mars: '2k_mars.jpg',
-    Jupiter: '2k_jupiter.jpg', Saturn: '2k_saturn.jpg', Uranus: '2k_uranus.jpg',
-    Neptune: '2k_neptune.jpg',
+// Surface maps in public/textures, by body name: equirectangular, longitude
+// 0 in the middle, east to the right. Sun, planets and our Moon: Solar
+// System Scope (CC BY 4.0; credited in the About box). Pluto and the other
+// moons: USGS / NASA maps, built by Star_Data/scripts/build_moon_textures.py
+// (which re-centres them, fills unseen areas and tints the greyscale ones).
+// Bodies without one keep their colour. The info card shows `from` (what
+// the map is made of), `by` (who made it, linked) and `note`.
+const SSS = { by: 'Solar System Scope', href: 'https://www.solarsystemscope.com/textures/' };
+const USGS = { by: 'USGS Astrogeology', href: 'https://astrogeology.usgs.gov/' };
+const NASA_3D = { by: 'NASA 3D Resources', href: 'https://github.com/nasa/NASA-3D-Resources' };
+const TINTED = 'Greyscale map, tinted with its usual colour';
+const UNSEEN_NORTH = 'Voyager 2 saw only the southern half (the north was in darkness); the rest is filled in';
+const NEW_HORIZONS_SOUTH = 'South of about 30° S was in darkness during the flyby; it is filled in';
+export const SURFACE_MAPS = {
+    Sun: { file: '2k_sun.jpg', ...SSS, from: 'Artwork', note: 'The real surface changes by the minute' },
+    Mercury: { file: '2k_mercury.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Venus: { file: '2k_venus_atmosphere.jpg', ...SSS, from: 'Based on NASA spacecraft images', note: 'The cloud tops: thick clouds hide the surface' },
+    Earth: { file: '2k_earth_daymap.jpg', ...SSS, from: 'Based on NASA satellite images', note: 'Cloud-free' },
+    Moon: { file: '2k_moon.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Mars: { file: '2k_mars.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Jupiter: { file: '2k_jupiter.jpg', ...SSS, from: 'Based on NASA spacecraft images', note: 'Cloud bands: they shift over weeks' },
+    Saturn: { file: '2k_saturn.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Uranus: { file: '2k_uranus.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Neptune: { file: '2k_neptune.jpg', ...SSS, from: 'Based on NASA spacecraft images' },
+    Pluto: { file: 'pluto.jpg', ...USGS, from: 'New Horizons mosaic (2015 flyby)', note: `${NEW_HORIZONS_SOUTH}. ${TINTED}` },
+    Io: { file: 'io.jpg', ...USGS, from: 'Galileo and Voyager colour mosaic' },
+    Europa: { file: 'europa.jpg', ...USGS, from: 'Galileo and Voyager mosaic', note: TINTED },
+    Ganymede: { file: 'ganymede.jpg', ...USGS, from: 'Galileo and Voyager colour mosaic' },
+    Callisto: { file: 'callisto.jpg', ...USGS, from: 'Galileo and Voyager mosaic', note: TINTED },
+    Mimas: { file: 'mimas.jpg', ...NASA_3D, from: 'Spacecraft map with gaps', note: `Unmapped areas are filled in. ${TINTED}` },
+    Enceladus: { file: 'enceladus.jpg', ...USGS, from: 'Cassini mosaic', note: TINTED },
+    Tethys: { file: 'tethys.jpg', ...NASA_3D, from: 'Spacecraft map with gaps', note: `Unmapped areas are filled in. ${TINTED}` },
+    Dione: { file: 'dione.jpg', ...USGS, from: 'Cassini and Voyager mosaic', note: TINTED },
+    Rhea: { file: 'rhea.jpg', ...USGS, from: 'Cassini and Voyager mosaic', note: TINTED },
+    Titan: { file: 'titan.jpg', ...USGS, from: 'Cassini near-infrared mosaic', note: `The surface under the haze, which hides it from ordinary cameras. ${TINTED}` },
+    Iapetus: { file: 'iapetus.jpg', ...NASA_3D, from: 'Spacecraft map', note: `Keeps its dark leading and bright trailing halves. ${TINTED}` },
+    Phobos: { file: 'phobos.jpg', ...NASA_3D, from: 'Spacecraft map', note: `Drawn as a sphere: the real Phobos is potato-shaped. ${TINTED}` },
+    Deimos: { file: 'deimos.jpg', ...NASA_3D, from: 'Spacecraft map', note: `Drawn as a sphere: the real Deimos is potato-shaped. ${TINTED}` },
+    Miranda: { file: 'miranda.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
+    Ariel: { file: 'ariel.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
+    Umbriel: { file: 'umbriel.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
+    Titania: { file: 'titania.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
+    Oberon: { file: 'oberon.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
+    Triton: { file: 'triton.jpg', ...USGS, from: 'Voyager 2 colour mosaic (1989 flyby)', note: 'Voyager 2 saw mostly the southern half; the rest is filled in' },
+    Charon: { file: 'charon.jpg', ...USGS, from: 'New Horizons mosaic (2015 flyby)', note: `${NEW_HORIZONS_SOUTH}. ${TINTED}` },
 };
+// Not tidally locked (spins every ~12 h); has no map anyway
+const UNLOCKED_MOONS = new Set(['Nereid']);
+// Time step for a locked moon's direction of motion (its orbit's pole)
+const LOCK_STEP_MS = 10 * 60 * 1000;
 // A strip across the rings, inner edge on the left; transparent in the gaps
 const RING_TEXTURE = '2k_saturn_ring_alpha.png';
 const textureUrl = (file) => `${import.meta.env.BASE_URL}textures/${file}`;
@@ -245,7 +287,8 @@ function moonFacts(m) {
 // facts: planets.json; moonsData: moons.json (optional). Returns the
 // layer's contents and controls:
 //   bodies: [{id, name, type, facts, radiusAu, position (Vector3, AU),
-//             parentId?, major?}], planets first, then major moons, then minor
+//             parentId?, major?, surfaceMap? (SURFACE_MAPS entry)}],
+//           planets first, then major moons, then minor
 //   byId:   Map id -> body
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
@@ -280,7 +323,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
 
     const makeBody = ({ id, name, type, facts: f, radiusAu, color, isSun = false, parentId = null, major = true }) => {
         const material = isSun ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
-        if (TEXTURES[id]) applyTexture(material, TEXTURES[id]);
+        const surfaceMap = SURFACE_MAPS[name] ?? null;
+        if (surfaceMap) applyTexture(material, surfaceMap.file);
         const anchor = new THREE.Group();
         scene.add(anchor);
         const mesh = track(new THREE.Mesh(new THREE.SphereGeometry(radiusAu, 64, 32), material));
@@ -292,7 +336,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             applyTexture(rings.material, RING_TEXTURE, () => { rings.material.opacity = 1; });
             anchor.add(rings);
         }
-        return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: anchor.position, parentId, major };
+        return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: anchor.position, parentId, major, surfaceMap };
     };
 
     // Sun, planets, Pluto, our Moon
@@ -345,6 +389,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     }
     const byId = new Map(bodies.map(b => [b.id, b]));
     const moonBodies = bodies.filter(b => b.parentId && b.id !== 'Moon');
+    const lockedMoons = moonBodies.filter(b => b.mesh && !UNLOCKED_MOONS.has(b.name));
 
     // ---------- Orbit lines ----------
     // Each orbit is sampled densely around its body's current place (see
@@ -486,6 +531,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     // spheres put the texture's middle on +x and its top on +y)
     const basis = new THREE.Matrix4();
     const xAxis = new THREE.Vector3(), yAxis = new THREE.Vector3(), zAxis = new THREE.Vector3();
+    const fromPlanet = new THREE.Vector3(), step = new THREE.Vector3();
     const update = (date) => {
         for (const body of bodies) {
             if (body.id === 'Sun' || body.moon) continue;
@@ -504,6 +550,22 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             const rel = isGalilean(body) ? galilean[body.name] : moonPosition(body.moon, date);
             body.position.set(rel[0], rel[1], rel[2]).add(parent);
             if (body.dot) body.dot.material.uniforms.uParentOffset.value.set(-rel[0], -rel[1], -rel[2]);
+        }
+        // Locked moons: x (longitude 0) to the planet; y (north) along the
+        // orbit's pole. IAU poles of planets' moons lie on the ecliptic-north
+        // side (so the Uranus moons and Triton spin backwards about it);
+        // a dwarf planet's moons, like Charon, keep the right-hand pole
+        const later = new Date(date.getTime() + LOCK_STEP_MS);
+        const galileanLater = galilean && galileanPositions(later);
+        for (const body of lockedMoons) {
+            fromPlanet.subVectors(body.position, byId.get(body.parentId).position);
+            const next = isGalilean(body) ? galileanLater[body.name] : moonPosition(body.moon, later);
+            step.set(next[0], next[1], next[2]).sub(fromPlanet);
+            yAxis.crossVectors(fromPlanet, step).normalize();
+            if (body.parentId !== 'Pluto' && yAxis.dot(ECLIPTIC_NORTH) < 0) yAxis.negate();
+            xAxis.copy(fromPlanet).negate().normalize();
+            zAxis.crossVectors(xAxis, yAxis);
+            body.mesh.quaternion.setFromRotationMatrix(basis.makeBasis(xAxis, yAxis, zAxis));
         }
         // Our Moon's dot fades by its separation from Earth too
         if (byId.has('Moon') && byId.has('Earth')) {
