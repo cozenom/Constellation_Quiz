@@ -346,6 +346,29 @@ body:has(.universe-3d-screen) .stars-toggle {
     color: rgba(253, 230, 138, 0.9);
 }
 
+/* Rings and gaps: centred on the ring, clickable (the overlay isn't) */
+.universe-3d-label-ring {
+    translate: -50% -50%;
+    font-size: 0.72rem;
+    font-style: italic;
+    color: rgba(222, 205, 170, 0.85);
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.universe-3d-label-gap {
+    color: rgba(165, 180, 205, 0.9);
+}
+
+.universe-3d-label-ring:hover {
+    color: #f8fafc;
+    text-decoration: underline;
+}
+
+.universe-3d-label-ring.selected {
+    color: #facc15;
+}
+
 /* Earth: always shown, in the colour of its marker ring */
 .universe-3d-label-earth {
     color: #93c5fd;

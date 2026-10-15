@@ -20,7 +20,9 @@ import {
     scaleBarDistance,
     starRecord,
 } from '../utils/universe3d';
+import { RING_FEATURES, RING_FEATURES_BY_ID, ringLabelKm, ringPole, ringScaleKm, ringSubtitle } from '../utils/rings';
 import PlanetInfoCard from './PlanetInfoCard';
+import RingInfoCard from './RingInfoCard';
 import StarInfoCard from './StarInfoCard';
 import Universe3DSearch from './Universe3DSearch';
 import Universe3DTimeBar, { nextPresetRate, TIME_RANGE } from './Universe3DTimeBar';
@@ -55,6 +57,17 @@ const EARTH_RING_PICK_PX = 12;
 // body's surface (see solarNearPlane)
 const SOLAR_NEAR_FRACTION = 0.3;
 const FOV = 60;
+// Ring and gap labels show once the feature (its ringScaleKm) is drawn
+// this many px across: gaps sooner, as they're narrow
+const RING_LABEL_PX = 18;
+const RING_GAP_LABEL_PX = 6;
+// Ring labels keep this far (px) inside the screen edges
+const RING_LABEL_MARGIN_PX = 24;
+// Points tried around a ring for its label when its right-hand end is off screen
+const RING_LABEL_SAMPLES = 48;
+// Viewing a ring feature: this many times its size away, at least the minimum
+const RING_VIEW_SCALE = 5;
+const RING_VIEW_MIN_KM = 2000;
 
 // Points shader: each star stores its absolute magnitude, and the apparent
 // magnitude is recomputed from the camera distance every frame. From Earth
@@ -231,9 +244,11 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const [showPlanets, setShowPlanets] = useState(true);
     const [showOrbits, setShowOrbits] = useState(true);
     const [showSmallMoons, setShowSmallMoons] = useState(true);
-    // At most one of these is set: a star index, or a solar system body id
+    // At most one of these is set: a star index, a solar system body id, or
+    // a ring feature id (utils/rings.js)
     const [selectedStar, setSelectedStar] = useState(null);
     const [selectedBody, setSelectedBody] = useState(null);
+    const [selectedRing, setSelectedRing] = useState(null);
     // On phones the options panel starts collapsed so it doesn't cover the sky
     const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 767);
     // What the view is centred on, for the footer title. Starts orbiting
@@ -269,14 +284,16 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         [constellationData, selectedAbbrev]
     );
 
-    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, selectedAbbrev, selectedHips };
+    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, selectedAbbrev, selectedHips, selectedRing };
 
     const selectStar = (index) => {
         setSelectedBody(null);
+        setSelectedRing(null);
         setSelectedStar(index);
     };
     const selectBody = (id) => {
         setSelectedStar(null);
+        setSelectedRing(null);
         setSelectedBody(id);
     };
 
@@ -339,6 +356,28 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             };
         };
 
+        // Camera pose for viewing a ring feature, in ly: above the ring's
+        // sunlit face, looking down at it where it is seen side-on from the
+        // Sun (so it isn't in the planet's shadow), from RING_VIEW_SCALE
+        // times its size away. {position, target, minDistance} or null.
+        const ringPose = (featureId) => {
+            const f = RING_FEATURES_BY_ID.get(featureId);
+            const planet = f && solar?.byId.get(f.planet);
+            if (!planet) return null;
+            const pole = new THREE.Vector3(...ringPole(f.planet));
+            const toSun = planet.position.clone().negate().normalize();
+            if (pole.dot(toSun) < 0) pole.negate();
+            const side = new THREE.Vector3().crossVectors(pole, toSun).normalize();
+            const target = planet.position.clone().addScaledVector(side, ringLabelKm(f) / KM_PER_AU);
+            const viewAu = Math.max(ringScaleKm(f) * RING_VIEW_SCALE, RING_VIEW_MIN_KM) / KM_PER_AU;
+            const position = target.clone().addScaledVector(toSun.multiplyScalar(0.5).add(pole).normalize(), viewAu);
+            return {
+                position: position.divideScalar(AU_PER_LY).toArray(),
+                target: target.divideScalar(AU_PER_LY).toArray(),
+                minDistance: viewAu * 0.02 / AU_PER_LY,
+            };
+        };
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
@@ -398,6 +437,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             // Earth in ly from the Sun; everything Earth-relative reads this
             earthPosition,
             bodyPose,
+            ringPose,
             // The body the view rides along with as time runs (see setFollow)
             follow: { id: home ? 'Earth' : null, moveTarget: true },
             selectedBodyId: null,
@@ -654,6 +694,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             const hit = pickAny(e.clientX, e.clientY, e.pointerType === 'touch' ? 24 : 14);
             setSelectedStar(hit?.type === 'star' ? hit.index : null);
             setSelectedBody(hit?.type === 'body' ? hit.id : null);
+            setSelectedRing(null);  // ring features are picked by their labels
         };
         // Hover: ring + name tooltip (mouse only, throttled to one pick per frame)
         let hoverRequest = null;
@@ -710,6 +751,30 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             el: makeLabelEl(body.name, `universe-3d-label universe-3d-label-planet${body.id === 'Earth' ? ' universe-3d-label-earth' : ''}`),
             shown: false,
         }));
+        // Rings and gaps: clickable labels (see placeRingLabel)
+        const ringLabels = solar ? RING_FEATURES.filter(f => solar.byId.has(f.planet)).map(f => {
+            const el = makeLabelEl(f.name, `universe-3d-label universe-3d-label-ring${f.kind === 'gap' ? ' universe-3d-label-gap' : ''}`);
+            el.addEventListener('click', () => {
+                setSelectedStar(null);
+                setSelectedBody(null);
+                setSelectedRing(f.id);
+            });
+            // Scrolling over a label still zooms
+            el.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                canvas.dispatchEvent(new WheelEvent('wheel', e));
+            }, { passive: false });
+            return {
+                feature: f,
+                el,
+                shown: false,
+                selected: false,
+                pole: new THREE.Vector3(...ringPole(f.planet)),
+                labelAu: ringLabelKm(f) / KM_PER_AU,
+                scaleAu: ringScaleKm(f) / KM_PER_AU,
+                minPx: f.kind === 'gap' ? RING_GAP_LABEL_PX : RING_LABEL_PX,
+            };
+        }) : [];
         const placedLabels = [];
 
         const projected = new THREE.Vector3();
@@ -727,6 +792,62 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             if (show) label.el.style.transform = `translate(${screenPos[0] + dx}px, ${screenPos[1] + dy}px)`;
         };
         const starPosition = new THREE.Vector3();
+
+        // Where a ring feature's label goes, [x, y] px, or null. Shown once
+        // the feature is drawn big enough (always when selected). It sits on
+        // the ring at the point farthest right on screen, where rings look
+        // widest; when that's off screen (zoomed in), at the visible point
+        // nearest the screen centre. Points behind the planet don't count.
+        const ringDirA = new THREE.Vector3();
+        const ringDirB = new THREE.Vector3();
+        const ringPoint = new THREE.Vector3();
+        const cameraAxis = new THREE.Vector3();
+        const placeRingLabel = (label, selected, width, height, pxPerRadian) => {
+            const planet = solar.byId.get(label.feature.planet);
+            const centre = planet.position;
+            const dist = centre.distanceTo(solarCamera.position);
+            if (!selected && label.scaleAu / dist * pxPerRadian < label.minPx) return null;
+            // In the ring plane: A towards the screen's right (or up, if the
+            // ring is seen edge-on running up the screen), B at right angles
+            const { pole } = label;
+            cameraAxis.setFromMatrixColumn(solarCamera.matrixWorld, 0);
+            ringDirA.copy(cameraAxis).addScaledVector(pole, -cameraAxis.dot(pole));
+            if (ringDirA.lengthSq() < 0.05) {
+                cameraAxis.setFromMatrixColumn(solarCamera.matrixWorld, 1);
+                ringDirA.copy(cameraAxis).addScaledVector(pole, -cameraAxis.dot(pole));
+            }
+            ringDirA.normalize();
+            ringDirB.crossVectors(pole, ringDirA);
+            const disc = bodyOnScreen(planet, width, height);
+            const m = RING_LABEL_MARGIN_PX;
+            const pointAt = (angle) => {
+                ringPoint.copy(centre)
+                    .addScaledVector(ringDirA, label.labelAu * Math.cos(angle))
+                    .addScaledVector(ringDirB, label.labelAu * Math.sin(angle));
+                bodyProjected.copy(ringPoint).applyMatrix4(solarCamera.matrixWorldInverse);
+                if (bodyProjected.z >= 0) return null;  // behind the camera
+                bodyProjected.applyMatrix4(solarCamera.projectionMatrix);
+                const x = (bodyProjected.x + 1) / 2 * width;
+                const y = (1 - bodyProjected.y) / 2 * height;
+                if (x < m || x > width - m || y < m || y > height - m) return null;
+                const behindPlanet = disc && ringPoint.distanceTo(solarCamera.position) > dist
+                    && Math.hypot(x - disc.x, y - disc.y) < disc.radiusPx;
+                return behindPlanet ? null : [x, y];
+            };
+            const rightEnd = pointAt(0);
+            if (rightEnd) return rightEnd;
+            let best = null;
+            let bestDist = Infinity;
+            for (let i = 1; i < RING_LABEL_SAMPLES; i++) {
+                const p = pointAt(i / RING_LABEL_SAMPLES * 2 * Math.PI);
+                const d = p && Math.hypot(p[0] - width / 2, p[1] - height / 2);
+                if (p && d < bestDist) {
+                    best = p;
+                    bestDist = d;
+                }
+            }
+            return best;
+        };
 
         const updateLabels = () => {
             const opts = optionsRef.current;
@@ -773,6 +894,21 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                     if (isEarth) earthRing = p.radiusPx < 5;
                 }
                 setLabel(label, screenPos, 8, dy);
+            }
+            // Ring labels after the bodies': a body's label wins an overlap
+            const ringsWanted = opts.showLabels && opts.showPlanets && bodiesActive();
+            const pxPerRadian = height / 2 / Math.tan(THREE.MathUtils.degToRad(solarCamera.fov) / 2);
+            for (const label of ringLabels) {
+                const selected = label.feature.id === opts.selectedRing;
+                let p = ringsWanted ? placeRingLabel(label, selected, width, height, pxPerRadian) : null;
+                // Centred text: overlapping if within about a label's size
+                if (p && !selected && placedLabels.some(q => Math.abs(q.x - p[0]) < 60 && Math.abs(q.y - p[1]) < 14)) p = null;
+                if (p) placedLabels.push({ x: p[0], y: p[1] });
+                setLabel(label, p, 0, 0);
+                if (selected !== label.selected) {
+                    label.el.classList.toggle('selected', selected);
+                    label.selected = selected;
+                }
             }
             earthMarked = earthRing;
             earthMarkerNear.visible = earthRing && solarLayer.visible;
@@ -989,6 +1125,16 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         setFocus({ type: 'body', id });
     };
 
+    // Fly to a ring feature (see ringPose in the setup), riding along with its planet
+    const viewRing = (id) => {
+        const s = sceneRef.current;
+        const pose = s?.ringPose(id);
+        if (!pose) return;
+        s.setFollow(RING_FEATURES_BY_ID.get(id).planet);
+        s.flyTo(pose.position, pose.target, pose.minDistance);
+        setFocus({ type: 'ring', id });
+    };
+
     // Go back to Earth and orbit the star, so you see where it is in the night sky
     const lookAtStar = (index) => {
         const s = sceneRef.current;
@@ -1102,7 +1248,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 if (e.code !== 'Escape') return;
             }
             if (e.code === 'Escape') {
-                if (selectedStar !== null || selectedBody !== null) selectStar(null);
+                if (selectedStar !== null || selectedBody !== null || selectedRing !== null) selectStar(null);
                 else onBack();
             }
             if (e.code === 'KeyL') setShowLines(prev => !prev);
@@ -1134,6 +1280,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const star = selectedStar !== null ? starRecord(starBuffers, selectedStar) : null;
     const solar = sceneRef.current?.solar;
     const body = selectedBody !== null && solar ? solar.byId.get(selectedBody) : null;
+    const ring = selectedRing !== null ? RING_FEATURES_BY_ID.get(selectedRing) : null;
     // Current distances (AU), for the card
     const bodyDistances = body && {
         sun: body.position.length(),
@@ -1152,6 +1299,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const f = solar.byId.get(focus.id).facts;
         title = f.name;
         subtitle = { star: 'Our star', planet: 'Planet', 'dwarf planet': 'Dwarf planet', moon: `Moon of ${f.parent}` }[f.type];
+    } else if (focus.type === 'ring') {
+        const f = RING_FEATURES_BY_ID.get(focus.id);
+        title = f.name;
+        subtitle = ringSubtitle(f);
     } else if (focus.type === 'star') {
         const rec = starRecord(starBuffers, focus.index);
         const bayer = formatBayer(lineStarInfo.get(rec.hip)?.bayer);
@@ -1160,7 +1311,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     }
 
     return (
-        <div className={`universe-3d-screen ${star || body ? 'has-card' : ''}`}>
+        <div className={`universe-3d-screen ${star || body || ring ? 'has-card' : ''}`}>
             <div className="universe-3d-canvas" ref={mountRef} />
             <div className="universe-3d-labels" ref={labelsRef} />
             <div className="universe-3d-tooltip" ref={tooltipRef} />
@@ -1265,6 +1416,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                     onFlyTo={() => flyToBody(selectedBody)}
                 />
             )}
+            {ring && (
+                <RingInfoCard
+                    feature={ring}
+                    onClose={() => setSelectedRing(null)}
+                    onView={() => viewRing(selectedRing)}
+                />
+            )}
 
             {planetFacts && (
                 <Universe3DTimeBar
@@ -1292,7 +1450,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 {title && subtitle && <div className="universe-3d-subtitle">{subtitle}</div>}
                 <div ref={distanceRef} className="universe-3d-distance" />
                 <div className="universe-3d-hint">
-                    Click a star or planet for details · Drag to rotate · Scroll to zoom
+                    Click a star, planet or ring name for details · Drag to rotate · Scroll to zoom
                 </div>
             </div>
         </div>

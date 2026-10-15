@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
+import { RING_SYSTEMS } from './rings.js';
 import { bodyAxes, heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
 import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
 
@@ -108,102 +109,7 @@ const LOCK_STEP_MS = 10 * 60 * 1000;
 const textureUrl = (file) => `${import.meta.env.BASE_URL}textures/${file}`;
 
 // ---------- Rings ----------
-// Each ring system lies in its planet's equator (pole: IAU north pole, RA
-// and Dec in degrees, J2000) and is drawn as flat strips, km from the
-// planet's centre. Saturn's main rings are the Solar System Scope texture,
-// which isn't evenly scaled: its `stops` pin texture positions (u) to the
-// real radii of the C and B ring inner edges, the Cassini Division, the
-// Encke Gap's centre (where Pan orbits) and the A ring's outer edge, and
-// it is stretched linearly between them. The rest are drawn from
-// published ring edges (Burns et al., Esposito, de Pater et al.; as tabled
-// on Wikipedia's ring articles): bands [inner km, outer km, opacity].
-// Opacities are for display. The real faint rings are far darker (Jupiter's
-// would be invisible), so the dusty ones are exaggerated to be seen; the
-// narrow Uranus rings are thinner than a texel and come out as faint lines.
-const band = (r, width, opacity) => [r - width / 2, r + width / 2, opacity];
-const RING_SYSTEMS = {
-    Jupiter: {
-        pole: [268.057, 64.495],
-        strips: [{
-            km: [92000, 226000], color: '#8c7a66',
-            bands: [
-                [92000, 122500, 0.05],    // halo
-                [122500, 129000, 0.22],   // main ring
-                [129000, 182000, 0.04],   // Amalthea gossamer ring
-                [182000, 226000, 0.02],   // Thebe gossamer ring
-            ],
-        }],
-    },
-    Saturn: {
-        pole: [40.589, 83.537],
-        strips: [
-            {
-                // C, B and A rings: [texture pixel / 2048, km]; the ends
-                // (clear margins) extrapolated from their neighbours
-                texture: '2k_saturn_ring_alpha.png',
-                stops: [
-                    [0, 70613],
-                    [107.5, 74490],     // C ring inner edge
-                    [592.5, 91980],     // B ring inner edge
-                    [1375.5, 117580],   // Cassini Division
-                    [1448.5, 122170],
-                    [1835, 133590],     // Encke Gap centre
-                    [1926.5, 136780],   // A ring outer edge
-                    [2048, 141016],
-                ].map(([px, km]) => [px / 2048, km]),
-            },
-            {
-                km: [139500, 480000], color: '#c9c2b4',
-                bands: [
-                    band(140180, 50, 0.6),    // F ring (shepherded by Prometheus and Pandora)
-                    [166000, 175000, 0.05],   // G ring
-                    [180000, 480000, 0.015],  // E ring (from Enceladus' plumes)
-                ],
-            },
-        ],
-    },
-    Uranus: {
-        pole: [257.311, -15.175],
-        strips: [
-            {
-                km: [37000, 52000], color: '#77736c',
-                bands: [
-                    [37850, 41350, 0.05],     // zeta (dusty)
-                    band(41837, 2, 0.7),      // 6
-                    band(42234, 2.5, 0.7),    // 5
-                    band(42571, 2.5, 0.7),    // 4
-                    band(44718, 7, 0.7),      // alpha
-                    band(45661, 8, 0.7),      // beta
-                    band(47175, 1.5, 0.7),    // eta
-                    band(47627, 2.5, 0.7),    // gamma
-                    band(48300, 6, 0.7),      // delta
-                    band(50023, 1.5, 0.5),    // lambda
-                    band(51149, 58, 0.85),    // epsilon (19-96 km wide)
-                ],
-            },
-            {
-                km: [60000, 104000], color: '#8fa7c9',
-                bands: [
-                    [64200, 68000, 0.05],     // nu (dusty)
-                    [86000, 103000, 0.04],    // mu (dusty, blue; Mab's orbit)
-                ],
-            },
-        ],
-    },
-    Neptune: {
-        pole: [299.36, 43.46],
-        strips: [{
-            km: [40000, 64000], color: '#7a6f69',
-            bands: [
-                [40900, 42900, 0.06],         // Galle
-                band(53200, 113, 0.35),       // Le Verrier
-                [53200, 57200, 0.04],         // Lassell
-                band(57200, 50, 0.25),        // Arago
-                band(62932, 35, 0.4),         // Adams (its arcs not drawn)
-            ],
-        }],
-    },
-};
+// Ring systems (what to draw, in which plane) are in utils/rings.js
 const RING_TEXTURE_PX = 2048;
 // Sharper rings seen at a slant (clamped to what the GPU supports)
 const RING_ANISOTROPY = 8;
