@@ -7,7 +7,7 @@
 // (x, y, z) -> (x, z, -y). Checked against Skyfield + DE421 by
 // scripts/check-planets.js.
 
-import { Body, GeoMoon, HelioVector } from 'astronomy-engine';
+import { Body, GeoMoon, HelioVector, RotationAxis } from 'astronomy-engine';
 
 // Drawn in the solar-system layer, in this order
 export const SOLAR_SYSTEM_BODIES = [
@@ -30,6 +30,28 @@ const toScene = (v) => [v.x, v.z, -v.y];
 // SOLAR_SYSTEM_BODIES, plus 'Moon'.
 export function heliocentricPosition(body, date) {
     return toScene(HelioVector(Body[body], date));
+}
+
+// A body's spin axis and prime meridian at a Date (IAU WGCCRE 2015), as
+// unit vectors in the scene frame: {pole, meridian}. pole is the IAU north
+// pole (the one north of the invariable plane, so Venus, Uranus and Pluto
+// spin backwards about it); meridian points from the centre to longitude 0
+// on the equator. Sun, planets, Pluto and the Moon.
+export function bodyAxes(body, date) {
+    const { ra, spin, north } = RotationAxis(Body[body], date);
+    const pole = toScene(north);
+    // W (spin) is measured east along the body's equator from its ascending
+    // node on the J2000 equator, which lies at the pole's RA + 90 deg
+    const a = (ra * 15 + 90) * Math.PI / 180;
+    const node = toScene({ x: Math.cos(a), y: Math.sin(a), z: 0 });
+    const east = [  // pole x node: 90 deg east of the node
+        pole[1] * node[2] - pole[2] * node[1],
+        pole[2] * node[0] - pole[0] * node[2],
+        pole[0] * node[1] - pole[1] * node[0],
+    ];
+    const w = spin * Math.PI / 180;
+    const meridian = node.map((n, i) => n * Math.cos(w) + east[i] * Math.sin(w));
+    return { pole, meridian };
 }
 
 // Every body in SOLAR_SYSTEM_BODIES plus the Moon: {name: [x, y, z]} in AU

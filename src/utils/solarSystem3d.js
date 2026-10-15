@@ -6,6 +6,12 @@
 // camera-relative numbers and close-ups stay sharp. The Sun's glow is the
 // star-layer point at the origin; here it is only a sphere.
 //
+// The Sun, planets, Pluto and our Moon turn on their real axes (IAU poles
+// and prime meridians, utils/planets.js bodyAxes), so their surface maps
+// show the side really facing you at the clock's time. Each body is an
+// anchor group at its place holding the dot (and Saturn's rings), with the
+// spinning sphere inside it. Other moons are flat-coloured and don't turn.
+//
 // Moons: the major ones (moons.json `major`, plus our Moon) are bodies like
 // the planets, with orbit lines and labels. The minor ones are one cloud of
 // small dots per planet, positioned at the planet, with no labels (hover
@@ -17,7 +23,7 @@
 
 import * as THREE from 'three';
 import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
-import { heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
+import { bodyAxes, heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
 import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
 
 // Whole layer fades out between these camera distances from the Sun (AU)
@@ -46,6 +52,19 @@ const MOON_COLORS = {
     Titan: '#d6a25a', Enceladus: '#e8eef2', Iapetus: '#8f8676', Triton: '#cdbcb3',
     Phobos: '#7d7268', Deimos: '#9a8f82', Charon: '#9b958f',
 };
+
+// Surface maps in public/textures (Solar System Scope, CC BY 4.0; credited
+// in the About box): equirectangular, longitude 0 in the middle, east to
+// the right. Bodies without one (Pluto, other moons) keep their colour.
+const TEXTURES = {
+    Sun: '2k_sun.jpg', Mercury: '2k_mercury.jpg', Venus: '2k_venus_atmosphere.jpg',
+    Earth: '2k_earth_daymap.jpg', Moon: '2k_moon.jpg', Mars: '2k_mars.jpg',
+    Jupiter: '2k_jupiter.jpg', Saturn: '2k_saturn.jpg', Uranus: '2k_uranus.jpg',
+    Neptune: '2k_neptune.jpg',
+};
+// A strip across the rings, inner edge on the left; transparent in the gaps
+const RING_TEXTURE = '2k_saturn_ring_alpha.png';
+const textureUrl = (file) => `${import.meta.env.BASE_URL}textures/${file}`;
 
 // Saturn's north pole (IAU), for tilting its rings
 const SATURN_POLE = { raHours: 40.589 / 15, decDeg: 83.537 };
@@ -193,6 +212,12 @@ function disposeLine(line) {
 function makeSaturnRings(radiusAu, color) {
     const [inner, outer] = SATURN_RINGS_KM.map(km => km / KM_PER_AU);
     const geometry = new THREE.RingGeometry(inner, outer, 128);
+    // Lay the texture strip across the rings: u from inner to outer edge
+    const pos = geometry.attributes.position;
+    const uv = geometry.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+        uv.setXY(i, (Math.hypot(pos.getX(i), pos.getY(i)) - inner) / (outer - inner), 0.5);
+    }
     const material = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false,
     });
@@ -237,14 +262,37 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const orbitGroup = new THREE.Group();
     scene.add(orbitGroup);
 
+    // Textures load in the background; until then a body shows its colour
+    const loader = new THREE.TextureLoader();
+    const textures = [];
+    let disposed = false;
+    const applyTexture = (material, file, onLoad) => {
+        loader.load(textureUrl(file), (texture) => {
+            if (disposed) { texture.dispose(); return; }
+            texture.colorSpace = THREE.SRGBColorSpace;
+            textures.push(texture);
+            material.map = texture;
+            material.color.set(0xffffff);
+            material.needsUpdate = true;
+            onLoad?.();
+        });
+    };
+
     const makeBody = ({ id, name, type, facts: f, radiusAu, color, isSun = false, parentId = null, major = true }) => {
         const material = isSun ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
-        const mesh = track(new THREE.Mesh(new THREE.SphereGeometry(radiusAu, 48, 24), material));
-        scene.add(mesh);
+        if (TEXTURES[id]) applyTexture(material, TEXTURES[id]);
+        const anchor = new THREE.Group();
+        scene.add(anchor);
+        const mesh = track(new THREE.Mesh(new THREE.SphereGeometry(radiusAu, 64, 32), material));
+        anchor.add(mesh);
         const dot = isSun ? null : track(makeDot(color, radiusAu, pixelRatio, parentId !== null));
-        if (dot) mesh.add(dot);
-        if (id === 'Saturn') mesh.add(track(makeSaturnRings(radiusAu, color)));
-        return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: mesh.position, parentId, major };
+        if (dot) anchor.add(dot);
+        if (id === 'Saturn') {
+            const rings = track(makeSaturnRings(radiusAu, color));
+            applyTexture(rings.material, RING_TEXTURE, () => { rings.material.opacity = 1; });
+            anchor.add(rings);
+        }
+        return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: anchor.position, parentId, major };
     };
 
     // Sun, planets, Pluto, our Moon
@@ -260,6 +308,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         });
     });
     const planetIds = new Set(bodies.map(b => b.id));
+    const spinning = [...bodies];  // the ones bodyAxes knows
 
     // Moons of the other planets
     const moons = (moonsData?.moons ?? []).filter(m => planetIds.has(m.planet));
@@ -433,10 +482,21 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     }
 
     const parentOffset = new THREE.Vector3();
+    // Sphere axes: x to the prime meridian, y to the north pole (three.js
+    // spheres put the texture's middle on +x and its top on +y)
+    const basis = new THREE.Matrix4();
+    const xAxis = new THREE.Vector3(), yAxis = new THREE.Vector3(), zAxis = new THREE.Vector3();
     const update = (date) => {
         for (const body of bodies) {
             if (body.id === 'Sun' || body.moon) continue;
             body.position.set(...heliocentricPosition(body.id, date));
+        }
+        for (const body of spinning) {
+            const { pole, meridian } = bodyAxes(body.id, date);
+            xAxis.set(...meridian);
+            yAxis.set(...pole);
+            zAxis.crossVectors(xAxis, yAxis);
+            body.mesh.quaternion.setFromRotationMatrix(basis.makeBasis(xAxis, yAxis, zAxis));
         }
         const galilean = moonBodies.some(isGalilean) ? galileanPositions(date) : null;
         for (const body of moonBodies) {
@@ -533,6 +593,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             dotMaterials.forEach(m => { m.uniforms.uViewportHeight.value = px; });
         },
         dispose: () => {
+            disposed = true;
+            textures.forEach(t => t.dispose());
             setHighlight(null);
             orbits.forEach(({ line }) => disposeLine(line));
             disposables.forEach(obj => {
