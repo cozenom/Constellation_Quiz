@@ -16,9 +16,9 @@
 // J2000, north = +Y).
 
 import * as THREE from 'three';
-import { GALILEAN, galileanPositions, moonOrbitLoop, moonPosition } from './moons';
-import { heliocentricPosition, moonOrbitPath, orbitPath, SOLAR_SYSTEM_BODIES } from './planets';
-import { KM_PER_AU, raDecToXYZ } from './universe3d';
+import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
+import { heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
+import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
 
 // Whole layer fades out between these camera distances from the Sun (AU)
 const FADE_START_AU = 300;
@@ -28,6 +28,10 @@ const DOT_SIZE_PX = 6;
 const MINOR_MOON_SIZE_PX = 3;
 const DEG_TO_RAD = Math.PI / 180;
 const ORBIT_OPACITY = 0.35;
+// Orbit lines are resampled once their body has moved this much of an orbit,
+// spending at most ORBIT_BUDGET_MS a frame on it (see resampleStaleOrbits)
+const ORBIT_RESAMPLE_FRACTION = 1 / 200;
+const ORBIT_BUDGET_MS = 4;
 // A moon's dot fades in between these distances (px) from its planet's centre
 const MOON_SEPARATION_PX = [6, 14];
 // A planet's small-moon cloud fades in as its typical orbit grows across
@@ -293,10 +297,15 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const byId = new Map(bodies.map(b => [b.id, b]));
     const moonBodies = bodies.filter(b => b.parentId && b.id !== 'Moon');
 
-    // Orbit lines, built for the date given to update(). Moon orbits sit in
-    // a group per planet, kept at the planet.
-    let orbitsDate = null;
-    let orbitLines = [];
+    // ---------- Orbit lines ----------
+    // Each orbit is sampled densely around its body's current place (see
+    // sampleOrbit in planets.js). As time runs the body moves on, so a line
+    // is resampled once its body has gone ORBIT_RESAMPLE_FRACTION of the way
+    // round; the most out-of-date first, within ORBIT_BUDGET_MS a frame, so
+    // fast time stays smooth (lines just lag a little). Moon orbits sit in a
+    // group per planet, kept at the planet.
+    const isGalilean = (body) => body.parentId === 'Jupiter' && GALILEAN.includes(body.name);
+    const orbits = [];  // {line, sample(date), periodDays, sampledAt (ms) | null}
     const moonOrbitGroups = new Map();  // planet id -> Group
     const moonOrbitGroup = (planetId) => {
         if (!moonOrbitGroups.has(planetId)) {
@@ -306,56 +315,75 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         }
         return moonOrbitGroups.get(planetId);
     };
-    const addLine = (line, parent = orbitGroup) => {
+    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments }) => {
+        const line = makeOrbitLine(new Float32Array(segments * 3), color, opacity);
+        line.frustumCulled = false;  // samples move round the orbit
+        line.visible = false;        // until first sampled
         parent.add(line);
-        orbitLines.push(line);
-        return line;
+        const orbit = { line, sample, periodDays, sampledAt: null };
+        orbits.push(orbit);
+        return orbit;
     };
+    const resample = (orbit, date) => {
+        orbit.line.geometry.attributes.position.array.set(orbit.sample(date));
+        orbit.line.geometry.attributes.position.needsUpdate = true;
+        orbit.line.visible = true;
+        orbit.sampledAt = date.getTime();
+    };
+    const moonOrbit = (body, opacity) => addOrbit({
+        sample: isGalilean(body)
+            ? (d) => galileanOrbitLoop(body.name, moonPeriodDays(body.moon), d)
+            : (d) => moonOrbitLoop(body.moon, d),
+        periodDays: moonPeriodDays(body.moon), color: body.color, opacity,
+        parent: moonOrbitGroup(body.parentId), segments: 256,
+    });
 
-    // Jupiter's big four come from astronomy-engine; sample their orbit lines
-    // from it too, so each moon sits exactly on its line
-    const galileanLoop = (body, date, segments = 256) => {
-        const periodMs = 360 / Math.abs(body.moon.n) * 86400000;
-        const out = new Float32Array(segments * 3);
-        for (let i = 0; i < segments; i++) {
-            const u = -1 + 2 * i / segments;
-            const offset = Math.sign(u) * Math.abs(u) ** 3 * periodMs / 2;
-            out.set(galileanPositions(new Date(date.getTime() + offset))[body.name], i * 3);
+    for (const id of SOLAR_SYSTEM_BODIES) {
+        const body = byId.get(id);
+        if (body) addOrbit({ sample: (d) => orbitPath(id, d), periodDays: orbitPeriodDays(id), color: body.color, segments: 512 });
+    }
+    if (byId.has('Moon')) {
+        addOrbit({
+            sample: (d) => moonOrbitPath(d), periodDays: orbitPeriodDays('Moon'),
+            color: byId.get('Moon').color, parent: moonOrbitGroup('Earth'), segments: 512,
+        });
+    }
+    for (const body of moonBodies.filter(b => b.major)) moonOrbit(body);
+
+    let lastDate = null;
+    const resampleStaleOrbits = (date) => {
+        const now = date.getTime();
+        const stale = orbits
+            .map(o => ({
+                o,
+                age: o.sampledAt === null ? Infinity : Math.abs(now - o.sampledAt) / (o.periodDays * 86400000 * ORBIT_RESAMPLE_FRACTION),
+            }))
+            .filter(s => s.age >= 1)
+            .sort((a, b) => b.age - a.age);
+        const start = performance.now();
+        for (const { o } of stale) {
+            resample(o, date);
+            // First build: everything at once; afterwards a few ms a frame
+            if (lastDate !== null && performance.now() - start > ORBIT_BUDGET_MS) break;
         }
-        return out;
     };
-    const isGalilean = (body) => body.parentId === 'Jupiter' && GALILEAN.includes(body.name);
-    const moonLoop = (body, date) => (isGalilean(body) ? galileanLoop(body, date) : moonOrbitLoop(body.moon, date));
 
+    // A selected minor moon gets its orbit drawn (major ones always have one)
     let highlightId = null;
-    let highlightLine = null;
-    const buildHighlight = (date) => {
-        if (highlightLine) {
-            orbitLines = orbitLines.filter(l => l !== highlightLine);
-            disposeLine(highlightLine);
-            highlightLine = null;
+    let highlight = null;
+    const setHighlight = (id) => {
+        if (highlight) {
+            orbits.splice(orbits.indexOf(highlight), 1);
+            disposeLine(highlight.line);
+            highlight = null;
         }
-        const body = highlightId && byId.get(highlightId);
+        highlightId = id;
+        const body = id && byId.get(id);
         if (body && body.moon && !body.major) {
-            highlightLine = addLine(makeOrbitLine(moonOrbitLoop(body.moon, date), body.color, 0.6), moonOrbitGroup(body.parentId));
+            highlight = moonOrbit(body, 0.6);
+            if (lastDate) resample(highlight, lastDate);
+            applyOrbitOpacity();
         }
-    };
-
-    const buildOrbits = (date) => {
-        orbitLines.forEach(disposeLine);
-        orbitLines = [];
-        highlightLine = null;
-        for (const id of SOLAR_SYSTEM_BODIES) {
-            const body = byId.get(id);
-            if (body) addLine(makeOrbitLine(orbitPath(id, date), body.color));
-        }
-        if (byId.has('Moon')) addLine(makeOrbitLine(moonOrbitPath(date), byId.get('Moon').color), moonOrbitGroup('Earth'));
-        for (const body of moonBodies.filter(b => b.major)) {
-            addLine(makeOrbitLine(moonLoop(body, date), body.color), moonOrbitGroup(body.parentId));
-        }
-        buildHighlight(date);
-        applyOrbitOpacity();
-        orbitsDate = date;
     };
 
     const parentOffset = new THREE.Vector3();
@@ -387,8 +415,9 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             });
             cloud.geometry.attributes.position.needsUpdate = true;
         }
-        // Rebuild orbits when the date has moved a lot (planets drift off them)
-        if (!orbitsDate || Math.abs(date - orbitsDate) > 30 * 86400000) buildOrbits(date);
+        resampleStaleOrbits(date);
+        if (lastDate === null) applyOrbitOpacity();
+        lastDate = date;
         for (const [planetId, group] of moonOrbitGroups) group.position.copy(byId.get(planetId).position);
     };
 
@@ -401,7 +430,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     let fade = 1;
     function applyOrbitOpacity() {
         orbitGroup.visible = showOrbits && fade > 0;
-        orbitLines.forEach(line => { line.material.opacity = line.userData.baseOpacity * fade; });
+        orbits.forEach(({ line }) => { line.material.opacity = line.userData.baseOpacity * fade; });
     }
 
     return {
@@ -441,17 +470,12 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         setShowMinorMoons: (on) => { showMinorMoons = on; },
         // Draw the orbit of a selected minor moon (major ones always have one)
         setHighlightOrbit: (id) => {
-            if (id === highlightId) return;
-            highlightId = id;
-            if (orbitsDate) {
-                buildHighlight(orbitsDate);
-                applyOrbitOpacity();
-            }
+            if (id !== highlightId) setHighlight(id);
         },
         setHaze: (on) => dotMaterials.forEach(m => { m.uniforms.uLinear.value = on ? 1 : 0; }),
         setViewportHeight: (px) => dotMaterials.forEach(m => { m.uniforms.uViewportHeight.value = px; }),
         dispose: () => {
-            orbitLines.forEach(disposeLine);
+            orbits.forEach(({ line }) => disposeLine(line));
             disposables.forEach(obj => {
                 obj.geometry.dispose();
                 obj.material.dispose();

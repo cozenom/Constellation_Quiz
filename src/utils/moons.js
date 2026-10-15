@@ -10,6 +10,7 @@
 // scripts/check-planets.js.
 
 import { JupiterMoons } from 'astronomy-engine';
+import { sampleOrbit } from './planets.js';
 import { KM_PER_AU } from './universe3d.js';  // .js so node scripts can import this too
 
 const DEG = Math.PI / 180;
@@ -63,15 +64,17 @@ export function galileanPositions(date) {
     return out;
 }
 
+// Orbital period in days of a moons.json moon
+export const moonPeriodDays = (m) => 360 / Math.abs(m.n);
+
 // One orbit as a closed loop around `date`, flat [x, y, z, ...] AU from the
 // planet. Points bunch up near the moon, like orbitPath in planets.js.
 export function moonOrbitLoop(m, date, segments = 256) {
-    const periodMs = 360 / Math.abs(m.n) * DAY_MS;
-    const out = new Float32Array(segments * 3);
-    for (let i = 0; i < segments; i++) {
-        const u = -1 + 2 * i / segments;
-        const offset = Math.sign(u) * Math.abs(u) ** 3 * periodMs / 2;
-        out.set(moonPosition(m, new Date(date.getTime() + offset)), i * 3);
-    }
-    return out;
+    return sampleOrbit(d => moonPosition(m, d), date, moonPeriodDays(m) * DAY_MS, segments);
+}
+
+// The same for Io, Europa, Ganymede or Callisto, sampled from astronomy-engine
+// so each sits exactly on its line. periodDays from its moons.json entry.
+export function galileanOrbitLoop(name, periodDays, date, segments = 256) {
+    return sampleOrbit(d => galileanPositions(d)[name], date, periodDays * DAY_MS, segments);
 }

@@ -46,13 +46,18 @@ export function geocentricMoon(date) {
     return toScene(GeoMoon(date));
 }
 
-// One orbit as a closed loop of points, flat [x, y, z, ...] in AU (for a
-// THREE.LineLoop). Sampled from the real positions, so it matches where the
-// body is drawn. Points bunch up around `date` (time offset ~ u^3): the
-// line passes through the body, and seen up close evenly spaced straight
-// segments show visible corners. Far round the orbit they're sparse, but
-// also far away, so the corners are too small to see.
-function sampleOrbit(position, date, periodMs, segments) {
+// Sidereal orbital period in days, for SOLAR_SYSTEM_BODIES and 'Moon'
+export const orbitPeriodDays = (body) => (body === 'Moon' ? MOON_ORBIT_DAYS : ORBIT_DAYS[body]);
+
+// One orbit as a closed loop of points, flat [x, y, z, ...] (for a
+// THREE.LineLoop). position(date) -> [x, y, z]. Sampled from the real
+// positions, so it matches where the body is drawn. Points bunch up around
+// `date` (time offset ~ u^3): the line passes through the body, and seen up
+// close evenly spaced straight segments show visible corners. Far round
+// the orbit they're sparse, but also far away, so the corners are too
+// small to see. As time runs the body leaves the dense part, so the 3D
+// view resamples each orbit once its body has moved on (solarSystem3d).
+export function sampleOrbit(position, date, periodMs, segments) {
     const out = new Float32Array(segments * 3);
     for (let i = 0; i < segments; i++) {
         const u = -1 + 2 * i / segments;

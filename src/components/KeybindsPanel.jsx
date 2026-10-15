@@ -50,6 +50,9 @@ function KeybindsPanel({ screen }) {
                     { keys: ['N'], label: 'Show/hide names' },
                     { keys: ['H'], label: 'Haze on/off' },
                     { keys: ['R'], label: 'Reset view (back to Earth)' },
+                    { keys: ['Space'], label: 'Play / pause time' },
+                    { keys: ['[', ']'], label: 'Time slower / faster' },
+                    { keys: ['T'], label: 'Back to now' },
                     { keys: ['Esc'], label: 'Close card / back to menu' }
                 ];
 

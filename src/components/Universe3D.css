@@ -178,6 +178,111 @@
     color: #64748b;
 }
 
+/* Clock: bottom left, above the scale bar */
+.universe-3d-time {
+    position: absolute;
+    left: 1rem;
+    bottom: 3.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.universe-3d-time-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.universe-3d-time button {
+    min-height: 1.9rem;
+    min-width: 2rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.85rem;
+    background: rgba(51, 65, 85, 0.7);
+}
+
+.universe-3d-time button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.universe-3d-time-speed {
+    min-width: 7.5rem;
+    color: #cbd5e1;
+    text-align: center;
+}
+
+.universe-3d-time-date {
+    position: relative;
+}
+
+.universe-3d-time-date button {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    color: #e2e8f0;
+}
+
+/* The native picker, opened by the date button; kept rendered for showPicker() */
+.universe-3d-time-date input {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Speed slider (◀ input ▶) and date scrubber (input + end dates) */
+.universe-3d-time-slider {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.universe-3d-time-slider input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    height: 1.2rem;
+    margin: 0;
+    accent-color: #60a5fa;
+    cursor: pointer;
+}
+
+/* Centre mark on the speed slider: time stopped */
+.universe-3d-time-speed-slider {
+    background: linear-gradient(#475569, #475569) center / 2px 60% no-repeat;
+}
+
+.universe-3d-time-scrub {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+
+.universe-3d-time-scrub input[type="range"] {
+    accent-color: #facc15;
+}
+
+.universe-3d-time-scrub-ends {
+    display: flex;
+    justify-content: space-between;
+}
+
+.universe-3d-time-note {
+    font-size: 0.75rem;
+    color: #fbbf24;
+}
+
 /* Scale bar (Google Maps style): label over a ruler with end ticks.
    Width and text are set every frame by the render loop. */
 .universe-3d-scale {
@@ -262,7 +367,7 @@ body:has(.universe-3d-screen) .stars-toggle {
     top: 4.5rem;
     left: 1rem;
     width: 20rem;
-    max-height: calc(100% - 8.5rem);  /* stops above the scale bar */
+    max-height: calc(100% - 19rem);  /* stops above the clock and scale bar */
     overflow-y: auto;
     padding: 1rem;
     background: rgba(15, 23, 42, 0.88);
@@ -411,8 +516,18 @@ body:has(.universe-3d-screen) .stars-toggle {
         gap: 0.4rem;
     }
 
-    .universe-3d-screen.has-card .universe-3d-scale {
+    .universe-3d-screen.has-card .universe-3d-scale,
+    .universe-3d-screen.has-card .universe-3d-time {
         display: none;
+    }
+
+    /* Clock: centred above the footer */
+    .universe-3d-time {
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 7.5rem;
+        width: max-content;
+        max-width: calc(100% - 2rem);
     }
 
     /* Card becomes a bottom sheet; the panel and footer make room for it */

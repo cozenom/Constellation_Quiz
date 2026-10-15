@@ -23,6 +23,7 @@ import {
 import PlanetInfoCard from './PlanetInfoCard';
 import StarInfoCard from './StarInfoCard';
 import Universe3DSearch from './Universe3DSearch';
+import Universe3DTimeBar, { nextPresetRate, TIME_RANGE } from './Universe3DTimeBar';
 import './Universe3D.css';
 
 const SUN_ABS_MAG = 4.83;
@@ -224,6 +225,12 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const scaleBarRef = useRef(null);
     const scaleLabelRef = useRef(null);
     const sceneRef = useRef(null);  // three.js objects + helpers, set up once
+    // Simulated time, advanced by the render loop: {time (ms), rate (simulated
+    // seconds per real second; 0 stops, negative runs backwards), playing}.
+    // clockView is a copy for the time bar, refreshed a few times a second.
+    const clockRef = useRef(null);
+    if (!clockRef.current) clockRef.current = { time: Date.now(), rate: 1, playing: true };
+    const [clockView, setClockView] = useState(() => ({ ...clockRef.current }));
     const optionsRef = useRef({});  // current toggles, read by the render loop
 
     const starBuffers = useMemo(() => (stars3d ? buildStarBuffers(stars3d) : null), [stars3d]);
@@ -276,10 +283,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const solarCamera = solarLayer.camera;
         const syncCameras = () => layers.forEach(layer => syncLayerCamera(layer, camera));
 
-        // Planets at today's positions (a clock comes later). Without
+        // Planets and moons at the clock's time (see the render loop). Without
         // planets.json the layer stays empty and Earth stays at the Sun.
         const solar = planetFacts ? buildSolarSystem(solarLayer.scene, planetFacts, moonsData, pixelRatio) : null;
-        solar?.update(new Date());
+        solar?.update(new Date(clockRef.current.time));
         const earthPosition = new THREE.Vector3();
         if (solar?.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
 
@@ -360,6 +367,16 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             // Earth in ly from the Sun; everything Earth-relative reads this
             earthPosition,
             bodyPose,
+            // The body the view rides along with as time runs (see setFollow)
+            follow: { id: home ? 'Earth' : null, moveTarget: true },
+            selectedBodyId: null,
+        };
+        // As time runs, keep the view with a moving body: the camera moves
+        // with it, and so does the orbit target if it is that body
+        // (moveTarget). Looking at stars from Earth, only the camera rides
+        // along with Earth. id null: nothing moves.
+        s.setFollow = (id, moveTarget = true) => {
+            s.follow = { id: id && solar?.byId.has(id) ? id : null, moveTarget };
         };
         s.setHaze = (on) => {
             s.haze = on;
@@ -722,9 +739,63 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             label.textContent = text;
         };
 
+        // ---------- Clock ----------
+        // clockRef.current: {time (ms), rate, playing}; the time bar changes it.
+        // Each frame the time advances by the speed, the solar system moves,
+        // and the followed body takes the camera (and target) along.
+        const followBefore = new THREE.Vector3();
+        const followDelta = new THREE.Vector3();
+        let solarTime = clockRef.current.time;
+        const moveSolarSystem = (time) => {
+            const followed = s.follow.id ? solar.byId.get(s.follow.id) : null;
+            if (followed) followBefore.copy(followed.position);
+            solar.update(new Date(time));
+            if (solar.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
+            if (!followed) return;
+            followDelta.subVectors(followed.position, followBefore).divideScalar(AU_PER_LY);
+            camera.position.add(followDelta);
+            if (s.follow.moveTarget) controls.target.add(followDelta);
+            const f = s.flight;
+            if (f) {
+                // A flight to a moving body (or from moving Earth) moves with it
+                f.pivot.add(followDelta);
+                if (s.follow.moveTarget) {
+                    f.fromTarget.add(followDelta);
+                    f.toTarget.add(followDelta);
+                } else {
+                    f.toOffset.add(followDelta);
+                }
+            }
+        };
+
+        let lastFrame = null;
+        let lastPublished = 0;
+        const advanceClock = (now) => {
+            const clock = clockRef.current;
+            const dt = lastFrame === null ? 0 : Math.min(now - lastFrame, 250);  // ms; cap after a stalled tab
+            lastFrame = now;
+            if (clock.playing) {
+                clock.time = THREE.MathUtils.clamp(clock.time + dt * clock.rate, TIME_RANGE[0], TIME_RANGE[1]);
+            }
+            if (solar && clock.time !== solarTime) {
+                moveSolarSystem(clock.time);
+                solarTime = clock.time;
+            }
+            // The selected planet's ring moves with it
+            if (s.selectedBodyId && solar?.byId.has(s.selectedBodyId)) {
+                bodySelectedRing.position.copy(solar.byId.get(s.selectedBodyId).position);
+            }
+            // The time bar (and card distances) re-render a few times a second
+            if (now - lastPublished > 250) {
+                lastPublished = now;
+                setClockView({ ...clock });
+            }
+        };
+
         let frameId;
         let lastDistanceLabel = '';
         const animate = (now) => {
+            advanceClock(now);
             updateFlight(now);
             controls.update();
             // The solar system fades out as the camera leaves it
@@ -777,6 +848,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const viewConstellation = (abbrev) => {
         const s = sceneRef.current;
         if (!s) return;
+        s.setFollow('Earth', false);
         s.flyTo(s.earthPosition.toArray(), constellationFocus(constellationData[abbrev], starBuffers));
         setFocus({ type: 'constellation' });
     };
@@ -788,11 +860,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         if (!s) return;
         const home = s.bodyPose('Earth');
         if (home) {
+            s.setFollow('Earth');
             s.flyTo(home.position, home.target, home.minDistance);
             setFocus({ type: 'body', id: 'Earth' });
         } else if (selectedAbbrev) {
             viewConstellation(selectedAbbrev);
         } else {
+            s.setFollow(null);
             s.flyTo([0, 0, 0], [0, 0, -500]);
             setFocus({ type: 'none' });
         }
@@ -803,6 +877,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const s = sceneRef.current;
         const pose = s?.bodyPose(id);
         if (!pose) return;
+        s.setFollow(id);
         s.flyTo(pose.position, pose.target, pose.minDistance);
         setFocus({ type: 'body', id });
     };
@@ -812,6 +887,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const s = sceneRef.current;
         if (!s) return;
         const p = starBuffers.positions.subarray(index * 3, index * 3 + 3);
+        s.setFollow('Earth', false);
         s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]]);
         setFocus({ type: 'star', index });
     };
@@ -839,9 +915,21 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const dir = p.map((v, i) => v - earth[i]);
         const dist = Math.hypot(...dir);
         const keep = 1 - Math.min(Math.max(dist * 0.05, 0.3), 15) / dist;
+        s.setFollow(null);
         s.flyTo(dir.map((v, i) => earth[i] + v * keep), p, ORBIT_MIN_DISTANCE);
         setFocus({ type: 'star', index });
     };
+
+    // ---------- Clock controls (the render loop advances the time) ----------
+    const updateClock = (changes) => {
+        Object.assign(clockRef.current, changes);
+        setClockView({ ...clockRef.current });
+    };
+    const togglePlay = () => updateClock({ playing: !clockRef.current.playing });
+    const changeSpeed = (direction) => updateClock({ rate: nextPresetRate(clockRef.current.rate, direction), playing: true });
+    const setRate = (rate) => updateClock({ rate, playing: true });
+    const goToNow = () => updateClock({ time: Date.now(), rate: 1, playing: true });
+    const setTime = (ms) => updateClock({ time: THREE.MathUtils.clamp(ms, TIME_RANGE[0], TIME_RANGE[1]) });
 
     // Draw the selected constellation's stick figure (the flight to it is
     // started by whatever selected it)
@@ -896,6 +984,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const i = selectedStar;
         placeRing(s.selectedRing, i === null ? null : starBuffers.positions.subarray(i * 3, i * 3 + 3));
         placeRing(s.bodySelectedRing, selectedBody && s.solar ? s.solar.byId.get(selectedBody).position.toArray() : null);
+        s.selectedBodyId = selectedBody;  // the render loop keeps the ring on it as time runs
         s.solar?.setHighlightOrbit(selectedBody);
     }, [selectedStar, selectedBody, starBuffers, planetFacts, moonsData]);
 
@@ -912,6 +1001,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             if (e.code === 'KeyL') setShowLines(prev => !prev);
             if (e.code === 'KeyN') setShowLabels(prev => !prev);
             if (e.code === 'KeyR') resetView();
+            if (e.code === 'Space') {
+                e.preventDefault();  // no page scroll / button press
+                togglePlay();
+            }
+            if (e.code === 'BracketLeft') changeSpeed(-1);
+            if (e.code === 'BracketRight') changeSpeed(1);
+            if (e.code === 'KeyT') goToNow();
             if (e.code === 'KeyH') setShowHaze(prev => !prev);
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -1059,6 +1155,19 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                     distances={bodyDistances}
                     onClose={() => setSelectedBody(null)}
                     onFlyTo={() => flyToBody(selectedBody)}
+                />
+            )}
+
+            {planetFacts && (
+                <Universe3DTimeBar
+                    time={clockView.time}
+                    rate={clockView.rate}
+                    playing={clockView.playing}
+                    onTogglePlay={togglePlay}
+                    onStep={changeSpeed}
+                    onSetRate={setRate}
+                    onNow={goToNow}
+                    onSetTime={setTime}
                 />
             )}
 
