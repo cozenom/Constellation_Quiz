@@ -57,12 +57,28 @@ export const orbitPeriodDays = (body) => (body === 'Moon' ? MOON_ORBIT_DAYS : OR
 // the orbit they're sparse, but also far away, so the corners are too
 // small to see. As time runs the body leaves the dense part, so the 3D
 // view resamples each orbit once its body has moved on (solarSystem3d).
+//
+// Real orbits don't close exactly (the Moon's least: the Sun keeps
+// reshaping it), so the two ends, half a period either side, miss by a
+// little and the loop's closing segment would show as a jag. Each half is
+// eased towards the midpoint of that gap, not at all near the body and
+// fully at the far end, so the ends meet and the body stays on its line.
 export function sampleOrbit(position, date, periodMs, segments) {
+    const t = date.getTime();
+    const start = position(new Date(t - periodMs / 2));
+    const end = position(new Date(t + periodMs / 2));
+    const fixStart = start.map((v, k) => (end[k] - v) / 2);  // start -> midpoint
+    const fixEnd = end.map((v, k) => (start[k] - v) / 2);    // end -> midpoint
+    const ease = (x) => x * x * (3 - 2 * x);
+
     const out = new Float32Array(segments * 3);
     for (let i = 0; i < segments; i++) {
         const u = -1 + 2 * i / segments;
         const offset = Math.sign(u) * Math.abs(u) ** 3 * periodMs / 2;
-        out.set(position(new Date(date.getTime() + offset)), i * 3);
+        const p = position(new Date(t + offset));
+        const fix = u < 0 ? fixStart : fixEnd;
+        const w = ease(Math.abs(u));
+        out.set([p[0] + fix[0] * w, p[1] + fix[1] * w, p[2] + fix[2] * w], i * 3);
     }
     return out;
 }
