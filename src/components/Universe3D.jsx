@@ -352,7 +352,14 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         scene.add(hoverRing, selectedRing);
         const bodyHoverRing = makeRing(0xcbd5e1, 0.6, 26 * pixelRatio);
         const bodySelectedRing = makeRing(0xfacc15, 0.9, 30 * pixelRatio);
-        solarLayer.scene.add(bodyHoverRing, bodySelectedRing);
+        // Earth is hard to find: it gets a blue ring while its sphere is small
+        // on screen (placed by updateLabels). One in each layer: the solar
+        // system's (AU) while that is drawn, the star layer's (ly) beyond it,
+        // whose near plane (0.0001 ly, ~6 AU) would clip it close by.
+        const earthMarkerNear = makeRing(0x60a5fa, 0.9, 18 * pixelRatio);
+        const earthMarkerFar = makeRing(0x60a5fa, 0.9, 18 * pixelRatio);
+        solarLayer.scene.add(bodyHoverRing, bodySelectedRing, earthMarkerNear);
+        scene.add(earthMarkerFar);
 
         // Haze: bloom post-processing, used when s.haze is on
         const composer = new EffectComposer(renderer);
@@ -377,7 +384,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         // along with Earth. id null: nothing moves.
         s.setFollow = (id, moveTarget = true) => {
             s.follow = { id: id && solar?.byId.has(id) ? id : null, moveTarget };
+            s.focused = true;
         };
+        // Centred on something (the footer names it); panning away clears it
+        s.focused = true;
         s.setHaze = (on) => {
             s.haze = on;
             solar?.setHaze(on);
@@ -520,12 +530,17 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         let solarFade = 0;
         const bodyProjected = new THREE.Vector3();
         // Screen position and drawn radius (px) of a body, or null when it is
-        // off screen, behind the camera, or the camera is inside it
+        // off screen, behind the camera, or the camera is inside it. Done by
+        // hand rather than with project(): that also rejects points past the
+        // layer's far plane (1e5 AU, ~1.6 ly), which would hide the Sun and
+        // Earth labels from further out.
         const bodyOnScreen = (body, width, height) => {
             const dist = body.position.distanceTo(solarCamera.position);
             if (dist < body.radiusAu * 1.5) return null;
-            bodyProjected.copy(body.position).project(solarCamera);
-            if (bodyProjected.z > 1 || Math.abs(bodyProjected.x) > 1.05 || Math.abs(bodyProjected.y) > 1.05) return null;
+            bodyProjected.copy(body.position).applyMatrix4(solarCamera.matrixWorldInverse);
+            if (bodyProjected.z >= 0) return null;  // behind the camera
+            bodyProjected.applyMatrix4(solarCamera.projectionMatrix);
+            if (Math.abs(bodyProjected.x) > 1.05 || Math.abs(bodyProjected.y) > 1.05) return null;
             const radiusPx = body.radiusAu / dist * (height / 2) / Math.tan(THREE.MathUtils.degToRad(solarCamera.fov) / 2);
             return { x: (bodyProjected.x + 1) / 2 * width, y: (1 - bodyProjected.y) / 2 * height, radiusPx };
         };
@@ -644,7 +659,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         // Minor moons get no label (hover names them)
         const bodyLabels = (solar?.bodies ?? []).filter(body => body.major !== false).map(body => ({
             body,
-            el: makeLabelEl(body.name, 'universe-3d-label universe-3d-label-planet'),
+            el: makeLabelEl(body.name, `universe-3d-label universe-3d-label-planet${body.id === 'Earth' ? ' universe-3d-label-earth' : ''}`),
             shown: false,
         }));
         const placedLabels = [];
@@ -687,19 +702,35 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 );
                 setLabel(label, wanted ? toScreen(label.position, width, height) : null, 0, 0);
             }
-            // The Sun is labelled from anywhere, so you can find home
+            // Earth is labelled from anywhere, with a ring, so you can always
+            // find home, and other labels never hide it (next to the Sun's,
+            // its label goes underneath). The Sun is labelled like the planets.
             placedLabels.length = 0;
+            let sunAt = null;
+            let earthRing = false;
             for (const label of bodyLabels) {
                 const { body } = label;
+                const isEarth = body.id === 'Earth';
                 let screenPos = null;
-                const wanted = opts.showLabels && (body.id === 'Sun' || (opts.showPlanets && bodiesActive()));
+                let dy = -8;
+                const wanted = opts.showLabels && (isEarth || (opts.showPlanets && bodiesActive()));
                 const p = wanted ? bodyOnScreen(body, width, height) : null;
-                if (p && !placedLabels.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 16)) {
+                if (body.id === 'Sun') sunAt = p;
+                const free = p && (isEarth || !placedLabels.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 16));
+                if (free) {
                     placedLabels.push(p);
                     const r = Math.min(p.radiusPx, height / 4) * 0.7;
                     screenPos = [p.x + r, p.y - r];
+                    if (isEarth && sunAt && Math.hypot(sunAt.x - p.x, sunAt.y - p.y) < 16) dy = 8;
+                    if (isEarth) earthRing = p.radiusPx < 5;
                 }
-                setLabel(label, screenPos, 8, -8);
+                setLabel(label, screenPos, 8, dy);
+            }
+            earthMarkerNear.visible = earthRing && solarLayer.visible;
+            earthMarkerFar.visible = earthRing && !solarLayer.visible;
+            if (earthRing) {
+                earthMarkerNear.position.copy(solar.byId.get('Earth').position);
+                earthMarkerFar.position.copy(earthPosition);
             }
         };
 
@@ -792,12 +823,24 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             }
         };
 
+        const targetBefore = new THREE.Vector3();
         let frameId;
         let lastDistanceLabel = '';
         const animate = (now) => {
             advanceClock(now);
             updateFlight(now);
+            targetBefore.copy(controls.target);
             controls.update();
+            // Only panning moves the target inside controls.update (rotating
+            // and zooming don't): the view is no longer centred on what it was.
+            // The threshold ignores rounding (controls.update re-scales the
+            // target every frame); a pan moves it by far more.
+            const panTolerance = 1e-6 * camera.position.distanceTo(controls.target) + 1e-12 * controls.target.length();
+            if (!s.flight && s.focused && targetBefore.distanceTo(controls.target) > panTolerance) {
+                s.focused = false;
+                s.follow = { id: null, moveTarget: true };
+                setFocus({ type: 'none' });
+            }
             // The solar system fades out as the camera leaves it
             solarFade = solar ? solar.fadeForDistance(camera.position.length() * AU_PER_LY) : 0;
             solar?.setFade(solarFade);
@@ -831,7 +874,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             canvas.removeEventListener('pointermove', onPointerMove);
             canvas.removeEventListener('pointerleave', onPointerLeave);
             controls.dispose();
-            [stars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, s.selectedLines, s.allLines]
+            [stars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, earthMarkerNear, earthMarkerFar, s.selectedLines, s.allLines]
                 .forEach(disposeObject);
             solar?.dispose();
             bloomPass.dispose();
@@ -1035,7 +1078,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     };
 
     // Footer: what the view is centred on
-    let title = '3D Universe';
+    // (nothing when the view isn't centred on anything, e.g. after panning)
+    let title = null;
     let subtitle = null;
     if (focus.type === 'constellation' && selected) {
         title = selected.name;
@@ -1180,8 +1224,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             </div>
 
             <div className="universe-3d-footer">
-                <div className="universe-3d-title">{title}</div>
-                {subtitle && <div className="universe-3d-subtitle">{subtitle}</div>}
+                {title && <div className="universe-3d-title">{title}</div>}
+                {title && subtitle && <div className="universe-3d-subtitle">{subtitle}</div>}
                 <div ref={distanceRef} className="universe-3d-distance" />
                 <div className="universe-3d-hint">
                     Click a star or planet for details · Drag to rotate · Scroll to zoom

@@ -346,6 +346,12 @@ body:has(.universe-3d-screen) .stars-toggle {
     color: rgba(253, 230, 138, 0.9);
 }
 
+/* Earth: always shown, in the colour of its marker ring */
+.universe-3d-label-earth {
+    color: #93c5fd;
+    font-weight: 600;
+}
+
 .universe-3d-tooltip {
     position: fixed;
     top: 0;
