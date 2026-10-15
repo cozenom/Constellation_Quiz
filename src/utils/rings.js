@@ -49,6 +49,9 @@ export const RING_SYSTEMS = {
                     [1926.5, 136780],   // A ring outer edge
                     [2048, 141016],
                 ].map(([px, km]) => [px / 2048, km]),
+                // Gaps too narrow for the texture (about one texel), cut out
+                // by the ring shader: the Keeler Gap, where Daphnis orbits
+                carve: [[136484, 136526]],
             },
             {
                 km: [139500, 480000], color: '#c9c2b4',
@@ -115,15 +118,17 @@ export function ringPole(planet) {
 // scaleKm: how big the feature looks for deciding when to label it, if not
 // its width (narrow rings: the distance to their neighbours, so a label
 // shows once they are drawn apart). madeOf / discovered / note: the card.
-// Sources: NASA Science ring pages, Wikipedia's ring articles and their
-// references (Burns et al., Esposito, de Pater et al., Showalter & Lissauer).
+// Sources: Wikipedia's ring articles and their references (Burns et al.,
+// Esposito, de Pater et al., Showalter & Lissauer), NASA / JPL releases
+// (Galileo gossamer rings 1998, Hubble G ring and Uranus rings 2005).
+// Checked 2026-10-15; where sources disagree (G ring) the card says so.
 const narrow = (r, width) => [r - width / 2, r + width / 2];
 
 const SATURN_RINGS = [
     {
         id: 'saturn-c', name: 'C ring', kind: 'ring', km: [74490, 91980],
         madeOf: 'Water ice, dirtier and darker than the B and A rings',
-        discovered: '1850, by William and George Bond (and William Dawes)',
+        discovered: '1850, by William and George Bond (William Dawes and Johann Galle also saw it)',
         note: 'Also called the Crepe Ring for its faint, see-through look: Saturn shows through it.',
     },
     {
@@ -155,6 +160,14 @@ const SATURN_RINGS = [
             + 'Its pull leaves waves along both edges.',
     },
     {
+        id: 'saturn-keeler', name: 'Keeler Gap', kind: 'gap', km: [136484, 136526],
+        width: '35-42 km (sources differ)',
+        madeOf: 'Empty, apart from Daphnis',
+        note: 'Daphnis, an 8 km moon, orbits inside it and keeps it clear, raising waves on both edges '
+            + 'as it goes. Ripples on the edges pointed to a moon there before Cassini found Daphnis '
+            + 'on 1 May 2005. Named after James Keeler, who found the Encke Gap.',
+    },
+    {
         id: 'saturn-f', name: 'F ring', kind: 'ring', km: narrow(140180, 50), scaleKm: 3400,
         width: 'A few hundred km, with a bright core tens of km wide',
         madeOf: 'Icy particles and lots of fine dust',
@@ -165,15 +178,15 @@ const SATURN_RINGS = [
     {
         id: 'saturn-g', name: 'G ring', kind: 'ring', km: [166000, 175000],
         madeOf: 'Fine dust',
-        discovered: '1980, by Voyager 1',
+        discovered: '1979-80: sources credit Pioneer 11 (1979) or Voyager 1 (1980)',
         note: 'Fed by a bright arc of debris around the tiny moonlet Aegaeon, chipped off by small impacts.',
     },
     {
         id: 'saturn-e', name: 'E ring', kind: 'ring', km: [180000, 480000], labelKm: 300000,
         madeOf: 'Microscopic ice grains',
-        discovered: '1966, from Earth (Walter Feibelman)',
-        note: 'Saturn\'s widest ring. Enceladus orbits inside it and keeps it supplied: '
-            + 'the ice it sprays from geysers at its south pole drifts out into the ring.',
+        discovered: 'Spotted by Walter Feibelman in 1967 on a 1966 photograph; confirmed by Pioneer 11 in 1979',
+        note: 'Saturn\'s widest ring, starting near Mimas\' orbit. Enceladus orbits inside it and keeps it '
+            + 'supplied: the ice it sprays from geysers at its south pole drifts out into the ring.',
     },
 ].map(f => ({ ...f, planet: 'Saturn' }));
 
@@ -181,7 +194,7 @@ const JUPITER_RINGS = [
     {
         id: 'jupiter-halo', name: 'Halo ring', kind: 'ring', km: [92000, 122500],
         madeOf: 'Very fine dust',
-        discovered: '1979, by the Voyager probes',
+        discovered: '1979, by Voyager 1, with the main ring',
         note: 'A thick, doughnut-shaped cloud: dust from the main ring drifting inwards, '
             + 'puffed up by Jupiter\'s magnetic field.',
     },
@@ -195,14 +208,14 @@ const JUPITER_RINGS = [
     {
         id: 'jupiter-amalthea', name: 'Amalthea gossamer ring', kind: 'ring', km: [129000, 182000],
         madeOf: 'Fine dust from Amalthea',
-        discovered: '1979 (Voyager); Galileo showed in the 1990s that there are two gossamer rings',
+        discovered: 'In a Voyager image (reported 1985); Galileo images showed in 1998 that there are two gossamer rings',
         note: 'Really a thick sheet, as tall as Amalthea\'s slightly tilted orbit carries it above '
             + 'and below Jupiter\'s equator. Drawn flat here.',
     },
     {
         id: 'jupiter-thebe', name: 'Thebe gossamer ring', kind: 'ring', km: [129000, 226000], labelKm: 205000, scaleKm: 44000,
         madeOf: 'Fine dust from Thebe',
-        discovered: '1979 (Voyager); Galileo showed in the 1990s that there are two gossamer rings',
+        discovered: 'In a Voyager image (reported 1985); Galileo images showed in 1998 that there are two gossamer rings',
         note: 'Even fainter than Amalthea\'s, and thicker; it reaches a little past Thebe\'s orbit '
             + '(222,000 km). Drawn flat here, beyond Amalthea\'s ring.',
     },
@@ -210,7 +223,7 @@ const JUPITER_RINGS = [
 
 const URANUS_NARROW = {
     madeOf: 'Dark chunks, centimetres to metres across, with little dust',
-    discovered: '1977, from Earth, when a star blinked off and on several times before passing behind Uranus',
+    discovered: '1977, from Earth, when a star dimmed five times before Uranus covered it, and five times after',
 };
 const URANUS_RINGS = [
     {
@@ -241,19 +254,19 @@ const URANUS_RINGS = [
     {
         id: 'uranus-epsilon', name: 'ε ring', kind: 'ring', km: narrow(51149, 58), scaleKm: 1100,
         width: '20-96 km: it is slightly oval, widest farthest from Uranus',
-        madeOf: URANUS_NARROW.madeOf,
+        madeOf: 'Dark chunks 0.2-20 m across, with almost no dust',
         discovered: '1977, from Earth (James Elliot, Edward Dunham, Jessica Mink)',
         note: 'Uranus\' densest and widest ring, held in place by two shepherd moons: Cordelia inside it '
             + 'and Ophelia outside. Its material reflects only about 2% of sunlight, like charcoal.',
     },
     {
         id: 'uranus-nu', name: 'ν ring', kind: 'ring', km: [64200, 68000],
-        madeOf: 'Reddish dust', discovered: '2005, by the Hubble Space Telescope (Mark Showalter, Jack Lissauer)',
-        note: 'A faint dusty ring well outside the narrow rings.',
+        madeOf: 'Reddish dust', discovered: 'In Hubble images from 2003-05 (Mark Showalter, Jack Lissauer)',
+        note: 'A faint dusty ring well outside the narrow rings, between the orbits of the moons Portia and Rosalind.',
     },
     {
         id: 'uranus-mu', name: 'μ ring', kind: 'ring', km: [86000, 103000],
-        madeOf: 'Fine dust or ice grains, blue', discovered: '2005, by the Hubble Space Telescope (Mark Showalter, Jack Lissauer)',
+        madeOf: 'Very fine grains, blue', discovered: 'In Hubble images from 2003-05 (Mark Showalter, Jack Lissauer)',
         note: 'Fed by the small moon Mab, which orbits in its brightest part. It is blue, like Saturn\'s '
             + 'E ring fed by Enceladus.',
     },
@@ -269,7 +282,7 @@ const NEPTUNE_RINGS = [
     {
         id: 'neptune-le-verrier', name: 'Le Verrier ring', kind: 'ring', km: narrow(53200, 113), scaleKm: 2000,
         madeOf: NEPTUNE_DUST, discovered: '1989, by Voyager 2',
-        note: 'Narrow; the moon Despina orbits just inside it. Named after Urbain Le Verrier, '
+        note: 'Narrow; the moon Despina orbits about 700 km inside it. Named after Urbain Le Verrier, '
             + 'who worked out where Neptune would be found.',
     },
     {

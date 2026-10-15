@@ -28,8 +28,12 @@ function RingInfoCard({ feature: f, onClose, onView }) {
                 <dt>Made of</dt>
                 <dd>{f.madeOf}</dd>
 
-                <dt>Discovered</dt>
-                <dd>{f.discovered}</dd>
+                {f.discovered && (
+                    <>
+                        <dt>Discovered</dt>
+                        <dd>{f.discovered}</dd>
+                    </>
+                )}
             </dl>
 
             <p className="star-info-origin">{f.note}</p>

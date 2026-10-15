@@ -34,6 +34,9 @@ const FADE_START_AU = 300;
 const FADE_END_AU = 5000;
 
 const DOT_SIZE_PX = 6;
+// A body's texture starts loading once it is drawn this many px in radius
+// (a little before its sphere outgrows its dot, so it's there when visible)
+const TEXTURE_LOAD_PX = 2;
 const MINOR_MOON_SIZE_PX = 3;
 const DEG_TO_RAD = Math.PI / 180;
 const ORBIT_OPACITY = 0.35;
@@ -276,6 +279,42 @@ function makeBandTexture(bands, [innerKm, outerKm]) {
     return texture;
 }
 
+// Ring shading, added to a ring strip's material: the planet's shadow (a
+// point is shadowed if its line to the Sun passes through the planet), and
+// a gap too narrow for the texture cut out at its real radii (carveKm:
+// [[inner, outer]], first one used). Works in the ring mesh's own frame,
+// where the planet is at the origin; uSunDir (that frame) is set by
+// update(). Returns the uniforms.
+const RING_SHADOW_DARKNESS = 0.9;
+function addRingShading(material, planetRadiusAu, carveKm = []) {
+    const carve = carveKm[0] ?? [0, 0];
+    const uniforms = {
+        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uPlanetRadius: { value: planetRadiusAu },
+        uCarve: { value: new THREE.Vector2(carve[0] / KM_PER_AU, carve[1] / KM_PER_AU) },
+    };
+    material.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = 'varying vec3 vRingPos;\n' + shader.vertexShader.replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\n    vRingPos = position;'
+        );
+        shader.fragmentShader = 'varying vec3 vRingPos;\nuniform vec3 uSunDir;\nuniform float uPlanetRadius;\nuniform vec2 uCarve;\n'
+            + shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    float ringR = length(vRingPos.xy);
+    if (uCarve.y > 0.0) {
+        float w = fwidth(ringR);
+        diffuseColor.a *= 1.0 - smoothstep(uCarve.x - w, uCarve.x + w, ringR)
+            * (1.0 - smoothstep(uCarve.y - w, uCarve.y + w, ringR));
+    }
+    float along = dot(vRingPos, uSunDir);
+    float off = length(vRingPos - along * uSunDir);
+    float shadow = along < 0.0 ? 1.0 - smoothstep(uPlanetRadius * 0.98, uPlanetRadius * 1.02, off) : 0.0;
+    diffuseColor.rgb *= 1.0 - ${RING_SHADOW_DARKNESS.toFixed(2)} * shadow;`);
+    };
+    return uniforms;
+}
+
 // A flat ring in the plane whose normal is `pole`. stops: [[u, km], ...]
 // from the inner to the outer edge: texture position u lies at radius km,
 // linear in between. One ring of triangles per interval, so the stops sit
@@ -324,6 +363,7 @@ function moonFacts(m) {
 //           planets first, then major moons, then minor
 //   byId:   Map id -> body
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
+//   updateTextures(cameraAu, heightPx, fovDeg) (call each frame: lazy loading),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
 //   setShowMinorMoons(on), setHaze(on), setViewportHeight(px), dispose()
 export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
@@ -338,9 +378,13 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     const orbitGroup = new THREE.Group();
     scene.add(orbitGroup);
 
-    // Textures load in the background; until then a body shows its colour
+    // Textures load in the background; until then a body shows its colour.
+    // They load lazily: a body's (and its rings') only once it is drawn
+    // TEXTURE_LOAD_PX across (see updateTextures), so opening the view only
+    // fetches what you can see.
     const loader = new THREE.TextureLoader();
     const textures = [];
+    const pendingTextures = [];  // {position (Vector3, AU), extentAu, loads: [() => void]}
     let disposed = false;
     const applyTexture = (material, file, onLoad) => {
         loader.load(textureUrl(file), (texture) => {
@@ -354,30 +398,37 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         });
     };
 
+    // Ring strips' shadow uniforms, kept pointing at the Sun by update()
+    const ringShading = [];  // {uniforms, position (the planet's, AU), inverse (mesh rotation, inverted)}
+
     // One strip of a ring system: a loaded texture (shown as a translucent
-    // flat colour until it arrives) or one drawn from its bands
-    const makeRingStrip = (strip, pole, bodyColor) => {
+    // flat colour until it arrives; its load is added to `loads`) or one
+    // drawn from its bands. Shaded with the planet's shadow.
+    const makeRingStrip = (strip, pole, bodyColor, loads, planetRadiusAu, planetPosition) => {
         const material = new THREE.MeshBasicMaterial({
             color: strip.color ?? bodyColor, transparent: true, side: THREE.DoubleSide, depthWrite: false,
         });
+        const uniforms = addRingShading(material, planetRadiusAu, strip.carve);
         if (strip.texture) {
             material.opacity = 0.55;
-            applyTexture(material, strip.texture, (texture) => {
+            loads.push(() => applyTexture(material, strip.texture, (texture) => {
                 texture.anisotropy = RING_ANISOTROPY;
                 material.opacity = 1;
-            });
+            }));
         } else {
             material.map = makeBandTexture(strip.bands, strip.km);
             textures.push(material.map);
         }
         const stops = strip.stops ?? [[0, strip.km[0]], [1, strip.km[1]]];
-        return track(makeRingMesh(stops, pole, material));
+        const mesh = track(makeRingMesh(stops, pole, material));
+        ringShading.push({ uniforms, position: planetPosition, inverse: mesh.quaternion.clone().invert() });
+        return mesh;
     };
 
     const makeBody = ({ id, name, type, facts: f, radiusAu, color, isSun = false, parentId = null, major = true }) => {
         const material = isSun ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
         const surfaceMap = SURFACE_MAPS[name] ?? null;
-        if (surfaceMap) applyTexture(material, surfaceMap.file);
+        const loads = surfaceMap ? [() => applyTexture(material, surfaceMap.file)] : [];
         const anchor = new THREE.Group();
         scene.add(anchor);
         const mesh = track(new THREE.Mesh(new THREE.SphereGeometry(radiusAu, 64, 32), material));
@@ -385,7 +436,12 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         const dot = isSun ? null : track(makeDot(color, radiusAu, pixelRatio, parentId !== null));
         if (dot) anchor.add(dot);
         const rings = RING_SYSTEMS[id];
-        for (const strip of rings?.strips ?? []) anchor.add(makeRingStrip(strip, rings.pole, color));
+        let extentAu = radiusAu;
+        for (const strip of rings?.strips ?? []) {
+            anchor.add(makeRingStrip(strip, rings.pole, color, loads, radiusAu, anchor.position));
+            if (strip.texture) extentAu = Math.max(extentAu, strip.stops.at(-1)[1] / KM_PER_AU);
+        }
+        if (loads.length) pendingTextures.push({ position: anchor.position, extentAu, loads });
         return { id, name, type, facts: f, radiusAu, color, mesh, dot, position: anchor.position, parentId, major, surfaceMap };
     };
 
@@ -587,6 +643,10 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             if (body.id === 'Sun' || body.moon) continue;
             body.position.set(...heliocentricPosition(body.id, date));
         }
+        // Ring shadows: the Sun's direction in each ring's own frame
+        for (const r of ringShading) {
+            r.uniforms.uSunDir.value.copy(r.position).negate().normalize().applyQuaternion(r.inverse);
+        }
         for (const body of spinning) {
             const { pole, meridian } = bodyAxes(body.id, date);
             xAxis.set(...meridian);
@@ -677,6 +737,18 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         },
         // Fade each small-moon cloud by how big it is drawn. cameraAu: camera
         // position (AU); heightPx: viewport height (CSS px); fovDeg: vertical FOV.
+        // Start loading the textures of bodies now drawn TEXTURE_LOAD_PX
+        // across (radius, rings included). Same arguments as below.
+        updateTextures: (cameraAu, heightPx, fovDeg) => {
+            if (!pendingTextures.length) return;
+            const pxPerRadian = heightPx / 2 / Math.tan(fovDeg * DEG_TO_RAD / 2);
+            for (let i = pendingTextures.length - 1; i >= 0; i--) {
+                const p = pendingTextures[i];
+                if (p.extentAu / Math.max(cameraAu.distanceTo(p.position), 1e-12) * pxPerRadian < TEXTURE_LOAD_PX) continue;
+                p.loads.forEach(load => load());
+                pendingTextures.splice(i, 1);
+            }
+        },
         updateMinorMoonFade: (cameraAu, heightPx, fovDeg) => {
             const pxPerRadian = heightPx / 2 / Math.tan(fovDeg * DEG_TO_RAD / 2);
             for (const [planetId, entry] of clouds) {
