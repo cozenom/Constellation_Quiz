@@ -25,10 +25,13 @@ const SUN = new THREE.Vector3();
 // unit:   ly per layer unit (1 for ly, 1 / 63241 for AU, ...)
 // origin: () => THREE.Vector3, the layer's origin in ly from the Sun
 //         (omitted = the Sun); called every frame, so it can move
-// near / far: clip planes in layer units
+// near / far: clip planes in layer units. Both can be changed later
+// (layer.near / layer.far): the depth buffer only has ~16 million steps
+// between them, so a layer whose contents span a huge range can move its
+// near plane with the camera to stay precise close by.
 export function createLayer({ name, unit = 1, origin = () => SUN, near, far }) {
     const camera = new THREE.PerspectiveCamera(60, 1, near, far);
-    return { name, unit, origin, scene: new THREE.Scene(), camera, visible: true };
+    return { name, unit, origin, near, far, scene: new THREE.Scene(), camera, visible: true };
 }
 
 // Derive a layer's camera from the master camera. Call before rendering,
@@ -37,9 +40,11 @@ export function syncLayerCamera(layer, master) {
     const cam = layer.camera;
     cam.position.subVectors(master.position, layer.origin()).divideScalar(layer.unit);
     cam.quaternion.copy(master.quaternion);
-    if (cam.fov !== master.fov || cam.aspect !== master.aspect) {
+    if (cam.fov !== master.fov || cam.aspect !== master.aspect || cam.near !== layer.near || cam.far !== layer.far) {
         cam.fov = master.fov;
         cam.aspect = master.aspect;
+        cam.near = layer.near;
+        cam.far = layer.far;
         cam.updateProjectionMatrix();
     }
     cam.updateMatrixWorld();

@@ -50,7 +50,8 @@ export function geocentricMoon(date) {
 export const orbitPeriodDays = (body) => (body === 'Moon' ? MOON_ORBIT_DAYS : ORBIT_DAYS[body]);
 
 // One orbit as a closed loop of points, flat [x, y, z, ...] (for a
-// THREE.LineLoop). position(date) -> [x, y, z]. Sampled from the real
+// THREE.LineLoop), point segments/2 being the body at `date`.
+// position(date) -> [x, y, z]. Sampled from the real
 // positions, so it matches where the body is drawn. Points bunch up around
 // `date` (time offset ~ u^3): the line passes through the body, and seen up
 // close evenly spaced straight segments show visible corners. Far round
@@ -71,7 +72,9 @@ export function sampleOrbit(position, date, periodMs, segments) {
     const fixEnd = end.map((v, k) => (start[k] - v) / 2);    // end -> midpoint
     const ease = (x) => x * x * (3 - 2 * x);
 
-    const out = new Float32Array(segments * 3);
+    // Doubles: the 3D view re-centres these on the body before they go to
+    // the GPU as floats (see resample in solarSystem3d)
+    const out = new Float64Array(segments * 3);
     for (let i = 0; i < segments; i++) {
         const u = -1 + 2 * i / segments;
         const offset = Math.sign(u) * Math.abs(u) ** 3 * periodMs / 2;

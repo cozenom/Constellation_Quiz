@@ -51,6 +51,9 @@ const BODY_MIN_FADE = 0.3;
 const MOON_PICK_SEPARATION_PX = 10;
 // Earth's marker ring (18 px across) counts as a click target
 const EARTH_RING_PICK_PX = 12;
+// Solar-system near plane: this fraction of the distance to the nearest
+// body's surface (see solarNearPlane)
+const SOLAR_NEAR_FRACTION = 0.3;
 const FOV = 60;
 
 // Points shader: each star stores its absolute magnitude, and the apparent
@@ -865,6 +868,23 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             }
         };
 
+        // The solar-system layer spans 15 km to 100,000 AU; with a fixed near
+        // plane the depth buffer can't tell moons, their orbits and their
+        // planet apart (they flicker in front of and behind each other). So
+        // the near plane sits at a fraction of the distance to the nearest
+        // surface: depth is precise for whatever the camera is close to.
+        // Every body counts, small moons too (one you've flown to must not be
+        // clipped by a near plane set by its distant planet).
+        const cameraAu = new THREE.Vector3();
+        const solarNearPlane = () => {
+            cameraAu.copy(camera.position).multiplyScalar(AU_PER_LY);
+            let nearest = Infinity;
+            for (const body of solar.bodies) {
+                nearest = Math.min(nearest, body.position.distanceTo(cameraAu) - body.radiusAu);
+            }
+            return THREE.MathUtils.clamp(nearest * SOLAR_NEAR_FRACTION, 1e-9, 1e3);
+        };
+
         const targetBefore = new THREE.Vector3();
         let frameId;
         let lastDistanceLabel = '';
@@ -887,6 +907,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             solarFade = solar ? solar.fadeForDistance(camera.position.length() * AU_PER_LY) : 0;
             solar?.setFade(solarFade);
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
+            if (solar) solarLayer.near = solarNearPlane();
             syncCameras();
             solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
             updateBodyRings();

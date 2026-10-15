@@ -324,9 +324,23 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         orbits.push(orbit);
         return orbit;
     };
+    // The line's points go to the GPU as 32-bit floats, precise to ~1 km at
+    // 0.1 AU: too coarse up close to a distant moon. So they are stored
+    // relative to where the body was when sampled (the middle point), and
+    // the line is placed there in JS doubles: near the body the numbers stay
+    // small and precise.
     const resample = (orbit, date) => {
-        orbit.line.geometry.attributes.position.array.set(orbit.sample(date));
+        const loop = orbit.sample(date);  // doubles
+        const mid = loop.length / 6 | 0;  // the point at `date`
+        const ax = loop[mid * 3], ay = loop[mid * 3 + 1], az = loop[mid * 3 + 2];
+        const array = orbit.line.geometry.attributes.position.array;
+        for (let i = 0; i < loop.length; i += 3) {
+            array[i] = loop[i] - ax;
+            array[i + 1] = loop[i + 1] - ay;
+            array[i + 2] = loop[i + 2] - az;
+        }
         orbit.line.geometry.attributes.position.needsUpdate = true;
+        orbit.line.position.set(ax, ay, az);
         orbit.line.visible = true;
         orbit.sampledAt = date.getTime();
     };
@@ -371,11 +385,22 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     // A selected minor moon gets its orbit drawn (major ones always have one)
     let highlightId = null;
     let highlight = null;
+    // It also gets its own sphere and dot, placed in JS doubles like the
+    // major moons: in the shared cloud its position is a 32-bit float
+    // relative to the planet, which jitters by ~1 km up close.
+    let highlightVisual = null;  // {body, mesh, dot}
     const setHighlight = (id) => {
         if (highlight) {
             orbits.splice(orbits.indexOf(highlight), 1);
             disposeLine(highlight.line);
             highlight = null;
+        }
+        if (highlightVisual) {
+            const { mesh, dot } = highlightVisual;
+            scene.remove(mesh);
+            dotMaterials.splice(dotMaterials.indexOf(dot.material), 1);
+            [mesh, dot].forEach(obj => { obj.geometry.dispose(); obj.material.dispose(); });
+            highlightVisual = null;
         }
         highlightId = id;
         const body = id && byId.get(id);
@@ -383,8 +408,29 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             highlight = moonOrbit(body, 0.6);
             if (lastDate) resample(highlight, lastDate);
             applyOrbitOpacity();
+
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radiusAu, 24, 12),
+                new THREE.MeshLambertMaterial({ color: body.color }),
+            );
+            const dot = makeDot(body.color, body.radiusAu, pixelRatio, true);
+            const u = dot.material.uniforms;
+            u.uFade.value = fade;
+            u.uLinear.value = hazeOn ? 1 : 0;
+            u.uViewportHeight.value = viewportPx;
+            mesh.add(dot);
+            scene.add(mesh);
+            dotMaterials.push(dot.material);
+            highlightVisual = { body, mesh, dot };
+            placeHighlightVisual();
         }
     };
+    function placeHighlightVisual() {
+        if (!highlightVisual) return;
+        const { body, mesh, dot } = highlightVisual;
+        mesh.position.copy(body.position);
+        dot.material.uniforms.uParentOffset.value.subVectors(byId.get(body.parentId).position, body.position);
+    }
 
     const parentOffset = new THREE.Vector3();
     const update = (date) => {
@@ -409,12 +455,16 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
             cloud.position.copy(parent);
             const array = cloud.geometry.attributes.position.array;
             list.forEach((body, i) => {
-                array[i * 3] = body.position.x - parent.x;
-                array[i * 3 + 1] = body.position.y - parent.y;
-                array[i * 3 + 2] = body.position.z - parent.z;
+                // The selected one has its own dot (highlightVisual); its cloud
+                // point goes to the planet's centre, where cloud dots don't show
+                const own = body.id === highlightId;
+                array[i * 3] = own ? 0 : body.position.x - parent.x;
+                array[i * 3 + 1] = own ? 0 : body.position.y - parent.y;
+                array[i * 3 + 2] = own ? 0 : body.position.z - parent.z;
             });
             cloud.geometry.attributes.position.needsUpdate = true;
         }
+        placeHighlightVisual();
         resampleStaleOrbits(date);
         if (lastDate === null) applyOrbitOpacity();
         lastDate = date;
@@ -428,6 +478,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     let showOrbits = true;
     let showMinorMoons = true;
     let fade = 1;
+    let hazeOn = false;
+    let viewportPx = 1;
     function applyOrbitOpacity() {
         orbitGroup.visible = showOrbits && fade > 0;
         orbits.forEach(({ line }) => { line.material.opacity = line.userData.baseOpacity * fade; });
@@ -472,9 +524,16 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         setHighlightOrbit: (id) => {
             if (id !== highlightId) setHighlight(id);
         },
-        setHaze: (on) => dotMaterials.forEach(m => { m.uniforms.uLinear.value = on ? 1 : 0; }),
-        setViewportHeight: (px) => dotMaterials.forEach(m => { m.uniforms.uViewportHeight.value = px; }),
+        setHaze: (on) => {
+            hazeOn = on;
+            dotMaterials.forEach(m => { m.uniforms.uLinear.value = on ? 1 : 0; });
+        },
+        setViewportHeight: (px) => {
+            viewportPx = px;
+            dotMaterials.forEach(m => { m.uniforms.uViewportHeight.value = px; });
+        },
         dispose: () => {
+            setHighlight(null);
             orbits.forEach(({ line }) => disposeLine(line));
             disposables.forEach(obj => {
                 obj.geometry.dispose();
