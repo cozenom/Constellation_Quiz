@@ -1,5 +1,26 @@
 import React from 'react';
-import { describeSpectralType, distanceRange, formatBayer, luminosityVsSun } from '../utils/universe3d';
+import { describeSpectralType, distanceRange, formatBayer, KM_PER_AU, luminosityVsSun } from '../utils/universe3d';
+import { SUN_RADIUS_KM } from '../utils/starDisc';
+
+// Planet orbits (AU) for "if it replaced the Sun, its surface would reach..."
+const ORBITS = [['Mercury', 0.387], ['Venus', 0.723], ['Earth', 1.0], ['Mars', 1.524], ['Jupiter', 5.203], ['Saturn', 9.537]];
+
+// radiusRef: source of a measured radius; null = estimated from brightness and colour
+function RadiusValue({ radius, radiusRef }) {
+    const km = radius * SUN_RADIUS_KM;
+    const au = km / KM_PER_AU;
+    const digits = radiusRef ? 3 : 2;  // estimates are good to ~50% at best
+    const times = radius >= 10 ** digits ? Math.round(radius).toLocaleString() : Number(radius.toPrecision(digits)).toLocaleString();
+    const size = au >= 0.1 ? `${Number(au.toPrecision(digits))} AU` : `${Number(km.toPrecision(digits)).toLocaleString()} km`;
+    const passed = ORBITS.filter(([, a]) => au > a).pop();
+    return (
+        <>
+            {radiusRef ? '' : '~'}{times}× the Sun's
+            <div className="star-info-muted">{size} · {radiusRef ?? 'estimated from its brightness and colour'}</div>
+            {passed && <div className="star-info-muted">In the Sun's place it would reach past {passed[0]}'s orbit</div>}
+        </>
+    );
+}
 
 // Distances at or above this relative error are shown as approximate
 const APPROX_ERR = 0.25;
@@ -72,6 +93,13 @@ function StarInfoCard({ star, lineInfo, onClose, onFlyTo }) {
                             {description ? `${description[0].toUpperCase()}${description.slice(1)}` : 'Star'}
                             <span className="star-info-muted"> ({star.spect})</span>
                         </dd>
+                    </>
+                )}
+
+                {star.radius && (
+                    <>
+                        <dt>Radius {!star.radiusRef && <span className="star-info-approx">est.</span>}</dt>
+                        <dd><RadiusValue radius={star.radius} radiusRef={star.radiusRef} /></dd>
                     </>
                 )}
 

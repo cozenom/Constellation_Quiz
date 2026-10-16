@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPasses } from '../utils/layers3d';
+import { createStarDisc, radiusToLy } from '../utils/starDisc';
 import { buildSolarSystem, ECLIPTIC_NORTH, minViewRadii } from '../utils/solarSystem3d';
 import {
     AU_PER_LY,
@@ -48,6 +49,10 @@ const ZOOM_SPEED = 5;
 // Closest the camera may get to an orbit target that is a star or a
 // constellation (ly). Planets use a multiple of their radius instead.
 const ORBIT_MIN_DISTANCE = 0.01;
+// Stars (radius curated or estimated): "Fly to star" stops this many radii
+// from the centre (the disc ~20 deg across), and you may zoom in to this many
+const STAR_VIEW_RADII = 6;
+const STAR_MIN_RADII = 1.2;
 const EARTH_RADIUS_LY = 6378 / KM_PER_AU / AU_PER_LY;
 // Planet labels and picking only while the solar system is at least this visible
 const BODY_MIN_FADE = 0.3;
@@ -343,8 +348,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
 
         // Far -> near. The Earth layer (km) comes with satellites.
         const starLayer = createLayer({ name: 'universe', unit: 1, near: 0.0001, far: 1e6 });
+        // Real-size disc of the nearest star with a known radius (AU, at that star)
+        const starDisc = createStarDisc(starBuffers);
         const solarLayer = createLayer({ name: 'solar system', unit: 1 / AU_PER_LY, near: 1e-7, far: 1e5 });
-        const layers = [starLayer, solarLayer];
+        const layers = [starLayer, starDisc.layer, solarLayer];
         const scene = starLayer.scene;
         const starCamera = starLayer.camera;  // for picking and labels
         const solarCamera = solarLayer.camera;
@@ -492,6 +499,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             s.haze = on;
             solar?.setHaze(on);
             [stars, gaiaStars, sun].forEach(obj => { if (obj) obj.material.uniforms.uLinear.value = on ? 1 : 0; });
+            starDisc.setHaze(on);
             setLineHaze(s.selectedLines, on);
             setLineHaze(s.allLines, on);
         };
@@ -1089,6 +1097,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             solar?.setFade(solarFade);
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
             if (solar) solarLayer.near = solarNearPlane();
+            starDisc.update(camera, mount.clientHeight);
             syncCameras();
             solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
             solar?.updateTextures(solarCamera.position, mount.clientHeight, camera.fov);
@@ -1124,6 +1133,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             [stars, gaiaStars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, earthMarkerNear, earthMarkerFar, s.selectedLines, s.allLines]
                 .forEach(disposeObject);
             solar?.dispose();
+            starDisc.dispose();
             bloomPass.dispose();
             composer.dispose();
             renderer.dispose();
@@ -1182,13 +1192,26 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         setFocus({ type: 'ring', id });
     };
 
+    // A star's radius in ly (curated or estimated), or null if unknown
+    const starRadiusLy = (index) => {
+        const radius = starBuffers.radius[index];
+        return Number.isNaN(radius) ? null : radiusToLy(radius);
+    };
+
+    // How close the camera may zoom to a star: near its surface, or
+    // ORBIT_MIN_DISTANCE if its radius is unknown
+    const starMinDistance = (index) => {
+        const radiusLy = starRadiusLy(index);
+        return radiusLy ? radiusLy * STAR_MIN_RADII : ORBIT_MIN_DISTANCE;
+    };
+
     // Go back to Earth and orbit the star, so you see where it is in the night sky
     const lookAtStar = (index) => {
         const s = sceneRef.current;
         if (!s) return;
         const p = starBuffers.positions.subarray(index * 3, index * 3 + 3);
         s.setFollow('Earth', false);
-        s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]]);
+        s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]], starMinDistance(index));
         setFocus({ type: 'star', index });
     };
 
@@ -1206,7 +1229,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         }
     };
 
-    // Stop just short of the star (on the Earth side), looking at it
+    // Stop just short of the star (on the Earth side), looking at it: close
+    // enough that its real disc fills the view (STAR_VIEW_RADII radii out);
+    // it may then be zoomed to its surface. A star with no radius estimate
+    // is only approached to a few ly.
     const flyToStar = (index) => {
         const s = sceneRef.current;
         if (!s) return;
@@ -1214,9 +1240,11 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         const earth = s.earthPosition.toArray();
         const dir = p.map((v, i) => v - earth[i]);
         const dist = Math.hypot(...dir);
-        const keep = 1 - Math.min(Math.max(dist * 0.05, 0.3), 15) / dist;
+        const radiusLy = starRadiusLy(index);
+        const stopAt = radiusLy ? radiusLy * STAR_VIEW_RADII : Math.min(Math.max(dist * 0.05, 0.3), 15);
+        const keep = 1 - stopAt / dist;
         s.setFollow(null);
-        s.flyTo(dir.map((v, i) => earth[i] + v * keep), p, ORBIT_MIN_DISTANCE);
+        s.flyTo(dir.map((v, i) => earth[i] + v * keep), p, starMinDistance(index));
         setFocus({ type: 'star', index });
     };
 

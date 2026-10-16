@@ -57,6 +57,59 @@ function bvToTemperature(bv) {
     return 4600 * (1 / (0.92 * bv + 1.7) + 1 / (0.92 * bv + 0.62));
 }
 
+// Bolometric correction BC_V for an effective temperature (K): what turns
+// a visual absolute magnitude into a bolometric one (light at all
+// wavelengths). Flower 1996's polynomials in log T, with the corrected
+// coefficients of Torres 2010 (AJ 140, 1158, Table 1). Cool stars put most
+// of their light out in the infrared, so their BC is strongly negative.
+const BC_COEFFS = [
+    [3.70, [-0.190537291496456e5, 0.155144866764412e5, -0.421278819301717e4, 0.381476328422343e3]],
+    [3.90, [-0.370510203809015e5, 0.385672629965804e5, -0.150651486316025e5, 0.261724637119416e4, -0.170623810323864e3]],
+    [Infinity, [-0.118115450538963e6, 0.137145973583929e6, -0.636233812100225e5, 0.147412923562646e5,
+        -0.170587278406872e4, 0.788731721804990e2]],
+];
+
+export function bolometricCorrection(kelvin) {
+    const logT = Math.log10(kelvin);
+    const coeffs = BC_COEFFS.find(([upTo]) => logT < upTo)[1];
+    return coeffs.reduce((sum, c, i) => sum + c * Math.pow(logT, i), 0);
+}
+
+// Solar values for the radius estimate (IAU 2015 nominal M_bol; Teff)
+const SUN_M_BOL = 4.74;
+const SUN_TEFF = 5772;
+
+// M stars: B-V barely changes below ~3,800 K (molecular bands), so their
+// temperature comes from the spectral subtype instead. Approximate scales,
+// subtypes 0..9: giants/supergiants (van Belle et al. 1999 style), dwarfs
+// (Mamajek's mean dwarf table).
+const M_GIANT_TEFF = [3850, 3730, 3660, 3560, 3430, 3300, 3200, 3100, 2950, 2800];
+const M_DWARF_TEFF = [3850, 3660, 3560, 3430, 3210, 3060, 2810, 2680, 2570, 2380];
+
+function spectralTemperature(spect) {
+    const m = /^(sd)?M(\d(?:\.\d)?)/.exec(spect ?? '');
+    if (!m) return null;
+    const subtype = Math.min(9, Number(m[2]));
+    const dwarf = m[1] || /^[^I]*V/.test(spect.slice(m[0].length));
+    const scale = dwarf ? M_DWARF_TEFF : M_GIANT_TEFF;
+    const i = Math.floor(subtype);
+    return scale[i] + (scale[Math.min(9, i + 1)] - scale[i]) * (subtype - i);
+}
+
+// Estimated radius (solar radii) from magnitude, distance, B-V and spectral
+// type: luminosity from the bolometric magnitude, temperature from B-V (or
+// the spectral subtype for M stars), then R = sqrt(L) (T_sun / T)^2.
+// Ignores dust, so distant stars come out too small. null without a colour
+// or a distance.
+export function estimateRadius(mag, distLy, bv, spect) {
+    if (bv === null || bv === undefined || !(distLy > 0)) return null;
+    // Only for stars that are red too (Capella is listed "M1: comp" but is a pair of yellow giants)
+    const t = (bv >= 1.3 ? spectralTemperature(spect) : null) ?? bvToTemperature(Math.max(-0.4, Math.min(2.0, bv)));
+    const mBol = absoluteMagnitude(mag, distLy) + bolometricCorrection(t);
+    const lum = Math.pow(10, -0.4 * (mBol - SUN_M_BOL));
+    return Math.sqrt(lum) * Math.pow(SUN_TEFF / t, 2);
+}
+
 // Temperature (K) -> RGB in 0..1 (Tanner Helland's blackbody approximation)
 function temperatureToRGB(kelvin) {
     const t = kelvin / 100;
@@ -82,8 +135,9 @@ export function bvToColor(bv) {
     return [r + (1 - r) * mix, g + (1 - g) * mix, b + (1 - b) * mix];
 }
 
-// stars_3d.json ({fields, stars: [[...]]}) -> typed arrays for the GPU,
-// plus a hip -> index map for drawing constellation lines.
+// stars_3d.json ({fields, stars: [[...]], radii: {hip: {radius, ref}}}) ->
+// typed arrays for the GPU, a hip -> index map for drawing constellation
+// lines, and index -> {radius (solar radii), ref} for the curated radii.
 export function buildStarBuffers(stars3d) {
     const f = Object.fromEntries(stars3d.fields.map((name, i) => [name, i]));
     const count = stars3d.stars.length;
@@ -100,7 +154,19 @@ export function buildStarBuffers(stars3d) {
         hipToIndex.set(row[f.hip], i);
     });
 
-    return { positions, colors, absMags, hipToIndex, count, rows: stars3d.stars, fieldIndex: f };
+    // Radius (solar radii) per star: curated where known, else estimated
+    // (NaN without a colour or distance)
+    const radii = new Map();
+    for (const [hip, r] of Object.entries(stars3d.radii ?? {})) {
+        const index = hipToIndex.get(Number(hip));
+        if (index !== undefined) radii.set(index, r);
+    }
+    const radius = new Float32Array(count);
+    stars3d.stars.forEach((row, i) => {
+        radius[i] = radii.get(i)?.radius ?? estimateRadius(row[f.mag], row[f.dist], row[f.bv], row[f.spect]) ?? NaN;
+    });
+
+    return { positions, colors, absMags, hipToIndex, radii, radius, count, rows: stars3d.stars, fieldIndex: f };
 }
 
 // stars_gaia.bin rows (float32: ra hours, dec deg, dist ly, V, B-V or NaN)
@@ -123,10 +189,17 @@ export function buildGaiaBuffers(rows) {
     return { positions, colors, absMags, count };
 }
 
-// One star's catalogue row as an object ({hip, ra, dec, mag, dist, err, src, bv, spect, name})
+// One star's catalogue row as an object ({hip, ra, dec, mag, dist, err, src,
+// bv, spect, name, radius, radiusRef}): radius in solar radii (null if it
+// can't be estimated), radiusRef the source of a curated one, null for an estimate
 export function starRecord(starBuffers, index) {
     const row = starBuffers.rows[index];
-    return Object.fromEntries(Object.entries(starBuffers.fieldIndex).map(([name, i]) => [name, row[i]]));
+    const radius = starBuffers.radius[index];
+    return {
+        ...Object.fromEntries(Object.entries(starBuffers.fieldIndex).map(([name, i]) => [name, row[i]])),
+        radius: Number.isNaN(radius) ? null : radius,
+        radiusRef: starBuffers.radii.get(index)?.ref ?? null,
+    };
 }
 
 // hip -> what the constellation data knows about a line star
