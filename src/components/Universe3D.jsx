@@ -90,6 +90,13 @@ const RING_VIEW_MIN_KM = 2000;
 // guards log(0); the camera never gets that close to a star centre.
 // uMinAlpha keeps stars too faint for the eye as dim dots, so the shape of
 // the catalogue (the Gaia 100 pc sphere) shows from outside.
+// Positions are made camera-relative on the GPU from the camera split into
+// a float32 part and the remainder (uCamHigh + uCamLow, see setStarCamera):
+// position - uCamHigh is exact when the two are close, so a star stays put
+// up close. modelViewMatrix * position would round the camera to float32
+// (~2 AU at 500 ly) and the sprite would jump around next to its disc.
+// The star Points sit at the layer origin, so mat3(modelViewMatrix) is just
+// the view's rotation.
 const starVertexShader = `
     attribute float absMag;
     attribute vec3 color;
@@ -97,12 +104,15 @@ const starVertexShader = `
     uniform float uLinear;
     uniform float uMaxSize;
     uniform float uMinAlpha;
+    uniform vec3 uCamHigh;
+    uniform vec3 uCamLow;
     varying vec3 vColor;
     varying float vAlpha;
     varying float vGlow;
 
     void main() {
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vec3 relative = (position - uCamHigh) - uCamLow;
+        vec4 mvPosition = vec4(mat3(modelViewMatrix) * relative, 1.0);
         float distPc = max(length(mvPosition.xyz) / ${LY_PER_PARSEC}, 1e-9);
         float mag = absMag + 5.0 * log(distPc) / log(10.0) - 5.0;
 
@@ -157,7 +167,18 @@ const ringFragmentShader = `
     }
 `;
 
-function makeStarPoints(positions, colors, absMags, pixelRatio, maxSize = 24) {
+// The star shader's camera uniforms, shared by every star Points object
+function makeStarCamera() {
+    return { uCamHigh: { value: new THREE.Vector3() }, uCamLow: { value: new THREE.Vector3() } };
+}
+
+// position: the star layer camera's position (ly, doubles)
+function setStarCamera(starCamera, position) {
+    const high = starCamera.uCamHigh.value.set(Math.fround(position.x), Math.fround(position.y), Math.fround(position.z));
+    starCamera.uCamLow.value.subVectors(position, high);
+}
+
+function makeStarPoints(positions, colors, absMags, pixelRatio, starCamera, maxSize = 24) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -168,6 +189,7 @@ function makeStarPoints(positions, colors, absMags, pixelRatio, maxSize = 24) {
             uLinear: { value: 0 },
             uMaxSize: { value: maxSize },
             uMinAlpha: { value: STAR_MIN_ALPHA },
+            ...starCamera,
         },
         vertexShader: starVertexShader,
         fragmentShader: starFragmentShader,
@@ -432,13 +454,14 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             controls.target.set(0, 0, -500);
         }
 
-        const stars = makeStarPoints(starBuffers.positions, starBuffers.colors, starBuffers.absMags, pixelRatio);
+        const starCameraUniforms = makeStarCamera();
+        const stars = makeStarPoints(starBuffers.positions, starBuffers.colors, starBuffers.absMags, pixelRatio, starCameraUniforms);
         scene.add(stars);
 
         // Gaia's nearby stars (within 100 pc, not in the catalogue above):
         // drawn only, not picked or labelled
         const gaiaStars = gaiaBuffers
-            ? makeStarPoints(gaiaBuffers.positions, gaiaBuffers.colors, gaiaBuffers.absMags, pixelRatio)
+            ? makeStarPoints(gaiaBuffers.positions, gaiaBuffers.colors, gaiaBuffers.absMags, pixelRatio, starCameraUniforms)
             : null;
         if (gaiaStars) scene.add(gaiaStars);
 
@@ -448,6 +471,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             new Float32Array(bvToColor(SUN_BV)),
             new Float32Array([SUN_ABS_MAG]),
             pixelRatio,
+            starCameraUniforms,
             40
         );
         scene.add(sun);
@@ -1099,6 +1123,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             if (solar) solarLayer.near = solarNearPlane();
             starDisc.update(camera, mount.clientHeight);
             syncCameras();
+            setStarCamera(starCameraUniforms, starCamera.position);
             solar?.updateMinorMoonFade(solarCamera.position, mount.clientHeight, camera.fov);
             solar?.updateTextures(solarCamera.position, mount.clientHeight, camera.fov);
             solar?.updateRingView(solarCamera.position);
