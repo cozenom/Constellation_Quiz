@@ -1230,25 +1230,15 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         return radiusLy ? radiusLy * STAR_MIN_RADII : ORBIT_MIN_DISTANCE;
     };
 
-    // Go back to Earth and orbit the star, so you see where it is in the night sky
-    const lookAtStar = (index) => {
-        const s = sceneRef.current;
-        if (!s) return;
-        const p = starBuffers.positions.subarray(index * 3, index * 3 + 3);
-        s.setFollow('Earth', false);
-        s.flyTo(s.earthPosition.toArray(), [p[0], p[1], p[2]], starMinDistance(index));
-        setFocus({ type: 'star', index });
-    };
-
+    // Stars, planets and moons: fly straight in, as their cards' buttons do
     const handleSearchSelect = (item) => {
         if (item.type === 'constellation') {
             setSelectedAbbrev(item.abbrev);
             viewConstellation(item.abbrev);
         } else if (item.type === 'star') {
             selectStar(item.starIndex);
-            lookAtStar(item.starIndex);
+            flyToStar(item.starIndex);
         } else if (item.type === 'planet') {
-            // Planets and moons: fly straight in (stars are shown from Earth)
             selectBody(item.id);
             flyToBody(item.id);
         }

@@ -190,15 +190,21 @@ export function buildGaiaBuffers(rows) {
 }
 
 // One star's catalogue row as an object ({hip, ra, dec, mag, dist, err, src,
-// bv, spect, name, radius, radiusRef}): radius in solar radii (null if it
-// can't be estimated), radiusRef the source of a curated one, null for an estimate
+// bv, spect, name, radius, radiusRef, radiusMethod, radiusBib}): radius in
+// solar radii (null if it can't be estimated); for one from stars_3d.json
+// "radii", its reference, method ("lit" published radius, "diam" measured
+// angular diameter x our distance) and ADS bibcode (diam only). All null
+// for an estimate.
 export function starRecord(starBuffers, index) {
     const row = starBuffers.rows[index];
     const radius = starBuffers.radius[index];
+    const known = starBuffers.radii.get(index);
     return {
         ...Object.fromEntries(Object.entries(starBuffers.fieldIndex).map(([name, i]) => [name, row[i]])),
         radius: Number.isNaN(radius) ? null : radius,
-        radiusRef: starBuffers.radii.get(index)?.ref ?? null,
+        radiusRef: known?.ref ?? null,
+        radiusMethod: known?.method ?? null,
+        radiusBib: known?.bib ?? null,
     };
 }
 

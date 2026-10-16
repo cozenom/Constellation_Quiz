@@ -5,8 +5,21 @@ import { SUN_RADIUS_KM } from '../utils/starDisc';
 // Planet orbits (AU) for "if it replaced the Sun, its surface would reach..."
 const ORBITS = [['Mercury', 0.387], ['Venus', 0.723], ['Earth', 1.0], ['Mars', 1.524], ['Jupiter', 5.203], ['Saturn', 9.537]];
 
+// Where a radius comes from: a published radius (its reference), a measured
+// angular diameter x our distance (linked to the paper on ADS), or estimated
+function RadiusSource({ radiusRef, radiusMethod, radiusBib }) {
+    if (!radiusRef) return 'estimated from its brightness and colour';
+    if (radiusMethod !== 'diam') return radiusRef;
+    return (
+        <>
+            measured diameter ·{' '}
+            <a href={`https://ui.adsabs.harvard.edu/abs/${radiusBib}`} target="_blank" rel="noopener noreferrer">{radiusRef}</a>
+        </>
+    );
+}
+
 // radiusRef: source of a measured radius; null = estimated from brightness and colour
-function RadiusValue({ radius, radiusRef }) {
+function RadiusValue({ radius, radiusRef, radiusMethod, radiusBib }) {
     const km = radius * SUN_RADIUS_KM;
     const au = km / KM_PER_AU;
     const digits = radiusRef ? 3 : 2;  // estimates are good to ~50% at best
@@ -16,7 +29,7 @@ function RadiusValue({ radius, radiusRef }) {
     return (
         <>
             {radiusRef ? '' : '~'}{times}× the Sun's
-            <div className="star-info-muted">{size} · {radiusRef ?? 'estimated from its brightness and colour'}</div>
+            <div className="star-info-muted">{size} · <RadiusSource radiusRef={radiusRef} radiusMethod={radiusMethod} radiusBib={radiusBib} /></div>
             {passed && <div className="star-info-muted">In the Sun's place it would reach past {passed[0]}'s orbit</div>}
         </>
     );
@@ -99,7 +112,7 @@ function StarInfoCard({ star, lineInfo, onClose, onFlyTo }) {
                 {star.radius && (
                     <>
                         <dt>Radius {!star.radiusRef && <span className="star-info-approx">est.</span>}</dt>
-                        <dd><RadiusValue radius={star.radius} radiusRef={star.radiusRef} /></dd>
+                        <dd><RadiusValue radius={star.radius} radiusRef={star.radiusRef} radiusMethod={star.radiusMethod} radiusBib={star.radiusBib} /></dd>
                     </>
                 )}
 
