@@ -32,6 +32,7 @@ function App() {
     const [stars3d, setStars3d] = useState(null);
     const [planetFacts, setPlanetFacts] = useState(null);
     const [moonsData, setMoonsData] = useState(null);
+    const [smallBodies, setSmallBodies] = useState(null);
     const [loadingError, setLoadingError] = useState(null);
 
     // Load constellation data from external JSON
@@ -244,6 +245,37 @@ function App() {
             });
     };
 
+    // Asteroids and comets (orbits from JPL's Small-Body Database): the named
+    // ones plus the default tier of the point cloud (small_bodies.bin, packed
+    // uint16 orbit elements). The 3D view fetches the bigger tier itself when
+    // asked. Optional like planets.json.
+    const loadSmallBodies = () => {
+        if (smallBodies !== null) {
+            return Promise.resolve(smallBodies);
+        }
+
+        const base = `${import.meta.env.BASE_URL}data/`;
+        const fetchOk = (name) => fetch(base + name).then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load ${name}: ${response.statusText}`);
+            }
+            return response;
+        });
+        return Promise.all([
+            fetchOk('small_bodies.json').then(response => response.json()),
+            fetchOk('small_bodies.bin').then(response => response.arrayBuffer()),
+        ])
+            .then(([meta, buffer]) => {
+                const data = { meta, points: new Uint16Array(buffer) };
+                setSmallBodies(data);
+                return data;
+            })
+            .catch(error => {
+                console.error('Error loading small bodies:', error);
+                return null;
+            });
+    };
+
     const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
@@ -335,7 +367,7 @@ function App() {
     };
 
     const goToUniverse3d = async () => {
-        await Promise.all([loadStars3d(), loadPlanetFacts(), loadMoons()]);
+        await Promise.all([loadStars3d(), loadPlanetFacts(), loadMoons(), loadSmallBodies()]);
         setScreen('universe3d');
     };
 
@@ -500,6 +532,7 @@ function App() {
                         stars3d={stars3d}
                         planetFacts={planetFacts}
                         moonsData={moonsData}
+                        smallBodies={smallBodies}
                         onBack={backToTitle}
                     />
                 </Suspense>

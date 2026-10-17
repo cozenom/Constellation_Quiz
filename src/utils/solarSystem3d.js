@@ -19,14 +19,20 @@
 // and click still find them, and a clicked one gets its orbit line). A
 // moon's dot only shows once it is drawn a few pixels clear of its planet,
 // so from far away a planet is just its own dot.
-// Positions come from utils/planets.js and utils/moons.js (scene frame:
-// J2000, north = +Y).
+//
+// Named asteroids, dwarf planets and comets (small_bodies.json `named`)
+// are bodies too, plain grey spheres; dwarf planets always show their
+// orbits, the rest only while selected. The unnamed ones are a point cloud
+// of their own (smallBodies3d.js).
+// Positions come from utils/planets.js, utils/moons.js and
+// utils/smallBodies.js (scene frame: J2000, north = +Y).
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
 import { RING_SYSTEMS } from './rings.js';
 import { bodyAxes, heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
+import { smallBodyOrbit, smallBodyPeriodDays, smallBodyPosition } from './smallBodies.js';
 import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
 
 // Whole layer fades out between these camera distances from the Sun (AU)
@@ -52,6 +58,12 @@ const MOON_SEPARATION_PX = [6, 14];
 const MINOR_CLOUD_FADE_PX = [150, 450];
 // Minor moons with no measured size are drawn (and flown to) at this radius
 const UNKNOWN_MOON_RADIUS_KM = 5;
+// Comet nuclei with no measured size (the new and interstellar ones)
+const UNKNOWN_NUCLEUS_RADIUS_KM = 1;
+const ASTEROID_COLOR = '#9a948b';
+const ICY_COLOR = '#c2b5a8';      // dwarf planets and bodies beyond Jupiter
+const COMET_COLOR = '#7fd6ea';
+const ICY_TYPES = new Set(['dwarf planet', 'centaur', 'trans-Neptunian object']);
 const DEFAULT_MOON_COLOR = '#aaa49b';
 const MOON_COLORS = {
     Io: '#d8c46f', Europa: '#cdbea2', Ganymede: '#9f978b', Callisto: '#6e665d',
@@ -273,12 +285,13 @@ function makeMinorMoonCloud(count, pixelRatio) {
 }
 
 // Orbit lines write depth, so where two cross on screen the nearer one is
-// drawn on top instead of whichever happened to be drawn last
-function makeOrbitLine(flatPositions, color, opacity = ORBIT_OPACITY) {
+// drawn on top instead of whichever happened to be drawn last.
+// closed: false for the open paths of objects escaping the Sun
+function makeOrbitLine(flatPositions, color, opacity = ORBIT_OPACITY, closed = true) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(flatPositions, 3));
     const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
-    const line = new THREE.LineLoop(geometry, material);
+    const line = closed ? new THREE.LineLoop(geometry, material) : new THREE.Line(geometry, material);
     line.userData.baseOpacity = opacity;
     return line;
 }
@@ -523,19 +536,23 @@ function moonFacts(m) {
     };
 }
 
-// facts: planets.json; moonsData: moons.json (optional). Returns the
+// facts: planets.json; moonsData: moons.json (optional); smallBodies:
+// small_bodies.json (optional; its named bodies). Returns the
 // layer's contents and controls:
 //   bodies: [{id, name, type, facts, radiusAu, position (Vector3, AU),
-//             parentId?, major?, surfaceMap? (SURFACE_MAPS entry)}],
-//           planets first, then major moons, then minor
+//             parentId?, major?, surfaceMap? (SURFACE_MAPS entry),
+//             smallBody? (small_bodies.json entry)}],
+//           planets first, then major moons, minor moons, small bodies
 //   byId:   Map id -> body
+//   isShown(body): false for small bodies while they're switched off
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
+//   setShowSmallBodies(on),
 //   updateTextures(cameraAu, heightPx, fovDeg) (call each frame: lazy loading),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
 //   setShowMinorMoons(on), setRingWaveScale(scale), updateRingView(cameraAu)
 //   (each frame), setHaze(on),
 //   setViewportHeight(px), dispose()
-export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
+export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodies = null) {
     const factsById = new Map(facts.bodies.map(b => [b.id, b]));
     const disposables = [];
     const track = (obj) => { disposables.push(obj); return obj; };
@@ -766,6 +783,20 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         entry.spreadAu = radii[Math.floor(radii.length / 2)];
         entry.fade = 0;
     }
+    // Named asteroids, dwarf planets and comets
+    const smallBodyList = [];
+    for (const sb of smallBodies?.named ?? []) {
+        const isComet = sb.type === 'comet' || (sb.type === 'interstellar' && sb.diameter_km === null);
+        const body = makeBody({
+            id: sb.id, name: sb.name, type: sb.type, facts: { id: sb.id, name: sb.name, type: sb.type },
+            radiusAu: (sb.diameter_km ? sb.diameter_km / 2 : UNKNOWN_NUCLEUS_RADIUS_KM) / KM_PER_AU,
+            color: new THREE.Color(isComet ? COMET_COLOR : ICY_TYPES.has(sb.type) ? ICY_COLOR : ASTEROID_COLOR).getHex(),
+        });
+        body.smallBody = sb;
+        bodies.push(body);
+        smallBodyList.push(body);
+    }
+    let showSmallBodies = true;
     const byId = new Map(bodies.map(b => [b.id, b]));
     const moonBodies = bodies.filter(b => b.parentId && b.id !== 'Moon');
     const lockedMoons = moonBodies.filter(b => b.mesh && !UNLOCKED_MOONS.has(b.name));
@@ -788,12 +819,17 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         }
         return moonOrbitGroups.get(planetId);
     };
-    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments }) => {
-        const line = makeOrbitLine(new Float32Array(segments * 3), color, opacity);
+    // Small bodies' orbits, hidden with them (setShowSmallBodies)
+    const smallOrbitGroup = new THREE.Group();
+    orbitGroup.add(smallOrbitGroup);
+    // everyFrame: resampled whenever the time changes (small bodies: cheap
+    // to sample, and their body must sit exactly on its line up close)
+    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments, closed = true, everyFrame = false }) => {
+        const line = makeOrbitLine(new Float32Array(segments * 3), color, opacity, closed);
         line.frustumCulled = false;  // samples move round the orbit
         line.visible = false;        // until first sampled
         parent.add(line);
-        const orbit = { line, sample, periodDays, sampledAt: null };
+        const orbit = { line, sample, periodDays, everyFrame, sampledAt: null };
         orbits.push(orbit);
         return orbit;
     };
@@ -837,13 +873,31 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     }
     for (const body of moonBodies.filter(b => b.major)) moonOrbit(body);
 
+    const smallBodyOrbitLine = (body, opacity) => {
+        const sb = body.smallBody;
+        const bound = sb.e < 1;
+        const segments = bound ? 512 : 513;  // open paths: both ends sampled
+        return addOrbit({
+            sample: (d) => smallBodyOrbit(sb, d, bound ? segments : segments - 1).points,
+            periodDays: smallBodyPeriodDays(sb), color: body.color, opacity,
+            parent: smallOrbitGroup, segments, closed: bound, everyFrame: true,
+        });
+    };
+    for (const body of smallBodyList.filter(b => b.type === 'dwarf planet')) smallBodyOrbitLine(body);
+
     let lastDate = null;
     const resampleStaleOrbits = (date) => {
         const now = date.getTime();
+        // Every-frame lines (a few, microseconds each) outside the budget
+        for (const o of orbits) {
+            if (o.everyFrame && o.sampledAt !== now) resample(o, date);
+        }
         const stale = orbits
+            .filter(o => !o.everyFrame)
             .map(o => ({
                 o,
-                age: o.sampledAt === null ? Infinity : Math.abs(now - o.sampledAt) / (o.periodDays * 86400000 * ORBIT_RESAMPLE_FRACTION),
+                age: o.sampledAt === null ? Infinity
+                    : Math.abs(now - o.sampledAt) / (o.periodDays * 86400000 * ORBIT_RESAMPLE_FRACTION),
             }))
             .filter(s => s.age >= 1)
             .sort((a, b) => b.age - a.age);
@@ -855,7 +909,8 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         }
     };
 
-    // A selected minor moon gets its orbit drawn (major ones always have one)
+    // A selected minor moon gets its orbit drawn (major ones always have
+    // one), as does a selected small body other than a dwarf planet
     let highlightId = null;
     let highlight = null;
     // It also gets its own sphere and dot, placed in JS doubles like the
@@ -877,6 +932,11 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
         }
         highlightId = id;
         const body = id && byId.get(id);
+        if (body?.smallBody && body.type !== 'dwarf planet') {
+            highlight = smallBodyOrbitLine(body, 0.6);
+            if (lastDate) resample(highlight, lastDate);
+            applyOrbitOpacity();
+        }
         if (body && body.moon && !body.major) {
             highlight = moonOrbit(body, 0.6);
             if (lastDate) resample(highlight, lastDate);
@@ -953,9 +1013,10 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
 
     const update = (date) => {
         for (const body of bodies) {
-            if (body.id === 'Sun' || body.moon) continue;
+            if (body.id === 'Sun' || body.moon || body.smallBody) continue;
             body.position.set(...heliocentricPosition(body.id, date));
         }
+        for (const body of smallBodyList) body.position.set(...smallBodyPosition(body.smallBody, date));
         if (byId.has('Earth')) earthUniforms.uSunDir.value.copy(byId.get('Earth').position).negate().normalize();
         if (earthClouds) {
             // Drift east about Earth's axis (the sphere's y); the night-light
@@ -1039,7 +1100,13 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio) {
     return {
         bodies,
         byId,
+        isShown: (body) => !body.smallBody || showSmallBodies,
         update,
+        setShowSmallBodies: (on) => {
+            showSmallBodies = on;
+            smallOrbitGroup.visible = on;
+            for (const body of smallBodyList) body.mesh.parent.visible = on;
+        },
         // 1 near the Sun, 0 far out (log scale), from camera distance in AU
         fadeForDistance: (au) => 1 - THREE.MathUtils.smoothstep(
             Math.log10(Math.max(au, 1e-9)), Math.log10(FADE_START_AU), Math.log10(FADE_END_AU)

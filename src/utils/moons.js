@@ -21,7 +21,7 @@ const JD_UNIX_EPOCH = 2440587.5;
 const toScene = (x, y, z) => [x, z, -y];
 
 // Kepler's equation M = E - e sin E, solved for E (radians)
-function eccentricAnomaly(M, e) {
+export function eccentricAnomaly(M, e) {
     let E = e < 0.8 ? M : Math.PI;
     for (let k = 0; k < 30; k++) {
         const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));

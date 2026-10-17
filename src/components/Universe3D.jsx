@@ -7,10 +7,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPasses } from '../utils/layers3d';
 import { createStarDisc, radiusToLy } from '../utils/starDisc';
 import { buildSolarSystem, ECLIPTIC_NORTH, minViewRadii } from '../utils/solarSystem3d';
+import { buildSmallBodyCloud, SMALL_BODY_GROUP_COLORS } from '../utils/smallBodies3d';
 import {
     AU_PER_LY,
     KM_PER_AU,
     LY_PER_PARSEC,
+    SMALL_BODY_TYPE_LABELS,
     buildGaiaBuffers,
     buildLineStarInfo,
     buildSearchIndex,
@@ -25,6 +27,7 @@ import {
 import { RING_FEATURES, RING_FEATURES_BY_ID, ringLabelKm, ringPole, ringScaleKm, ringSubtitle } from '../utils/rings';
 import PlanetInfoCard from './PlanetInfoCard';
 import RingInfoCard from './RingInfoCard';
+import SmallBodyInfoCard from './SmallBodyInfoCard';
 import StarInfoCard from './StarInfoCard';
 import Universe3DSearch from './Universe3DSearch';
 import Universe3DTimeBar, { nextPresetRate, TIME_RANGE } from './Universe3DTimeBar';
@@ -286,7 +289,7 @@ function formatDistance(target, earthPosition) {
 
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack }) {
+function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallBodies, onBack }) {
     // Constellation picked in search (abbrev), or null: none drawn
     const [selectedAbbrev, setSelectedAbbrev] = useState(null);
     const [showLines, setShowLines] = useState(true);
@@ -296,6 +299,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const [showOrbits, setShowOrbits] = useState(true);
     const [showSmallMoons, setShowSmallMoons] = useState(true);
     const [exaggerateRingWaves, setExaggerateRingWaves] = useState(false);
+    // Asteroids and comets: the named ones and the point cloud, its hidden
+    // groups (small_bodies.json group ids), and whether the big "more" tier
+    // (all 1.5 million) is drawn. moreTier: 'idle' | 'loading' | 'loaded' | 'error'
+    const [showSmallBodies, setShowSmallBodies] = useState(true);
+    const [hiddenGroups, setHiddenGroups] = useState(() => new Set());
+    const [showAllAsteroids, setShowAllAsteroids] = useState(false);
+    const [moreTier, setMoreTier] = useState('idle');
     // At most one of these is set: a star index, a solar system body id, or
     // a ring feature id (utils/rings.js)
     const [selectedStar, setSelectedStar] = useState(null);
@@ -328,8 +338,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     const gaiaBuffers = useMemo(() => (stars3d?.gaia ? buildGaiaBuffers(stars3d.gaia) : null), [stars3d]);
     const lineStarInfo = useMemo(() => buildLineStarInfo(constellationData), [constellationData]);
     const searchItems = useMemo(
-        () => (starBuffers ? buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData) : []),
-        [constellationData, starBuffers, lineStarInfo, planetFacts, moonsData]
+        () => (starBuffers ? buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData, smallBodies?.meta) : []),
+        [constellationData, starBuffers, lineStarInfo, planetFacts, moonsData, smallBodies]
     );
 
     const selectedHips = useMemo(
@@ -337,7 +347,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         [constellationData, selectedAbbrev]
     );
 
-    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, selectedAbbrev, selectedHips, selectedRing };
+    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, showSmallBodies, selectedAbbrev, selectedHips, selectedRing };
 
     const selectStar = (index) => {
         setSelectedBody(null);
@@ -381,8 +391,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
 
         // Planets and moons at the clock's time (see the render loop). Without
         // planets.json the layer stays empty and Earth stays at the Sun.
-        const solar = planetFacts ? buildSolarSystem(solarLayer.scene, planetFacts, moonsData, pixelRatio) : null;
+        const solar = planetFacts ? buildSolarSystem(solarLayer.scene, planetFacts, moonsData, pixelRatio, smallBodies?.meta) : null;
         solar?.update(new Date(clockRef.current.time));
+        // Unnamed asteroids and comets: a point cloud placed on the GPU. The
+        // default tier now; the "more" tier when asked (see showAllAsteroids)
+        const cloud = solar && smallBodies ? buildSmallBodyCloud(solarLayer.scene, smallBodies.meta, pixelRatio) : null;
+        cloud?.addTier(0, smallBodies.points);
+        cloud?.update(new Date(clockRef.current.time));
         const earthPosition = new THREE.Vector3();
         if (solar?.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
 
@@ -499,7 +514,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         composer.addPass(new OutputPass());
 
         const s = {
-            scene, camera, controls, selectedRing, bodySelectedRing, solar,
+            scene, camera, controls, selectedRing, bodySelectedRing, solar, cloud,
             selectedLines: null, allLines: null, flight: null, haze: false,
             // Earth in ly from the Sun; everything Earth-relative reads this
             earthPosition,
@@ -522,6 +537,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         s.setHaze = (on) => {
             s.haze = on;
             solar?.setHaze(on);
+            cloud?.setHaze(on);
             [stars, gaiaStars, sun].forEach(obj => { if (obj) obj.material.uniforms.uLinear.value = on ? 1 : 0; });
             starDisc.setHaze(on);
             setLineHaze(s.selectedLines, on);
@@ -695,7 +711,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             let bestDist = Infinity;
             for (const body of solar.bodies) {
                 const isEarth = body.id === 'Earth';
-                if (!active && !isEarth) continue;
+                if ((!active && !isEarth) || !solar.isShown(body)) continue;
                 // Small moons only while their cloud is shown (zoomed in)
                 if (body.major === false && solar.minorMoonFade(body.parentId) < 0.5) continue;
                 const p = bodyOnScreen(body, rect.width, rect.height);
@@ -959,7 +975,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                 const isEarth = body.id === 'Earth';
                 let screenPos = null;
                 let dy = -8;
-                const wanted = opts.showLabels && (isEarth || (opts.showPlanets && bodiesActive()));
+                const wanted = opts.showLabels && (isEarth || (opts.showPlanets && bodiesActive() && solar.isShown(body)));
                 const p = wanted ? bodyOnScreen(body, width, height) : null;
                 if (body.id === 'Sun') sunAt = p;
                 const free = p && (isEarth || !placedLabels.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 16));
@@ -1043,6 +1059,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             const followed = s.follow.id ? solar.byId.get(s.follow.id) : null;
             if (followed) followBefore.copy(followed.position);
             solar.update(new Date(time));
+            cloud?.update(new Date(time));
             if (solar.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
             if (!followed) return;
             followDelta.subVectors(followed.position, followBefore).divideScalar(AU_PER_LY);
@@ -1093,6 +1110,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             cameraAu.copy(camera.position).multiplyScalar(AU_PER_LY);
             let nearest = Infinity;
             for (const body of solar.bodies) {
+                if (!solar.isShown(body)) continue;
                 nearest = Math.min(nearest, body.position.distanceTo(cameraAu) - body.radiusAu);
             }
             return THREE.MathUtils.clamp(nearest * SOLAR_NEAR_FRACTION, 1e-9, 1e3);
@@ -1120,6 +1138,9 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             solarFade = solar ? solar.fadeForDistance(camera.position.length() * AU_PER_LY) : 0;
             solar?.setFade(solarFade);
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
+            cloud?.setFade(solarFade);
+            cloud?.setCameraDistance(camera.position.length() * AU_PER_LY);
+            cloud?.setVisible(optionsRef.current.showSmallBodies);
             if (solar) solarLayer.near = solarNearPlane();
             starDisc.update(camera, mount.clientHeight);
             syncCameras();
@@ -1158,6 +1179,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             [stars, gaiaStars, sun, hoverRing, selectedRing, bodyHoverRing, bodySelectedRing, earthMarkerNear, earthMarkerFar, s.selectedLines, s.allLines]
                 .forEach(disposeObject);
             solar?.dispose();
+            cloud?.dispose();
             starDisc.dispose();
             bloomPass.dispose();
             composer.dispose();
@@ -1166,7 +1188,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             labelsEl.replaceChildren();
             sceneRef.current = null;
         };
-    }, [starBuffers, gaiaBuffers, lineStarInfo, constellationData, planetFacts, moonsData]);
+    }, [starBuffers, gaiaBuffers, lineStarInfo, constellationData, planetFacts, moonsData, smallBodies]);
 
     // Fly back to Earth and orbit a constellation, so you see its figure as
     // in the night sky; dragging then shows it in 3D
@@ -1251,6 +1273,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
             selectStar(item.starIndex);
             flyToStar(item.starIndex);
         } else if (item.type === 'planet') {
+            if (sceneRef.current?.solar?.byId.get(item.id)?.smallBody) setShowSmallBodies(true);
             selectBody(item.id);
             flyToBody(item.id);
         }
@@ -1337,6 +1360,50 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         sceneRef.current?.solar?.setRingWaveScale(exaggerateRingWaves ? RING_WAVE_EXAGGERATION : 1);
     }, [exaggerateRingWaves, starBuffers, planetFacts, moonsData]);
 
+    // The point cloud follows showSmallBodies in the render loop
+    useEffect(() => {
+        sceneRef.current?.solar?.setShowSmallBodies(showSmallBodies);
+    }, [showSmallBodies, starBuffers, planetFacts, moonsData, smallBodies]);
+
+    useEffect(() => {
+        const cloud = sceneRef.current?.cloud;
+        if (!cloud) return;
+        for (const { id } of smallBodies.meta.groups) cloud.setGroupVisible(id, !hiddenGroups.has(id));
+    }, [hiddenGroups, starBuffers, planetFacts, moonsData, smallBodies]);
+
+    // All 1.5 million asteroids: the big tier is fetched on first use (once;
+    // later toggles and rebuilt scenes reuse it), then drawn whenever on
+    const moreTierRef = useRef(null);  // Promise of its Uint16Array (or null on failure)
+    useEffect(() => {
+        const cloud = sceneRef.current?.cloud;
+        if (!cloud) return;
+        cloud.setTierVisible(1, showAllAsteroids);
+        if (!showAllAsteroids || cloud.hasTier(1)) return;
+        if (!moreTierRef.current) {
+            setMoreTier('loading');
+            moreTierRef.current = fetch(`${import.meta.env.BASE_URL}data/${smallBodies.meta.tiers[1].file}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to load more asteroids: ${response.statusText}`);
+                    return response.arrayBuffer();
+                })
+                .then(buffer => {
+                    setMoreTier('loaded');
+                    return new Uint16Array(buffer);
+                })
+                .catch(error => {
+                    console.error('Error loading more asteroids:', error);
+                    moreTierRef.current = null;  // a later toggle tries again
+                    setMoreTier('error');
+                    setShowAllAsteroids(false);
+                    return null;
+                });
+        }
+        // Added even if switched off meanwhile: it stays hidden until on
+        moreTierRef.current.then(data => {
+            if (data && sceneRef.current?.cloud === cloud) cloud.addTier(1, data);
+        });
+    }, [showAllAsteroids, starBuffers, planetFacts, moonsData, smallBodies]);
+
     // Ring around the selected star or planet
     useEffect(() => {
         const s = sceneRef.current;
@@ -1405,7 +1472,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
     } else if (focus.type === 'body' && solar?.byId.has(focus.id)) {
         const f = solar.byId.get(focus.id).facts;
         title = f.name;
-        subtitle = { star: 'Our star', planet: 'Planet', 'dwarf planet': 'Dwarf planet', moon: `Moon of ${f.parent}` }[f.type];
+        subtitle = { star: 'Our star', planet: 'Planet', moon: `Moon of ${f.parent}`, ...SMALL_BODY_TYPE_LABELS }[f.type];
     } else if (focus.type === 'ring') {
         const f = RING_FEATURES_BY_ID.get(focus.id);
         title = f.name;
@@ -1506,6 +1573,55 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                             />
                             Ring waves ×{RING_WAVE_EXAGGERATION}
                         </label>
+                        {smallBodies && (
+                            <>
+                                <label
+                                    className={`universe-3d-checkbox universe-3d-sub-option ${showPlanets ? '' : 'disabled'}`}
+                                    title="Asteroids, comets and dwarf planets from JPL's Small-Body Database"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={showSmallBodies}
+                                        disabled={!showPlanets}
+                                        onChange={(e) => setShowSmallBodies(e.target.checked)}
+                                    />
+                                    Asteroids &amp; comets
+                                </label>
+                                {showPlanets && showSmallBodies && (
+                                    <div className="universe-3d-groups">
+                                        {smallBodies.meta.groups.filter(g => g.id !== 'other').map(g => (
+                                            <label key={g.id} className="universe-3d-checkbox universe-3d-group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!hiddenGroups.has(g.id)}
+                                                    onChange={(e) => setHiddenGroups(prev => {
+                                                        const next = new Set(prev);
+                                                        if (e.target.checked) next.delete(g.id);
+                                                        else next.add(g.id);
+                                                        return next;
+                                                    })}
+                                                />
+                                                <span className="universe-3d-swatch" style={{ background: SMALL_BODY_GROUP_COLORS[g.id] }} />
+                                                {g.name}
+                                            </label>
+                                        ))}
+                                        <label
+                                            className="universe-3d-checkbox universe-3d-group"
+                                            title={`Adds ${smallBodies.meta.tiers[1].count.toLocaleString()} smaller asteroids (a ${Math.round(smallBodies.meta.tiers[1].count * 12 / 1e6)} MB download, heavy for phones)`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={showAllAsteroids}
+                                                disabled={moreTier === 'loading'}
+                                                onChange={(e) => setShowAllAsteroids(e.target.checked)}
+                                            />
+                                            {moreTier === 'loading' ? 'Loading…' : `All ${((smallBodies.meta.tiers[0].count + smallBodies.meta.tiers[1].count) / 1e6).toFixed(1)} million`}
+                                            {moreTier === 'error' && <span className="universe-3d-error-note"> (failed)</span>}
+                                        </label>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </>
                 )}
                 <label className="universe-3d-checkbox">
@@ -1528,7 +1644,16 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                     onFocus={() => focusStar(selectedStar)}
                 />
             )}
-            {body && (
+            {body?.smallBody && (
+                <SmallBodyInfoCard
+                    body={body}
+                    distances={bodyDistances}
+                    time={clockView.time}
+                    onClose={() => setSelectedBody(null)}
+                    onFlyTo={() => flyToBody(selectedBody)}
+                />
+            )}
+            {body && !body.smallBody && (
                 <PlanetInfoCard
                     body={body}
                     distances={bodyDistances}

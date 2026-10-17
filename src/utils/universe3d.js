@@ -317,6 +317,18 @@ export function normalizeSearchText(text) {
         .trim();
 }
 
+// Card / footer / search wording for small_bodies.json `type`
+export const SMALL_BODY_TYPE_LABELS = {
+    'dwarf planet': 'Dwarf planet',
+    asteroid: 'Asteroid',
+    'near-Earth asteroid': 'Near-Earth asteroid',
+    'Trojan asteroid': 'Jupiter Trojan asteroid',
+    centaur: 'Centaur',
+    'trans-Neptunian object': 'Object beyond Neptune',
+    comet: 'Comet',
+    interstellar: 'Interstellar object',
+};
+
 // Other names a body can be searched by (Latin names; "Solar System" for the Sun)
 const BODY_ALIASES = {
     Sun: ['Sol', 'Solar System'],
@@ -328,8 +340,9 @@ const BODY_ALIASES = {
 // {type: 'constellation' | 'star', label, sublabel, terms, sortKey, ...}
 // where `terms` are normalized strings to match against. Type 'planet'
 // covers every Solar System body (planetFacts = planets.json, moonsData =
-// moons.json; both optional). Moon ids match solarSystem3d ('moon-<code>').
-export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData) {
+// moons.json, smallBodies = small_bodies.json; all optional). Moon ids
+// match solarSystem3d ('moon-<code>'); small bodies use their own ids.
+export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, planetFacts, moonsData, smallBodies) {
     const items = [];
 
     for (const body of planetFacts?.bodies ?? []) {
@@ -356,6 +369,17 @@ export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, p
             sublabel: `Moon of ${m.planet}`,
             terms: [normalizeSearchText(m.name)],
             sortKey: m.major ? -15 : 20,  // big moons first, small ones after stars
+        });
+    }
+    for (const b of smallBodies?.named ?? []) {
+        items.push({
+            type: 'planet',
+            id: b.id,
+            label: b.name,
+            sublabel: SMALL_BODY_TYPE_LABELS[b.type],
+            // Also by full designation: "99942", "1P/Halley", "C/1995 O1"
+            terms: [b.name, b.fullname].map(normalizeSearchText),
+            sortKey: b.type === 'dwarf planet' ? -15 : 10,
         });
     }
 
