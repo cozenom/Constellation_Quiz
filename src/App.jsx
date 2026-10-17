@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Title from './components/Title';
 import QuizSetup from './components/QuizSetup';
 import SkyViewSetup from './components/SkyViewSetup';
@@ -13,6 +13,22 @@ import { attachSmallBodyHistory } from './utils/smallBodies';
 const Universe3D = lazy(() => import('./components/Universe3D'));
 import KeybindsPanel from './components/KeybindsPanel';
 import StarField from './components/StarField';
+
+// Hash routing: each screen has a URL like /Constellation_Quiz/#/study, so
+// Back/Forward, refresh and direct links work (no server rewrites needed)
+const SCREEN_HASHES = {
+    'title': '#/',
+    'setup': '#/quiz-setup',
+    'quiz': '#/quiz',
+    'results': '#/results',
+    'skyview-setup': '#/skyview-setup',
+    'skyview': '#/skyview',
+    'study': '#/study',
+    'universe3d': '#/3d',
+};
+
+const screenFromHash = (hash) =>
+    Object.keys(SCREEN_HASHES).find(screen => SCREEN_HASHES[screen] === hash) || 'title';
 
 function App() {
     const [screen, setScreen] = useState('title'); // 'title', 'setup', 'quiz', 'results', 'skyview-setup', 'skyview', 'study', 'universe3d'
@@ -289,6 +305,62 @@ function App() {
             });
     };
 
+    // Show the screen the URL hash names. Screens that need in-memory state
+    // (a running quiz, a sky view config) fall back to their setup page when
+    // opened directly; 3D and sky view load their data first.
+    const showScreenFromHash = async () => {
+        const hash = window.location.hash;
+        let target = screenFromHash(hash);
+
+        if ((target === 'quiz' || target === 'results') && !quizState) target = 'setup';
+        if (target === 'skyview' && !skyViewConfig) target = 'skyview-setup';
+
+        if (SCREEN_HASHES[target] !== hash && hash !== '') {
+            // replaceState so Back doesn't return to the dead link
+            window.history.replaceState(null, '', SCREEN_HASHES[target]);
+        }
+
+        if (target === 'universe3d') {
+            await Promise.all([loadStars3d(), loadPlanetFacts(), loadMoons(), loadSmallBodies()]);
+        } else if (target === 'skyview') {
+            await loadSkyViewStars();
+        }
+        // The user may have navigated elsewhere while data was loading
+        if (window.location.hash !== hash && SCREEN_HASHES[target] !== window.location.hash) return;
+        setScreen(target);
+    };
+
+    // The listener is registered once, so read the latest closure via a ref
+    const showScreenRef = useRef(showScreenFromHash);
+    showScreenRef.current = showScreenFromHash;
+
+    // popstate fires on Back/Forward and on hand-edited hashes (not on pushState)
+    useEffect(() => {
+        const onPopState = () => showScreenRef.current();
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []);
+
+    // Open the page in the URL once the constellation data is ready
+    const dataReady = constellationData !== null;
+    useEffect(() => {
+        if (dataReady) showScreenRef.current();
+    }, [dataReady]);
+
+    // In-app screen changes: add a history entry and switch directly. The
+    // caller has just set up any state the screen needs, which this render's
+    // closures may not see yet, so the guards above are skipped.
+    const navigate = (target) => {
+        if (window.location.hash !== SCREEN_HASHES[target]) {
+            window.history.pushState(null, '', SCREEN_HASHES[target]);
+        }
+        if (target === 'universe3d') {
+            showScreenRef.current(); // loads the 3D data first
+        } else {
+            setScreen(target);
+        }
+    };
+
     const startQuiz = async (quizConfig) => {
         setConfig(quizConfig);
         setSavedConfig(quizConfig); // Save config for when user returns to menu
@@ -303,7 +375,7 @@ function App() {
             score: 0,
             answers: []
         });
-        setScreen('quiz');
+        navigate('quiz');
     };
 
     const handleAnswer = (isCorrect, userAnswer, correctAnswer) => {
@@ -349,7 +421,7 @@ function App() {
             });
         } else {
             // Single mode: go to results
-            setScreen('results');
+            navigate('results');
         }
     };
 
@@ -358,40 +430,39 @@ function App() {
     };
 
     const newQuiz = () => {
-        setScreen('title');
+        navigate('title');
         setConfig(null);
         setQuizState(null);
     };
 
     const backToSetup = () => {
-        setScreen('setup');
+        navigate('setup');
     };
 
     const goToSetup = () => {
-        setScreen('setup');
+        navigate('setup');
     };
 
     const goToSkyViewSetup = () => {
-        setScreen('skyview-setup');
+        navigate('skyview-setup');
     };
 
     const goToStudy = () => {
-        setScreen('study');
+        navigate('study');
     };
 
-    const goToUniverse3d = async () => {
-        await Promise.all([loadStars3d(), loadPlanetFacts(), loadMoons(), loadSmallBodies()]);
-        setScreen('universe3d');
+    const goToUniverse3d = () => {
+        navigate('universe3d');
     };
 
     const backToTitle = () => {
-        setScreen('title');
+        navigate('title');
         setSavedConfig(config);
         setSavedSkyViewConfig(skyViewConfig);
     };
 
     const backToSkyViewSetup = () => {
-        setScreen('skyview-setup');
+        navigate('skyview-setup');
     };
 
     // Show loading state
@@ -432,7 +503,7 @@ function App() {
         // Load sky view stars (ra/dec format)
         await loadSkyViewStars();
 
-        setScreen('skyview');
+        navigate('skyview');
     };
 
     const toggleStars = () => {
