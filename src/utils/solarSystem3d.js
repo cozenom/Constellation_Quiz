@@ -548,7 +548,7 @@ function moonFacts(m) {
 //   byId:   Map id -> body
 //   isShown(body): false for small bodies while they're switched off
 //   update(date), setFade(f), setShowOrbits(on), setHighlightOrbit(id),
-//   setShowSmallBodies(on),
+//   setShowSmallBodies(on), setCometOrbits(on) (every named comet's),
 //   updateTextures(cameraAu, heightPx, fovDeg) (call each frame: lazy loading),
 //   updateMinorMoonFade(cameraAu, heightPx, fovDeg), minorMoonFade(planetId),
 //   setShowMinorMoons(on), setRingWaveScale(scale), updateRingView(cameraAu)
@@ -959,6 +959,26 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
         }
     };
 
+    // Every named comet's orbit at once (the "Comets" region in search)
+    let cometOrbits = [];
+    const setCometOrbits = (on) => {
+        if (on === cometOrbits.length > 0) return;
+        if (on) {
+            cometOrbits = smallBodyList.filter(b => b.isComet).map(b => {
+                const orbit = smallBodyOrbitLine(b, 0.5);
+                if (lastDate) resample(orbit, lastDate);
+                return orbit;
+            });
+        } else {
+            for (const orbit of cometOrbits) {
+                orbits.splice(orbits.indexOf(orbit), 1);
+                disposeLine(orbit.line);
+            }
+            cometOrbits = [];
+        }
+        applyOrbitOpacity();
+    };
+
     // A selected minor moon gets its orbit drawn (major ones always have
     // one), as does a selected small body other than a dwarf planet
     let highlightId = null;
@@ -1152,6 +1172,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
         bodies,
         byId,
         isShown: (body) => !body.smallBody || showSmallBodies,
+        setCometOrbits,
         update,
         setShowSmallBodies: (on) => {
             showSmallBodies = on;

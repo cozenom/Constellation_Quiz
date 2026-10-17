@@ -166,6 +166,20 @@
     flex-shrink: 0;
 }
 
+/* Colour key in the footer (comet families) */
+.universe-3d-key {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 0.9rem;
+}
+
+.universe-3d-key > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 .universe-3d-error-note {
     color: #f87171;
 }

@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPasses } from '../utils/layers3d';
 import { createStarDisc, radiusToLy } from '../utils/starDisc';
 import { buildSolarSystem, ECLIPTIC_NORTH, minViewRadii } from '../utils/solarSystem3d';
-import { buildSmallBodyCloud, SMALL_BODY_GROUP_COLORS } from '../utils/smallBodies3d';
+import { buildSmallBodyCloud, COMET_FAMILIES, SMALL_BODY_GROUP_COLORS } from '../utils/smallBodies3d';
 import { buildOortCloud, OORT_LABEL_POSITION } from '../utils/oortCloud';
 import {
     AU_PER_LY,
@@ -1454,6 +1454,15 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         sceneRef.current?.solar?.setRingWaveScale(exaggerateRingWaves ? RING_WAVE_EXAGGERATION : 1);
     }, [exaggerateRingWaves, starBuffers, planetFacts, moonsData]);
 
+    // Viewing the "Comets" region draws every comet's orbit, named and in
+    // the cloud, until the view moves on
+    useEffect(() => {
+        const s = sceneRef.current;
+        const on = focus.type === 'region' && focus.id === 'comet';
+        s?.cloud?.setGroupOrbits('comet', on);
+        s?.solar?.setCometOrbits(on);
+    }, [focus, starBuffers, planetFacts, moonsData, smallBodies]);
+
     // "Asteroids & comets": on if anything in it is shown; switching it
     // turns everything in it on or off (each can then be switched alone)
     const smallGroupIds = (smallBodies?.meta.groups ?? []).map(g => g.id);
@@ -1584,7 +1593,16 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         subtitle = { star: 'Our star', planet: 'Planet', moon: `Moon of ${f.parent}`, ...SMALL_BODY_TYPE_LABELS }[f.type];
     } else if (focus.type === 'region') {
         title = SMALL_BODY_REGIONS[focus.id].label;
-        subtitle = focus.id === 'oort' ? 'A model: never seen directly' : 'Asteroids & comets';
+        subtitle = focus.id === 'oort' ? 'A model: never seen directly'
+            : focus.id === 'comet' ? (
+                // Key to the orbit colours
+                <span className="universe-3d-key">
+                    {COMET_FAMILIES.map(f => (
+                        <span key={f.name}><span className="universe-3d-swatch" style={{ background: f.color }} />{f.name}</span>
+                    ))}
+                </span>
+            )
+            : 'Asteroids & comets';
     } else if (focus.type === 'ring') {
         const f = RING_FEATURES_BY_ID.get(focus.id);
         title = f.name;

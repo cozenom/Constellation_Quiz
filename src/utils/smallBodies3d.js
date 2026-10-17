@@ -114,32 +114,61 @@ const fragmentShader = `
     }
 `;
 
-// The vertex shader's maths in JS (doubles): point k of a tier's rows at
-// `days` since the epoch -> out[o..o+2] (AU, scene frame)
+// The vertex shader's maths in JS (doubles), for picking and orbit lines
 const COS_EPS = Math.cos(OBLIQUITY_RAD), SIN_EPS = Math.sin(OBLIQUITY_RAD);
-function pointPosition(rows, k, logA, meanMotion, days, out, o) {
+// Point k of a tier's rows -> its elements (AU, radians)
+function decode(rows, k, logA) {
     const r = k * FIELDS_PER_POINT;
-    const a = Math.exp(logA[0] + (logA[1] - logA[0]) * rows[r] / 65535);
-    const e = rows[r + 1] / 65535;
-    const inc = rows[r + 2] / 65535 * Math.PI;
-    const node = rows[r + 3] / 65535 * 2 * Math.PI;
-    const w = rows[r + 4] / 65535 * 2 * Math.PI;
-    const n = meanMotion || GAUSS_K / (a * Math.sqrt(a));
-    const M = (((rows[r + 5] / 65535 * 2 * Math.PI + n * days) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    const E = eccentricAnomaly(M, e);
-    const px = a * (Math.cos(E) - e), py = a * Math.sqrt(1 - e * e) * Math.sin(E);
-    const cw = Math.cos(w), sw = Math.sin(w), ci = Math.cos(inc), si = Math.sin(inc), cn = Math.cos(node), sn = Math.sin(node);
+    return {
+        a: Math.exp(logA[0] + (logA[1] - logA[0]) * rows[r] / 65535),
+        e: rows[r + 1] / 65535,
+        inc: rows[r + 2] / 65535 * Math.PI,
+        node: rows[r + 3] / 65535 * 2 * Math.PI,
+        w: rows[r + 4] / 65535 * 2 * Math.PI,
+        M0: rows[r + 5] / 65535 * 2 * Math.PI,
+    };
+}
+// The point at eccentric anomaly E on an orbit -> out[o..o+2] (AU, scene frame)
+function placeOnOrbit(el, E, out, o) {
+    const px = el.a * (Math.cos(E) - el.e), py = el.a * Math.sqrt(1 - el.e * el.e) * Math.sin(E);
+    const cw = Math.cos(el.w), sw = Math.sin(el.w), ci = Math.cos(el.inc), si = Math.sin(el.inc);
+    const cn = Math.cos(el.node), sn = Math.sin(el.node);
     const x1 = cw * px - sw * py, y1 = sw * px + cw * py, y2 = ci * y1;
     const x = cn * x1 - sn * y2, y = sn * x1 + cn * y2, z = si * y1;
     out[o] = x;
     out[o + 1] = SIN_EPS * y + COS_EPS * z;
     out[o + 2] = -(COS_EPS * y - SIN_EPS * z);
 }
+// Point k at `days` since the epoch
+function pointPosition(rows, k, logA, meanMotion, days, out, o) {
+    const el = decode(rows, k, logA);
+    const n = meanMotion || GAUSS_K / (el.a * Math.sqrt(el.a));
+    const M = (((el.M0 + n * days) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    placeOnOrbit(el, eccentricAnomaly(M, el.e), out, o);
+}
+// Orbit lines: points per orbit, evenly spaced in eccentric anomaly (fine
+// both near the Sun and far out, as for the named bodies)
+const ORBIT_LINE_POINTS = 64;
+const ORBIT_LINE_OPACITY = 0.1;
+// Comet orbits are coloured by family, from the period (years)
+export const COMET_FAMILIES = [
+    { name: 'Jupiter-family', maxYears: 20, color: '#67e8f9' },
+    { name: 'Halley-type', maxYears: 200, color: '#c4b5fd' },
+    { name: 'Long-period', maxYears: Infinity, color: '#fbbf24' },
+];
+const familyColors = COMET_FAMILIES.map(f => new THREE.Color(f.color));
+// A line colour per orbit: comets by family, the rest their group's
+function orbitColor(groupId, el) {
+    if (groupId !== 'comet') return new THREE.Color(SMALL_BODY_GROUP_COLORS[groupId]);
+    const years = el.a ** 1.5;  // Kepler's third law (AU, years)
+    return familyColors[COMET_FAMILIES.findIndex(f => years < f.maxYears)];
+}
 
 // meta: small_bodies.json. Returns
 //   addTier(tierIndex, Uint16Array): draw a tier's points (0 default, 1 more)
 //   hasTier(tierIndex), update(date), setFade(f), setCameraDistance(au), setVisible(on),
 //   setGroupVisible(groupId, on), setTierVisible(tierIndex, on), setHaze(on),
+//   setGroupOrbits(groupId, on): draw every orbit of a group (default tier)
 //   pick(camera, width, height, x, y, radiusPx) -> {index, groupId, position} | null
 //     (the default tier's point nearest a screen point; index into its rows
 //     and small_bodies_names.json), dispose()
@@ -157,8 +186,11 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
     const objects = [];  // {points, tier, groupId}
     const hiddenGroups = new Set();
     const hiddenTiers = new Set();
+    const orbitsWanted = new Set();  // group ids whose orbit lines are asked for
+    let orbitLines = null;           // see setGroupOrbits
     const applyVisibility = () => {
         for (const o of objects) o.points.visible = !hiddenGroups.has(o.groupId) && !hiddenTiers.has(o.tier);
+        for (const [id, lines] of orbitLines ?? []) lines.visible = orbitsWanted.has(id) && !hiddenGroups.has(id);
     };
 
     // Hover picking: the default tier's positions, worked out in JS when
@@ -210,6 +242,48 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         return best;
     };
 
+    // Orbit lines of whole groups (default tier), built when first asked
+    // for: two-body orbits never change shape, so once is enough
+    orbitLines = new Map();  // group id -> LineSegments
+    let fadeNow = 1;
+    const setGroupOrbits = (id, on) => {
+        if (on) orbitsWanted.add(id);
+        else orbitsWanted.delete(id);
+        if (on && !orbitLines.has(id) && pickRows) {
+            const g = meta.groups.findIndex(x => x.id === id);
+            const start = meta.tiers[0].group_counts.slice(0, g).reduce((n, c) => n + c, 0);
+            const count = meta.tiers[0].group_counts[g];
+            const positions = new Float32Array(count * ORBIT_LINE_POINTS * 2 * 3);
+            const colors = new Float32Array(positions.length);
+            const p = new Float64Array(3), q = new Float64Array(3);
+            let o = 0;
+            for (let k = start; k < start + count; k++) {
+                const el = decode(pickRows, k, logA);
+                const { r, g: green, b } = orbitColor(id, el);
+                placeOnOrbit(el, 0, p, 0);
+                for (let i = 1; i <= ORBIT_LINE_POINTS; i++) {
+                    placeOnOrbit(el, 2 * Math.PI * i / ORBIT_LINE_POINTS, q, 0);
+                    positions.set(p, o);
+                    positions.set(q, o + 3);
+                    colors.set([r, green, b, r, green, b], o);
+                    o += 6;
+                    p.set(q);
+                }
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+                vertexColors: true, transparent: true, opacity: ORBIT_LINE_OPACITY * fadeNow,
+                depthWrite: false, blending: THREE.AdditiveBlending,
+            }));
+            lines.frustumCulled = false;
+            group.add(lines);
+            orbitLines.set(id, lines);
+        }
+        applyVisibility();
+    };
+
     const addTier = (tier, data) => {
         if (objects.some(o => o.tier === tier)) return;
         if (tier === 0) pickRows = data;
@@ -256,7 +330,11 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         hasTier: (tier) => objects.some(o => o.tier === tier),
         // Days since the epoch as a 32-bit float: ~1 minute steps a century out, plenty here
         update: (date) => { shared.uDays.value = julianDate(date) - meta.epoch_jd; },
-        setFade: (f) => { shared.uFade.value = f; },
+        setFade: (f) => {
+            shared.uFade.value = f;
+            fadeNow = f;
+            for (const lines of orbitLines.values()) lines.material.opacity = ORBIT_LINE_OPACITY * f;
+        },
         // Dim crowded groups (see TYPICAL_ORBIT_AU). Call each frame with
         // the camera's distance from the Sun (AU).
         setCameraDistance: (au) => {
@@ -278,7 +356,12 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         },
         setHaze: (on) => { shared.uLinear.value = on ? 1 : 0; },
         pick,
+        setGroupOrbits,
         dispose: () => {
+            for (const lines of orbitLines.values()) {
+                lines.geometry.dispose();
+                lines.material.dispose();
+            }
             scene.remove(group);
             for (const { points } of objects) {
                 points.geometry.dispose();
