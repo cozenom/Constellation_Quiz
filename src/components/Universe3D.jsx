@@ -857,11 +857,12 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             downAt = null;
             if (moved > 5) return;
             // Ring features are picked by their labels
-            const hit = ringId ? null : pickAny(e.clientX, e.clientY, e.pointerType === 'touch' ? 24 : 14);
+            const hit = ringId ? null : pickAny(e.clientX, e.clientY, e.pointerType === 'touch' ? 24 : 14, true);
             setSelectedStar(hit?.type === 'star' ? hit.index : null);
             setSelectedBody(hit?.type === 'body' ? hit.id : null);
             setSelectedRing(ringId);
-            setSelectedRegion(null);
+            // An unnamed asteroid or comet has no card of its own: its region's
+            setSelectedRegion(hit?.type === 'cloud' && SMALL_BODY_REGIONS[hit.groupId] ? hit.groupId : null);
         };
         // Hover: ring + name tooltip (mouse only, throttled to one pick per frame)
         let hoverRequest = null;
@@ -871,7 +872,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 hoverRequest = null;
                 const hit = pickAny(e.clientX, e.clientY, 12, true);
                 showHover(hit);
-                renderer.domElement.style.cursor = hit === null || hit.type === 'cloud' ? '' : 'pointer';
+                renderer.domElement.style.cursor = hit === null ? '' : 'pointer';
                 if (hit === null) {
                     tooltip.style.display = 'none';
                 } else {
