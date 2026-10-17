@@ -324,9 +324,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     const [selectedBody, setSelectedBody] = useState(null);
     const [selectedRing, setSelectedRing] = useState(null);
     // An asteroid / comet region whose card is open (SMALL_BODY_REGIONS key),
-    // and the comet families whose orbits its card has hidden
+    // and the parts of regions switched off from their cards ('group:part',
+    // e.g. 'main:inner', 'comet:halley')
     const [selectedRegion, setSelectedRegion] = useState(null);
-    const [hiddenFamilies, setHiddenFamilies] = useState(() => new Set());
+    const [hiddenParts, setHiddenParts] = useState(() => new Set());
     // On phones the options panel starts collapsed so it doesn't cover the sky
     const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 767);
     // What the view is centred on, for the footer title. Starts orbiting
@@ -414,7 +415,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         // Unnamed asteroids and comets: a point cloud placed on the GPU. The
         // default tier now; the "more" tier when asked (see showAllAsteroids)
         const cloud = solar && smallBodies ? buildSmallBodyCloud(solarLayer.scene, smallBodies.meta, pixelRatio) : null;
-        cloud?.addTier(0, smallBodies.points);
+        cloud?.addTier(0, smallBodies.points, smallBodies.parts);
         cloud?.update(new Date(clockRef.current.time));
         const earthPosition = new THREE.Vector3();
         if (solar?.byId.has('Earth')) earthPosition.copy(solar.byId.get('Earth').position).divideScalar(AU_PER_LY);
@@ -1475,8 +1476,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
 
     useEffect(() => {
         const cloud = sceneRef.current?.cloud;
-        for (const f of COMET_FAMILIES) cloud?.setOrbitPartVisible('comet', f.id, !hiddenFamilies.has(f.id));
-    }, [hiddenFamilies, starBuffers, planetFacts, moonsData, smallBodies]);
+        for (const [group, parts] of Object.entries(smallBodies?.meta.subgroup_ids ?? {})) {
+            for (const part of parts) cloud?.setPartVisible(group, part, !hiddenParts.has(`${group}:${part}`));
+        }
+    }, [hiddenParts, starBuffers, planetFacts, moonsData, smallBodies]);
 
     // "Asteroids & comets": on if anything in it is shown; switching it
     // turns everything in it on or off (each can then be switched alone)
@@ -1521,7 +1524,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 })
                 .then(buffer => {
                     setMoreTier('loaded');
-                    return new Uint16Array(buffer);
+                    const count = smallBodies.meta.tiers[1].count;
+                    return { rows: new Uint16Array(buffer, 0, count * 6), parts: new Uint8Array(buffer, count * 12, count) };
                 })
                 .catch(error => {
                     console.error('Error loading more asteroids:', error);
@@ -1533,7 +1537,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         }
         // Added even if switched off meanwhile: it stays hidden until on
         moreTierRef.current.then(data => {
-            if (data && sceneRef.current?.cloud === cloud) cloud.addTier(1, data);
+            if (data && sceneRef.current?.cloud === cloud) cloud.addTier(1, data.rows, data.parts);
         });
     }, [showAllAsteroids, starBuffers, planetFacts, moonsData, smallBodies]);
 
@@ -1837,11 +1841,11 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                     meta={smallBodies.meta}
                     bodies={solar.bodies}
                     time={clockView.time}
-                    hiddenFamilies={hiddenFamilies}
-                    onToggleFamily={(id) => setHiddenFamilies(prev => {
+                    hiddenParts={hiddenParts}
+                    onTogglePart={(key) => setHiddenParts(prev => {
                         const next = new Set(prev);
-                        if (next.has(id)) next.delete(id);
-                        else next.add(id);
+                        if (next.has(key)) next.delete(key);
+                        else next.add(key);
                         return next;
                     })}
                     onSelectBody={(id) => {

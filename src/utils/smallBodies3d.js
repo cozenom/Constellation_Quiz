@@ -51,6 +51,8 @@ const MIN_ALPHA = 0.008;
 const JUPITER_RATE = 2 * Math.PI / 4332.59;  // rad/day
 const RESONANT_RATE = { trojan: 1, hilda: 1.5 };
 const FIELDS_PER_POINT = 6;
+// Most parts in a group (small_bodies.json subgroup_ids)
+const MAX_PARTS = 8;
 // Points are only picked while the cloud is at least this visible
 const PICK_MIN_FADE = 0.3;
 
@@ -59,11 +61,18 @@ const vertexShader = `
     // position (three.js declares it): ln a, e, i (0..1 over their ranges).
     // Named so attribute 0 is always bound (some drivers are slow without).
     attribute vec3 elementsB;  // node, w, M at epoch (0..1 of a turn)
+    attribute float aPart;     // part of its group (small_bodies.json subgroup_ids), 255 none
+    uniform float uPartHidden[${MAX_PARTS}];  // 1: that part is switched off
     uniform vec2 uLogA;        // ln a range (AU)
     uniform float uDays;       // days since the elements' epoch
     uniform float uSize;
     uniform float uMeanMotion; // rad/day; 0: its own (Kepler's third law)
     void main() {
+        if (aPart < ${MAX_PARTS}.0 && uPartHidden[int(aPart)] > 0.5) {
+            gl_PointSize = 0.0;
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);  // outside the view
+            return;
+        }
         float a = exp(mix(uLogA.x, uLogA.y, position.x));
         float e = position.y;
         float inc = position.z * 3.141592653589793;
@@ -172,11 +181,13 @@ function orbitParts(groupId) {
 }
 
 // meta: small_bodies.json. Returns
-//   addTier(tierIndex, Uint16Array): draw a tier's points (0 default, 1 more)
+//   addTier(tierIndex, rows: Uint16Array, parts: Uint8Array): draw a tier's
+//     points (0 default, 1 more)
 //   hasTier(tierIndex), update(date), setFade(f), setCameraDistance(au), setVisible(on),
 //   setGroupVisible(groupId, on), setTierVisible(tierIndex, on), setHaze(on),
 //   setGroupOrbits(groupId, on): draw every orbit of a group (default tier)
-//   setOrbitPartVisible(groupId, sub, on): one part of those (a comet family)
+//   setPartVisible(groupId, sub, on): one part of a group (small_bodies.json
+//     subgroup_ids: a belt zone, a comet family...), dots and orbit lines
 //   pick(camera, width, height, x, y, radiusPx) -> {index, groupId, position} | null
 //     (the default tier's point nearest a screen point; index into its rows
 //     and small_bodies_names.json), dispose()
@@ -195,13 +206,15 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
     const hiddenGroups = new Set();
     const hiddenTiers = new Set();
     const orbitsWanted = new Set();   // group ids whose orbit lines are asked for
-    const hiddenOrbitParts = new Set();  // 'group:sub' (comet families)
+    const hiddenParts = new Set();    // 'group:sub' switched off (dots and orbit lines)
+    // Per group, shared by its tiers' materials: which parts are off
+    const partHidden = new Map(meta.groups.map(({ id }) => [id, { value: new Array(MAX_PARTS).fill(0) }]));
     let orbitLines = null;            // see setGroupOrbits
     const applyVisibility = () => {
         for (const o of objects) o.points.visible = !hiddenGroups.has(o.groupId) && !hiddenTiers.has(o.tier);
         for (const [id, parts] of orbitLines ?? []) {
             for (const { sub, lines } of parts) {
-                lines.visible = orbitsWanted.has(id) && !hiddenGroups.has(id) && !hiddenOrbitParts.has(`${id}:${sub}`);
+                lines.visible = orbitsWanted.has(id) && !hiddenGroups.has(id) && !hiddenParts.has(`${id}:${sub}`);
             }
         }
     };
@@ -209,6 +222,7 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
     // Hover picking: the default tier's positions, worked out in JS when
     // first needed and kept until the time changes
     let pickRows = null;
+    let pickParts = null;
     let pickCache = null;  // {days, positions: Float32Array}
     const pickPositions = () => {
         const days = shared.uDays.value;
@@ -236,7 +250,9 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         meta.groups.forEach(({ id }, g) => {
             const count = meta.tiers[0].group_counts[g];
             if (!hiddenGroups.has(id)) {
+                const off = partHidden.get(id).value;
                 for (let k = start; k < start + count; k++) {
+                    if (pickParts[k] < MAX_PARTS && off[pickParts[k]]) continue;
                     const x = positions[k * 3], y = positions[k * 3 + 1], z = positions[k * 3 + 2];
                     const w = m[3] * x + m[7] * y + m[11] * z + m[15];
                     if (w <= 0) continue;  // behind the camera
@@ -293,16 +309,24 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         if (on && !orbitLines.has(id) && pickRows) buildOrbitLines(id);
         applyVisibility();
     };
-    // Hide or show one part of a group's orbit lines (a comet family)
-    const setOrbitPartVisible = (id, sub, on) => {
-        if (on) hiddenOrbitParts.delete(`${id}:${sub}`);
-        else hiddenOrbitParts.add(`${id}:${sub}`);
+    // Hide or show one part of a group (a belt zone, a comet family...):
+    // its dots, orbit lines and picking
+    const setPartVisible = (id, sub, on) => {
+        const k = meta.subgroup_ids?.[id]?.indexOf(sub) ?? -1;
+        if (k < 0) return;
+        if (on) hiddenParts.delete(`${id}:${sub}`);
+        else hiddenParts.add(`${id}:${sub}`);
+        partHidden.get(id).value[k] = on ? 0 : 1;
         applyVisibility();
     };
 
-    const addTier = (tier, data) => {
+    // parts: one byte per point, its part (see setPartVisible)
+    const addTier = (tier, data, parts) => {
         if (objects.some(o => o.tier === tier)) return;
-        if (tier === 0) pickRows = data;
+        if (tier === 0) {
+            pickRows = data;
+            pickParts = parts;
+        }
         const { group_counts: counts } = meta.tiers[tier];
         const look = TIER_LOOK[tier];
         let start = 0;
@@ -311,12 +335,14 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
             if (!count) return;
             // A view into the file's buffer, no copy
             const rows = data.subarray(start * FIELDS_PER_POINT, (start + count) * FIELDS_PER_POINT);
+            const pointParts = parts.subarray(start, start + count);
             start += count;
             const buffer = new THREE.InterleavedBuffer(rows, FIELDS_PER_POINT);
             const geometry = new THREE.BufferGeometry();
             // Not positions: elements, placed by the shader (see vertexShader)
             geometry.setAttribute('position', new THREE.InterleavedBufferAttribute(buffer, 3, 0, true));
             geometry.setAttribute('elementsB', new THREE.InterleavedBufferAttribute(buffer, 3, 3, true));
+            geometry.setAttribute('aPart', new THREE.BufferAttribute(pointParts, 1));
             const material = new THREE.ShaderMaterial({
                 uniforms: {
                     ...shared,
@@ -324,6 +350,7 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
                     uAlpha: { value: look.alpha },
                     uDim: { value: 1 },
                     uMeanMotion: { value: (RESONANT_RATE[id] ?? 0) * JUPITER_RATE },
+                    uPartHidden: partHidden.get(id),
                     // Raw hex values, like the planet dots (no colour management)
                     uColor: { value: new THREE.Color().setHex(new THREE.Color(SMALL_BODY_GROUP_COLORS[id]).getHex(), THREE.LinearSRGBColorSpace) },
                 },
@@ -373,7 +400,7 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         setHaze: (on) => { shared.uLinear.value = on ? 1 : 0; },
         pick,
         setGroupOrbits,
-        setOrbitPartVisible,
+        setPartVisible,
         dispose: () => {
             for (const parts of orbitLines.values()) {
                 for (const { lines } of parts) {

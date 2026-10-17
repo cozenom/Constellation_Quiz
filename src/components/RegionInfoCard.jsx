@@ -98,9 +98,9 @@ const fmtYears = (days) => {
 
 // regionId: SMALL_BODY_REGIONS key; meta: small_bodies.json; bodies:
 // Solar System bodies (named small bodies and Pluto are listed);
-// time: the clock (ms); hiddenFamilies: Set of comet family ids whose
-// orbits are hidden
-function RegionInfoCard({ regionId, meta, bodies, time, hiddenFamilies, onToggleFamily, onSelectBody, onClose }) {
+// time: the clock (ms); hiddenParts: Set of 'region:part' switched off;
+// onTogglePart('region:part') switches one (its dots, and orbits for comets)
+function RegionInfoCard({ regionId, meta, bodies, time, hiddenParts, onTogglePart, onSelectBody, onClose }) {
     const info = REGION_INFO[regionId];
     const counts = meta.regions?.[regionId] ?? {};
     const total = regionId === 'oort' ? null
@@ -117,7 +117,7 @@ function RegionInfoCard({ regionId, meta, bodies, time, hiddenFamilies, onToggle
         const period = el && smallBodyPeriodDays(el);
         const extra = isComets && period
             ? `${fmtYears(period)}${period < 200 * 365.25 ? ` · next ${perihelionDate(el, date).getUTCFullYear()}` : ''}`
-            : SHOWERS[b.name] ?? (sb?.diameter_km ? `${Number(sb.diameter_km.toPrecision(3)).toLocaleString()} km` : '');
+            : SHOWERS[b.name] ?? (sb?.diameter_km ? `${sb.diameter_estimated ? '~' : ''}${Number(sb.diameter_km.toPrecision(3)).toLocaleString()} km across` : '');
         const shower = isComets && SHOWERS[b.name];
         return (
             <li key={b.id}>
@@ -146,24 +146,21 @@ function RegionInfoCard({ regionId, meta, bodies, time, hiddenFamilies, onToggle
 
             {info.parts.map(part => {
                 const swatch = part.color ?? SMALL_BODY_GROUP_COLORS[regionId];
-                const hidden = isComets && hiddenFamilies.has(part.id);
+                const key = `${regionId}:${part.id}`;
+                const hidden = hiddenParts.has(key);
                 return (
                     <div key={part.id} className="region-part">
-                        <div className="region-part-head">
-                            {isComets ? (
-                                <button
-                                    className={`universe-3d-swatch region-toggle ${hidden ? 'off' : ''}`}
-                                    style={{ background: swatch }}
-                                    onClick={() => onToggleFamily(part.id)}
-                                    title={hidden ? 'Show these orbits' : 'Hide these orbits'}
-                                    aria-pressed={!hidden}
-                                />
-                            ) : (
-                                <span className="universe-3d-swatch" style={{ background: swatch }} />
-                            )}
+                        {/* The whole heading switches the part's dots (and comets' orbits) */}
+                        <button
+                            className={`region-part-head ${hidden ? 'off' : ''}`}
+                            onClick={() => onTogglePart(key)}
+                            title={hidden ? 'Show these again' : 'Hide these'}
+                            aria-pressed={!hidden}
+                        >
+                            <span className="universe-3d-swatch" style={{ background: swatch }} />
                             <strong>{part.name}</strong>
                             <span className="region-count">{(counts[part.id] ?? 0).toLocaleString()}</span>
-                        </div>
+                        </button>
                         <div className="star-info-muted region-part-about">{part.about}</div>
                         {members(part.id).length > 0 && <ul className="region-members">{members(part.id).map(memberRow)}</ul>}
                     </div>
@@ -172,7 +169,7 @@ function RegionInfoCard({ regionId, meta, bodies, time, hiddenFamilies, onToggle
 
             {isComets && (
                 <div className="region-part">
-                    <div className="region-part-head">
+                    <div className="region-part-head static">
                         <span className="universe-3d-swatch" style={{ background: 'transparent', border: '1px solid #94a3b8' }} />
                         <strong>Passing through</strong>
                         <span className="region-count">{(meta.unbound_comets ?? 0).toLocaleString()}</span>

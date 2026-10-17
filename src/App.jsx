@@ -277,7 +277,9 @@ function App() {
         ])
             .then(([meta, buffer, historyBuffer]) => {
                 if (historyBuffer) attachSmallBodyHistory(meta, historyBuffer);
-                const data = { meta, points: new Uint16Array(buffer) };
+                // Rows of 6 uint16 elements, then one part byte per point
+                const count = meta.tiers[0].count;
+                const data = { meta, points: new Uint16Array(buffer, 0, count * 6), parts: new Uint8Array(buffer, count * 12, count) };
                 setSmallBodies(data);
                 return data;
             })
