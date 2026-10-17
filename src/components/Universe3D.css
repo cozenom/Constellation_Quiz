@@ -633,3 +633,67 @@ body:has(.universe-3d-screen) .stars-toggle {
         display: none;
     }
 }
+
+/* Region card (RegionInfoCard): parts with counts, named members */
+.region-info {
+    max-height: calc(100vh - 9rem);
+    overflow-y: auto;
+}
+
+.region-part {
+    margin-top: 0.75rem;
+}
+
+.region-part-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.88rem;
+}
+
+.region-count {
+    margin-left: auto;
+    color: #cbd5e1;
+    font-variant-numeric: tabular-nums;
+}
+
+.region-part-about {
+    font-size: 0.78rem;
+    margin: 0.15rem 0 0 1.05rem;
+}
+
+.region-members {
+    list-style: none;
+    margin: 0.3rem 0 0 1.05rem;
+    padding: 0;
+}
+
+.region-member {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.15rem 0.3rem;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.region-member:hover {
+    background: rgba(148, 163, 184, 0.15);
+}
+
+.region-toggle {
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.region-toggle.off {
+    opacity: 0.25;
+}

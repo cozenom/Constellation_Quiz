@@ -28,6 +28,7 @@ import {
 } from '../utils/universe3d';
 import { RING_FEATURES, RING_FEATURES_BY_ID, ringLabelKm, ringPole, ringScaleKm, ringSubtitle } from '../utils/rings';
 import PlanetInfoCard from './PlanetInfoCard';
+import RegionInfoCard from './RegionInfoCard';
 import RingInfoCard from './RingInfoCard';
 import SmallBodyInfoCard from './SmallBodyInfoCard';
 import StarInfoCard from './StarInfoCard';
@@ -322,6 +323,10 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     const [selectedStar, setSelectedStar] = useState(null);
     const [selectedBody, setSelectedBody] = useState(null);
     const [selectedRing, setSelectedRing] = useState(null);
+    // An asteroid / comet region whose card is open (SMALL_BODY_REGIONS key),
+    // and the comet families whose orbits its card has hidden
+    const [selectedRegion, setSelectedRegion] = useState(null);
+    const [hiddenFamilies, setHiddenFamilies] = useState(() => new Set());
     // On phones the options panel starts collapsed so it doesn't cover the sky
     const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 767);
     // What the view is centred on, for the footer title. Starts orbiting
@@ -363,11 +368,13 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     const selectStar = (index) => {
         setSelectedBody(null);
         setSelectedRing(null);
+        setSelectedRegion(null);
         setSelectedStar(index);
     };
     const selectBody = (id) => {
         setSelectedStar(null);
         setSelectedRing(null);
+        setSelectedRegion(null);
         setSelectedBody(id);
     };
 
@@ -853,6 +860,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             setSelectedStar(hit?.type === 'star' ? hit.index : null);
             setSelectedBody(hit?.type === 'body' ? hit.id : null);
             setSelectedRing(ringId);
+            setSelectedRegion(null);
         };
         // Hover: ring + name tooltip (mouse only, throttled to one pick per frame)
         let hoverRequest = null;
@@ -1354,6 +1362,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         s.setFollow(null);
         s.flyTo(pose.position, pose.target, pose.minDistance);
         setFocus({ type: 'region', id });
+        selectStar(null);
+        setSelectedRegion(id);
     };
 
     // Stars, planets and moons: fly straight in, as their cards' buttons do
@@ -1458,10 +1468,15 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     // the cloud, until the view moves on
     useEffect(() => {
         const s = sceneRef.current;
-        const on = focus.type === 'region' && focus.id === 'comet';
+        const on = selectedRegion === 'comet' || (focus.type === 'region' && focus.id === 'comet');
         s?.cloud?.setGroupOrbits('comet', on);
         s?.solar?.setCometOrbits(on);
-    }, [focus, starBuffers, planetFacts, moonsData, smallBodies]);
+    }, [focus, selectedRegion, starBuffers, planetFacts, moonsData, smallBodies]);
+
+    useEffect(() => {
+        const cloud = sceneRef.current?.cloud;
+        for (const f of COMET_FAMILIES) cloud?.setOrbitPartVisible('comet', f.id, !hiddenFamilies.has(f.id));
+    }, [hiddenFamilies, starBuffers, planetFacts, moonsData, smallBodies]);
 
     // "Asteroids & comets": on if anything in it is shown; switching it
     // turns everything in it on or off (each can then be switched alone)
@@ -1540,7 +1555,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 if (e.code !== 'Escape') return;
             }
             if (e.code === 'Escape') {
-                if (selectedStar !== null || selectedBody !== null || selectedRing !== null) selectStar(null);
+                if (selectedStar !== null || selectedBody !== null || selectedRing !== null || selectedRegion !== null) selectStar(null);
                 else onBack();
             }
             if (e.code === 'KeyL') setShowLines(prev => !prev);
@@ -1615,7 +1630,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     }
 
     return (
-        <div className={`universe-3d-screen ${star || body || ring ? 'has-card' : ''}`}>
+        <div className={`universe-3d-screen ${star || body || ring || selectedRegion ? 'has-card' : ''}`}>
             <div className="universe-3d-canvas" ref={mountRef} />
             <div className="universe-3d-labels" ref={labelsRef} />
             <div className="universe-3d-tooltip" ref={tooltipRef} />
@@ -1814,6 +1829,27 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                     distances={bodyDistances}
                     onClose={() => setSelectedBody(null)}
                     onFlyTo={() => flyToBody(selectedBody)}
+                />
+            )}
+            {selectedRegion && smallBodies && solar && (
+                <RegionInfoCard
+                    regionId={selectedRegion}
+                    meta={smallBodies.meta}
+                    bodies={solar.bodies}
+                    time={clockView.time}
+                    hiddenFamilies={hiddenFamilies}
+                    onToggleFamily={(id) => setHiddenFamilies(prev => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                    })}
+                    onSelectBody={(id) => {
+                        setShowSmallBodies(true);
+                        selectBody(id);
+                        flyToBody(id);
+                    }}
+                    onClose={() => setSelectedRegion(null)}
                 />
             )}
             {ring && (

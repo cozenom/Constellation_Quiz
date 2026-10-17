@@ -150,18 +150,25 @@ function pointPosition(rows, k, logA, meanMotion, days, out, o) {
 // both near the Sun and far out, as for the named bodies)
 const ORBIT_LINE_POINTS = 64;
 const ORBIT_LINE_OPACITY = 0.1;
-// Comet orbits are coloured by family, from the period (years)
+// Comet orbits are drawn and coloured by family, from the period (years);
+// ids as small_bodies.json's comet subgroups
 export const COMET_FAMILIES = [
-    { name: 'Jupiter-family', maxYears: 20, color: '#67e8f9' },
-    { name: 'Halley-type', maxYears: 200, color: '#c4b5fd' },
-    { name: 'Long-period', maxYears: Infinity, color: '#fbbf24' },
+    { id: 'jupiter', name: 'Jupiter-family', maxYears: 20, color: '#67e8f9' },
+    { id: 'halley', name: 'Halley-type', maxYears: 200, color: '#c4b5fd' },
+    { id: 'long', name: 'Long-period', maxYears: Infinity, color: '#fbbf24' },
 ];
-const familyColors = COMET_FAMILIES.map(f => new THREE.Color(f.color));
-// A line colour per orbit: comets by family, the rest their group's
-function orbitColor(groupId, el) {
-    if (groupId !== 'comet') return new THREE.Color(SMALL_BODY_GROUP_COLORS[groupId]);
-    const years = el.a ** 1.5;  // Kepler's third law (AU, years)
-    return familyColors[COMET_FAMILIES.findIndex(f => years < f.maxYears)];
+// Orbit lines come in parts that can be hidden alone: comets by family,
+// other groups whole. -> [{sub, color, test(el)}]
+function orbitParts(groupId) {
+    if (groupId !== 'comet') return [{ sub: '', color: SMALL_BODY_GROUP_COLORS[groupId], test: () => true }];
+    return COMET_FAMILIES.map((f, k) => ({
+        sub: f.id,
+        color: f.color,
+        test: (el) => {
+            const years = el.a ** 1.5;  // Kepler's third law (AU, years)
+            return years < f.maxYears && (k === 0 || years >= COMET_FAMILIES[k - 1].maxYears);
+        },
+    }));
 }
 
 // meta: small_bodies.json. Returns
@@ -169,6 +176,7 @@ function orbitColor(groupId, el) {
 //   hasTier(tierIndex), update(date), setFade(f), setCameraDistance(au), setVisible(on),
 //   setGroupVisible(groupId, on), setTierVisible(tierIndex, on), setHaze(on),
 //   setGroupOrbits(groupId, on): draw every orbit of a group (default tier)
+//   setOrbitPartVisible(groupId, sub, on): one part of those (a comet family)
 //   pick(camera, width, height, x, y, radiusPx) -> {index, groupId, position} | null
 //     (the default tier's point nearest a screen point; index into its rows
 //     and small_bodies_names.json), dispose()
@@ -186,11 +194,16 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
     const objects = [];  // {points, tier, groupId}
     const hiddenGroups = new Set();
     const hiddenTiers = new Set();
-    const orbitsWanted = new Set();  // group ids whose orbit lines are asked for
-    let orbitLines = null;           // see setGroupOrbits
+    const orbitsWanted = new Set();   // group ids whose orbit lines are asked for
+    const hiddenOrbitParts = new Set();  // 'group:sub' (comet families)
+    let orbitLines = null;            // see setGroupOrbits
     const applyVisibility = () => {
         for (const o of objects) o.points.visible = !hiddenGroups.has(o.groupId) && !hiddenTiers.has(o.tier);
-        for (const [id, lines] of orbitLines ?? []) lines.visible = orbitsWanted.has(id) && !hiddenGroups.has(id);
+        for (const [id, parts] of orbitLines ?? []) {
+            for (const { sub, lines } of parts) {
+                lines.visible = orbitsWanted.has(id) && !hiddenGroups.has(id) && !hiddenOrbitParts.has(`${id}:${sub}`);
+            }
+        }
     };
 
     // Hover picking: the default tier's positions, worked out in JS when
@@ -244,43 +257,46 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
 
     // Orbit lines of whole groups (default tier), built when first asked
     // for: two-body orbits never change shape, so once is enough
-    orbitLines = new Map();  // group id -> LineSegments
+    orbitLines = new Map();  // group id -> [{sub, lines}]
     let fadeNow = 1;
-    const setGroupOrbits = (id, on) => {
-        if (on) orbitsWanted.add(id);
-        else orbitsWanted.delete(id);
-        if (on && !orbitLines.has(id) && pickRows) {
-            const g = meta.groups.findIndex(x => x.id === id);
-            const start = meta.tiers[0].group_counts.slice(0, g).reduce((n, c) => n + c, 0);
-            const count = meta.tiers[0].group_counts[g];
-            const positions = new Float32Array(count * ORBIT_LINE_POINTS * 2 * 3);
-            const colors = new Float32Array(positions.length);
-            const p = new Float64Array(3), q = new Float64Array(3);
-            let o = 0;
-            for (let k = start; k < start + count; k++) {
-                const el = decode(pickRows, k, logA);
-                const { r, g: green, b } = orbitColor(id, el);
-                placeOnOrbit(el, 0, p, 0);
-                for (let i = 1; i <= ORBIT_LINE_POINTS; i++) {
-                    placeOnOrbit(el, 2 * Math.PI * i / ORBIT_LINE_POINTS, q, 0);
-                    positions.set(p, o);
-                    positions.set(q, o + 3);
-                    colors.set([r, green, b, r, green, b], o);
-                    o += 6;
-                    p.set(q);
-                }
+    const buildOrbitLines = (id) => {
+        const g = meta.groups.findIndex(x => x.id === id);
+        const start = meta.tiers[0].group_counts.slice(0, g).reduce((n, c) => n + c, 0);
+        const count = meta.tiers[0].group_counts[g];
+        const p = new Float64Array(3), q = new Float64Array(3);
+        const parts = orbitParts(id).map(part => ({ ...part, positions: [] }));
+        for (let k = start; k < start + count; k++) {
+            const el = decode(pickRows, k, logA);
+            const out = parts.find(part => part.test(el)).positions;
+            placeOnOrbit(el, 0, p, 0);
+            for (let i = 1; i <= ORBIT_LINE_POINTS; i++) {
+                placeOnOrbit(el, 2 * Math.PI * i / ORBIT_LINE_POINTS, q, 0);
+                out.push(p[0], p[1], p[2], q[0], q[1], q[2]);
+                p.set(q);
             }
+        }
+        orbitLines.set(id, parts.map(({ sub, color, positions }) => {
             const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
             const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
-                vertexColors: true, transparent: true, opacity: ORBIT_LINE_OPACITY * fadeNow,
+                color, transparent: true, opacity: ORBIT_LINE_OPACITY * fadeNow,
                 depthWrite: false, blending: THREE.AdditiveBlending,
             }));
             lines.frustumCulled = false;
             group.add(lines);
-            orbitLines.set(id, lines);
-        }
+            return { sub, lines };
+        }));
+    };
+    const setGroupOrbits = (id, on) => {
+        if (on) orbitsWanted.add(id);
+        else orbitsWanted.delete(id);
+        if (on && !orbitLines.has(id) && pickRows) buildOrbitLines(id);
+        applyVisibility();
+    };
+    // Hide or show one part of a group's orbit lines (a comet family)
+    const setOrbitPartVisible = (id, sub, on) => {
+        if (on) hiddenOrbitParts.delete(`${id}:${sub}`);
+        else hiddenOrbitParts.add(`${id}:${sub}`);
         applyVisibility();
     };
 
@@ -333,7 +349,7 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         setFade: (f) => {
             shared.uFade.value = f;
             fadeNow = f;
-            for (const lines of orbitLines.values()) lines.material.opacity = ORBIT_LINE_OPACITY * f;
+            for (const parts of orbitLines.values()) parts.forEach(({ lines }) => { lines.material.opacity = ORBIT_LINE_OPACITY * f; });
         },
         // Dim crowded groups (see TYPICAL_ORBIT_AU). Call each frame with
         // the camera's distance from the Sun (AU).
@@ -357,10 +373,13 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         setHaze: (on) => { shared.uLinear.value = on ? 1 : 0; },
         pick,
         setGroupOrbits,
+        setOrbitPartVisible,
         dispose: () => {
-            for (const lines of orbitLines.values()) {
-                lines.geometry.dispose();
-                lines.material.dispose();
+            for (const parts of orbitLines.values()) {
+                for (const { lines } of parts) {
+                    lines.geometry.dispose();
+                    lines.material.dispose();
+                }
             }
             scene.remove(group);
             for (const { points } of objects) {
