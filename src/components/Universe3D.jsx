@@ -1230,6 +1230,18 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
         return radiusLy ? radiusLy * STAR_MIN_RADII : ORBIT_MIN_DISTANCE;
     };
 
+    // Turn to face the star without moving: it becomes the orbit target, so
+    // dragging orbits it and zooming heads for it. The camera keeps riding
+    // along with whatever it rode with (e.g. Earth), the target stays put.
+    const focusStar = (index) => {
+        const s = sceneRef.current;
+        if (!s) return;
+        const p = Array.from(starBuffers.positions.subarray(index * 3, index * 3 + 3));
+        s.setFollow(s.follow.id, false);
+        s.flyTo(s.camera.position.toArray(), p, starMinDistance(index));
+        setFocus({ type: 'star', index });
+    };
+
     // Stars, planets and moons: fly straight in, as their cards' buttons do
     const handleSearchSelect = (item) => {
         if (item.type === 'constellation') {
@@ -1513,6 +1525,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, onBack
                     lineInfo={lineStarInfo.get(star.hip)}
                     onClose={() => setSelectedStar(null)}
                     onFlyTo={() => flyToStar(selectedStar)}
+                    onFocus={() => focusStar(selectedStar)}
                 />
             )}
             {body && (

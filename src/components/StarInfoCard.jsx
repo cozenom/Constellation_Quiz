@@ -71,7 +71,7 @@ function DistanceValue({ dist, err }) {
     );
 }
 
-function StarInfoCard({ star, lineInfo, onClose, onFlyTo }) {
+function StarInfoCard({ star, lineInfo, onClose, onFlyTo, onFocus }) {
     const bayer = formatBayer(lineInfo?.bayer);
     const title = star.name || bayer || `HIP ${star.hip}`;
     const subtitle = [
@@ -131,7 +131,10 @@ function StarInfoCard({ star, lineInfo, onClose, onFlyTo }) {
                 </p>
             )}
 
-            <button className="button-primary star-info-fly" onClick={onFlyTo}>Fly to star</button>
+            <div className="star-info-actions">
+                <button className="button-secondary star-info-fly" onClick={onFocus} title="Turn to face it without moving">Focus on</button>
+                <button className="button-primary star-info-fly" onClick={onFlyTo}>Fly to star</button>
+            </div>
         </div>
     );
 }

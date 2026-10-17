@@ -484,6 +484,16 @@ body:has(.universe-3d-screen) .stars-toggle {
     font-size: 0.9rem;
 }
 
+/* Star card: Focus on + Fly to star side by side */
+.star-info-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.star-info-actions .star-info-fly {
+    flex: 1;
+}
+
 .universe-3d-error {
     display: flex;
     align-items: center;
