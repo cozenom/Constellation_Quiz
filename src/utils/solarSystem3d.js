@@ -32,7 +32,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GALILEAN, galileanOrbitLoop, galileanPositions, moonOrbitLoop, moonPeriodDays, moonPosition } from './moons.js';
 import { RING_SYSTEMS } from './rings.js';
 import { bodyAxes, heliocentricPosition, moonOrbitPath, orbitPath, orbitPeriodDays, SOLAR_SYSTEM_BODIES } from './planets.js';
-import { smallBodyOrbit, smallBodyPeriodDays, smallBodyPosition } from './smallBodies.js';
+import { smallBodyOrbit, smallBodyPeriodDays, smallBodyPosition, spinAxes } from './smallBodies.js';
 import { KM_PER_AU, raDecToXYZ } from './universe3d.js';
 
 // Whole layer fades out between these camera distances from the Sun (AU)
@@ -134,6 +134,8 @@ export const SURFACE_MAPS = {
     Oberon: { file: 'oberon.jpg', ...NASA_3D, from: 'Voyager 2 map (1986 flyby)', note: `${UNSEEN_NORTH}. ${TINTED}` },
     Triton: { file: 'triton.jpg', ...USGS, from: 'Voyager 2 colour mosaic (1989 flyby)', note: 'Voyager 2 saw mostly the southern half; the rest is filled in' },
     Charon: { file: 'charon.jpg', ...USGS, from: 'New Horizons mosaic (2015 flyby)', note: `${NEW_HORIZONS_SOUTH}. ${TINTED}` },
+    Ceres: { file: 'ceres.jpg', ...USGS, from: 'Dawn mosaic (2015, made by DLR)', note: 'Around the south pole is filled in. Its bright spots are salt deposits in Occator crater' },
+    Vesta: { file: 'vesta.jpg', ...USGS, from: 'Dawn mosaic (2011-2012, made by DLR)', note: 'The north was in winter darkness while Dawn mapped it, so it shows dark. Drawn as a sphere: the real Vesta is squashed, with a giant crater at its south pole' },
 };
 // Earth's extra maps (Solar System Scope, like its day map; the ocean mask
 // converted from their TIFF) and look (see setupEarth)
@@ -793,10 +795,12 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
             color: new THREE.Color(isComet ? COMET_COLOR : ICY_TYPES.has(sb.type) ? ICY_COLOR : ASTEROID_COLOR).getHex(),
         });
         body.smallBody = sb;
+        body.isComet = isComet;
         bodies.push(body);
         smallBodyList.push(body);
     }
     let showSmallBodies = true;
+    const spinningSmall = smallBodyList.filter(b => b.smallBody.spin);
     const byId = new Map(bodies.map(b => [b.id, b]));
     const moonBodies = bodies.filter(b => b.parentId && b.id !== 'Moon');
     const lockedMoons = moonBodies.filter(b => b.mesh && !UNLOCKED_MOONS.has(b.name));
@@ -808,8 +812,12 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     // round; the most out-of-date first, within ORBIT_BUDGET_MS a frame, so
     // fast time stays smooth (lines just lag a little). Moon orbits sit in a
     // group per planet, kept at the planet.
+    // Between resamples the body runs along the true curve, which strays
+    // from the straight segments (Pluto: ~8,000 km, seven of its radii), so
+    // each frame the body's own position is put into the line between the
+    // two samples around it (bodyAt): the line always passes through it.
     const isGalilean = (body) => body.parentId === 'Jupiter' && GALILEAN.includes(body.name);
-    const orbits = [];  // {line, sample(date), periodDays, sampledAt (ms) | null}
+    const orbits = [];  // {line, sample(date), periodDays, sampledAt (ms) | null, ...}
     const moonOrbitGroups = new Map();  // planet id -> Group
     const moonOrbitGroup = (planetId) => {
         if (!moonOrbitGroups.has(planetId)) {
@@ -823,13 +831,16 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     const smallOrbitGroup = new THREE.Group();
     orbitGroup.add(smallOrbitGroup);
     // everyFrame: resampled whenever the time changes (small bodies: cheap
-    // to sample, and their body must sit exactly on its line up close)
-    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments, closed = true, everyFrame = false }) => {
-        const line = makeOrbitLine(new Float32Array(segments * 3), color, opacity, closed);
+    // to sample, and their body must sit exactly on its line up close).
+    // bodyAt() -> Vector3: the body in the line's frame (sampleOrbit lines,
+    // see placeBody), so the line can be drawn through it
+    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments, closed = true, everyFrame = false, bodyAt = null }) => {
+        const vertices = bodyAt ? segments + 1 : segments;
+        const line = makeOrbitLine(new Float32Array(vertices * 3), color, opacity, closed);
         line.frustumCulled = false;  // samples move round the orbit
         line.visible = false;        // until first sampled
         parent.add(line);
-        const orbit = { line, sample, periodDays, everyFrame, sampledAt: null };
+        const orbit = { line, sample, periodDays, segments, everyFrame, bodyAt, sampledAt: null, loop: null, origin: null };
         orbits.push(orbit);
         return orbit;
     };
@@ -841,7 +852,16 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     const resample = (orbit, date) => {
         const loop = orbit.sample(date);  // doubles
         const mid = loop.length / 6 | 0;  // the point at `date`
-        const ax = loop[mid * 3], ay = loop[mid * 3 + 1], az = loop[mid * 3 + 2];
+        orbit.loop = loop;
+        orbit.origin = [loop[mid * 3], loop[mid * 3 + 1], loop[mid * 3 + 2]];
+        orbit.line.position.set(...orbit.origin);
+        orbit.line.visible = true;
+        orbit.sampledAt = date.getTime();
+        if (orbit.bodyAt) {
+            placeBody(orbit, date);
+            return;
+        }
+        const [ax, ay, az] = orbit.origin;
         const array = orbit.line.geometry.attributes.position.array;
         for (let i = 0; i < loop.length; i += 3) {
             array[i] = loop[i] - ax;
@@ -849,40 +869,64 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
             array[i + 2] = loop[i + 2] - az;
         }
         orbit.line.geometry.attributes.position.needsUpdate = true;
-        orbit.line.position.set(ax, ay, az);
-        orbit.line.visible = true;
-        orbit.sampledAt = date.getTime();
     };
+    // Write the line with the body put in after the last sample before it.
+    // sampleOrbit's point i is at sampledAt + sign(u) |u|^3 period/2, with
+    // u = -1 + 2i/segments, so that sample is found by inverting this.
+    const placeBody = (orbit, date) => {
+        const { loop, segments, origin: [ax, ay, az] } = orbit;
+        const halfPeriod = orbit.periodDays * 86400000 / 2;
+        const u = Math.cbrt((date.getTime() - orbit.sampledAt) / halfPeriod);
+        const before = THREE.MathUtils.clamp(Math.floor((u + 1) * segments / 2), 0, segments - 1);
+        const body = orbit.bodyAt();
+        const array = orbit.line.geometry.attributes.position.array;
+        let out = 0;
+        for (let i = 0; i < segments; i++) {
+            array[out++] = loop[i * 3] - ax;
+            array[out++] = loop[i * 3 + 1] - ay;
+            array[out++] = loop[i * 3 + 2] - az;
+            if (i === before) {
+                array[out++] = body.x - ax;
+                array[out++] = body.y - ay;
+                array[out++] = body.z - az;
+            }
+        }
+        orbit.line.geometry.attributes.position.needsUpdate = true;
+    };
+    const relative = new THREE.Vector3();
+    const fromParent = (body) => () => relative.subVectors(body.position, byId.get(body.parentId).position);
     const moonOrbit = (body, opacity) => addOrbit({
         sample: isGalilean(body)
             ? (d) => galileanOrbitLoop(body.name, moonPeriodDays(body.moon), d)
             : (d) => moonOrbitLoop(body.moon, d),
         periodDays: moonPeriodDays(body.moon), color: body.color, opacity,
-        parent: moonOrbitGroup(body.parentId), segments: 256,
+        parent: moonOrbitGroup(body.parentId), segments: 256, bodyAt: fromParent(body),
     });
 
     for (const id of SOLAR_SYSTEM_BODIES) {
         const body = byId.get(id);
-        if (body) addOrbit({ sample: (d) => orbitPath(id, d), periodDays: orbitPeriodDays(id), color: body.color, segments: 512 });
+        if (body) {
+            addOrbit({
+                sample: (d) => orbitPath(id, d), periodDays: orbitPeriodDays(id), color: body.color, segments: 512,
+                bodyAt: () => body.position,
+            });
+        }
     }
     if (byId.has('Moon')) {
         addOrbit({
             sample: (d) => moonOrbitPath(d), periodDays: orbitPeriodDays('Moon'),
             color: byId.get('Moon').color, parent: moonOrbitGroup('Earth'), segments: 512,
+            bodyAt: fromParent(byId.get('Moon')),
         });
     }
     for (const body of moonBodies.filter(b => b.major)) moonOrbit(body);
 
-    const smallBodyOrbitLine = (body, opacity) => {
-        const sb = body.smallBody;
-        const bound = sb.e < 1;
-        const segments = bound ? 512 : 513;  // open paths: both ends sampled
-        return addOrbit({
-            sample: (d) => smallBodyOrbit(sb, d, bound ? segments : segments - 1).points,
-            periodDays: smallBodyPeriodDays(sb), color: body.color, opacity,
-            parent: smallOrbitGroup, segments, closed: bound, everyFrame: true,
-        });
-    };
+    // An open line of 513 points, closed or not by its points (see smallBodyOrbit)
+    const smallBodyOrbitLine = (body, opacity) => addOrbit({
+        sample: (d) => smallBodyOrbit(body.smallBody, d, 512),
+        periodDays: smallBodyPeriodDays(body.smallBody), color: body.color, opacity,
+        parent: smallOrbitGroup, segments: 513, closed: false, everyFrame: true,
+    });
     for (const body of smallBodyList.filter(b => b.type === 'dwarf planet')) smallBodyOrbitLine(body);
 
     let lastDate = null;
@@ -902,10 +946,16 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
             .filter(s => s.age >= 1)
             .sort((a, b) => b.age - a.age);
         const start = performance.now();
+        const resampled = new Set();
         for (const { o } of stale) {
             resample(o, date);
+            resampled.add(o);
             // First build: everything at once; afterwards a few ms a frame
             if (lastDate !== null && performance.now() - start > ORBIT_BUDGET_MS) break;
+        }
+        // The rest keep their samples; put their bodies' new places in
+        for (const o of orbits) {
+            if (o.bodyAt && o.loop && !resampled.has(o) && o.sampledAt !== now) placeBody(o, date);
         }
     };
 
@@ -1026,8 +1076,9 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
             earthClouds.rotation.y = fraction * 2 * Math.PI;
             earthUniforms.uCloudShift.value = fraction;
         }
-        for (const body of spinning) {
-            const { pole, meridian } = bodyAxes(body.id, date);
+        // Small bodies with a map turn on their own model (spinAxes)
+        for (const body of [...spinning, ...spinningSmall]) {
+            const { pole, meridian } = body.smallBody ? spinAxes(body.smallBody.spin, date) : bodyAxes(body.id, date);
             xAxis.set(...meridian);
             yAxis.set(...pole);
             zAxis.crossVectors(xAxis, yAxis);

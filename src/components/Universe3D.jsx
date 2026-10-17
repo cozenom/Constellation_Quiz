@@ -8,10 +8,12 @@ import { addLayerPasses, createLayer, renderLayers, syncLayerCamera, syncLayerPa
 import { createStarDisc, radiusToLy } from '../utils/starDisc';
 import { buildSolarSystem, ECLIPTIC_NORTH, minViewRadii } from '../utils/solarSystem3d';
 import { buildSmallBodyCloud, SMALL_BODY_GROUP_COLORS } from '../utils/smallBodies3d';
+import { buildOortCloud, OORT_LABEL_POSITION } from '../utils/oortCloud';
 import {
     AU_PER_LY,
     KM_PER_AU,
     LY_PER_PARSEC,
+    SMALL_BODY_REGIONS,
     SMALL_BODY_TYPE_LABELS,
     buildGaiaBuffers,
     buildLineStarInfo,
@@ -81,6 +83,11 @@ const RING_WAVE_EXAGGERATION = 10;
 // Viewing a ring feature: this many times its size away, at least the minimum
 const RING_VIEW_SCALE = 5;
 const RING_VIEW_MIN_KM = 2000;
+// Overview of an asteroid / comet region (search): camera this far from the
+// Sun (AU), above the ecliptic on Earth's side
+const REGION_VIEW_AU = {
+    main: 9, hilda: 12, trojan: 16, neo: 4, centaur: 70, tno: 140, comet: 14, other: 10, oort: 400000,
+};
 
 // Points shader: each star stores its absolute magnitude, and the apparent
 // magnitude is recomputed from the camera distance every frame. From Earth
@@ -299,13 +306,17 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
     const [showOrbits, setShowOrbits] = useState(true);
     const [showSmallMoons, setShowSmallMoons] = useState(true);
     const [exaggerateRingWaves, setExaggerateRingWaves] = useState(false);
-    // Asteroids and comets: the named ones and the point cloud, its hidden
-    // groups (small_bodies.json group ids), and whether the big "more" tier
-    // (all 1.5 million) is drawn. moreTier: 'idle' | 'loading' | 'loaded' | 'error'
+    // Asteroids and comets: the named ones (showSmallBodies), the point
+    // cloud's hidden groups (small_bodies.json group ids), and whether the
+    // big "more" tier (all 1.5 million) is drawn. Each is switched alone;
+    // the "Asteroids & comets" box switches them all (see setAllSmallBodies).
+    // moreTier: 'idle' | 'loading' | 'loaded' | 'error'
     const [showSmallBodies, setShowSmallBodies] = useState(true);
     const [hiddenGroups, setHiddenGroups] = useState(() => new Set());
     const [showAllAsteroids, setShowAllAsteroids] = useState(false);
     const [moreTier, setMoreTier] = useState('idle');
+    // The Oort cloud model (star layer), shown with the asteroids
+    const [showOort, setShowOort] = useState(true);
     // At most one of these is set: a star index, a solar system body id, or
     // a ring feature id (utils/rings.js)
     const [selectedStar, setSelectedStar] = useState(null);
@@ -347,7 +358,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         [constellationData, selectedAbbrev]
     );
 
-    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, showSmallBodies, selectedAbbrev, selectedHips, selectedRing };
+    optionsRef.current = { showLines, showAllLines, showLabels, showPlanets, showSmallBodies, showOort, selectedAbbrev, selectedHips, selectedRing };
 
     const selectStar = (index) => {
         setSelectedBody(null);
@@ -451,6 +462,14 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             };
         };
 
+        // Camera pose for an overview of an asteroid region, in ly: distAu
+        // from the Sun, looking at it from above the ecliptic on Earth's side
+        const regionPose = (distAu) => {
+            const dir = earthPosition.lengthSq() > 0 ? earthPosition.clone().normalize() : new THREE.Vector3(1, 0, 0);
+            const offset = dir.add(ECLIPTIC_NORTH.clone().multiplyScalar(1.2)).normalize().multiplyScalar(distAu / AU_PER_LY);
+            return { position: offset.toArray(), target: [0, 0, 0], minDistance: distAu * 0.01 / AU_PER_LY };
+        };
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
@@ -481,6 +500,9 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         if (gaiaStars) scene.add(gaiaStars);
 
         // The Sun, so you can find home after flying away
+        // The Oort cloud: a model, far beyond the planets (see utils/oortCloud)
+        const oort = buildOortCloud(scene, pixelRatio);
+
         const sun = makeStarPoints(
             new Float32Array([0, 0, 0]),
             new Float32Array(bvToColor(SUN_BV)),
@@ -520,6 +542,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             earthPosition,
             bodyPose,
             ringPose,
+            regionPose,
             // The body the view rides along with as time runs (see setFollow)
             follow: { id: home ? 'Earth' : null, moveTarget: true },
             selectedBodyId: null,
@@ -736,17 +759,63 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             return best;
         };
 
-        // Planets win over stars: they're drawn on top
-        const pickAny = (clientX, clientY, radiusPx) => {
+        // An unnamed asteroid or comet under the point (hover only), or null
+        const pickCloudDot = (clientX, clientY, radiusPx) => {
+            if (!cloud || !solarLayer.visible) return null;
+            const rect = renderer.domElement.getBoundingClientRect();
+            syncLayerCamera(solarLayer, camera);
+            return cloud.pick(solarCamera, rect.width, rect.height, clientX - rect.left, clientY - rect.top, radiusPx);
+        };
+
+        // Planets win over stars: they're drawn on top. Cloud dots come
+        // between, for hovering (withCloud): they have no card to open.
+        const pickAny = (clientX, clientY, radiusPx, withCloud = false) => {
             const id = pickBody(clientX, clientY, radiusPx);
             if (id !== null) return { type: 'body', id };
+            const dot = withCloud ? pickCloudDot(clientX, clientY, Math.min(radiusPx, 8)) : null;
+            if (dot) return { type: 'cloud', ...dot };
             const index = pickStar(clientX, clientY, radiusPx);
             return index === null ? null : { type: 'star', index };
         };
 
+        // Cloud dot names (small_bodies_names.json): loaded on the first hover
+        let dotNames = null;  // null | 'loading' | {names, H}
+        const loadDotNames = () => {
+            if (dotNames) return;
+            dotNames = 'loading';
+            fetch(`${import.meta.env.BASE_URL}data/${smallBodies.meta.names_file}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to load asteroid names: ${response.statusText}`);
+                    return response.json();
+                })
+                .then(data => { dotNames = data; })
+                .catch(error => {
+                    console.error(error);
+                    dotNames = null;  // try again on a later hover
+                });
+        };
+        const groupNames = new Map((smallBodies?.meta.groups ?? []).map(g => [g.id, g.name]));
+        // "433 Eros · Near-Earth · ~17 km" (size from brightness, typical albedo)
+        const dotLabel = (hit) => {
+            loadDotNames();
+            const group = groupNames.get(hit.groupId);
+            if (typeof dotNames !== 'object' || dotNames === null) return group;
+            const H = dotNames.H[hit.index];
+            const km = H === null ? null : 1329 / Math.sqrt(0.14) * 10 ** (-H / 5);
+            const size = km === null || hit.groupId === 'comet' ? ''
+                : ` · ~${km < 1 ? `${Math.round(km * 1000)} m` : `${Number(km.toPrecision(2))} km`}`;
+            return `${dotNames.names[hit.index]} · ${group}${size}`;
+        };
+
         const showHover = (hit) => {
             placeRing(hoverRing, hit?.type === 'star' ? positions.subarray(hit.index * 3, hit.index * 3 + 3) : null);
-            placeRing(bodyHoverRing, hit?.type === 'body' ? solar.byId.get(hit.id).position.toArray() : null);
+            placeRing(bodyHoverRing, hit?.type === 'body' ? solar.byId.get(hit.id).position.toArray()
+                : hit?.type === 'cloud' ? hit.position : null);
+            if (hit?.type === 'cloud') {
+                const u = bodyHoverRing.material.uniforms;
+                u.uSize.value = bodyHoverRing.userData.minSize;
+                u.uOpacity.value = bodyHoverRing.userData.opacity;
+            }
             s.hoverBodyId = hit?.type === 'body' ? hit.id : null;
         };
 
@@ -791,13 +860,15 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             if (e.pointerType !== 'mouse' || e.buttons !== 0 || hoverRequest) return;
             hoverRequest = requestAnimationFrame(() => {
                 hoverRequest = null;
-                const hit = pickAny(e.clientX, e.clientY, 12);
+                const hit = pickAny(e.clientX, e.clientY, 12, true);
                 showHover(hit);
-                renderer.domElement.style.cursor = hit === null ? '' : 'pointer';
+                renderer.domElement.style.cursor = hit === null || hit.type === 'cloud' ? '' : 'pointer';
                 if (hit === null) {
                     tooltip.style.display = 'none';
                 } else {
-                    tooltip.textContent = hit.type === 'star' ? starLabel(hit.index) : solar.byId.get(hit.id).name;
+                    tooltip.textContent = hit.type === 'star' ? starLabel(hit.index)
+                        : hit.type === 'cloud' ? dotLabel(hit)
+                        : solar.byId.get(hit.id).name;
                     tooltip.style.display = 'block';
                     tooltip.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 10}px)`;
                 }
@@ -868,6 +939,11 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 minPx: f.kind === 'gap' ? RING_GAP_LABEL_PX : RING_LABEL_PX,
             };
         }) : [];
+        const oortLabel = {
+            position: new THREE.Vector3(...OORT_LABEL_POSITION),
+            el: makeLabelEl('Oort cloud (model)', 'universe-3d-label universe-3d-label-constellation'),
+            shown: false,
+        };
         const placedLabels = [];
 
         const projected = new THREE.Vector3();
@@ -964,6 +1040,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 );
                 setLabel(label, wanted ? toScreen(label.position, width, height) : null, 0, 0);
             }
+            setLabel(oortLabel, opts.showLabels && oort.fade() > 0.3 ? toScreen(oortLabel.position, width, height) : null, 0, 0);
             // Earth is labelled from anywhere, with a ring, so you can always
             // find home, and other labels never hide it (next to the Sun's,
             // its label goes underneath). The Sun is labelled like the planets.
@@ -1140,7 +1217,8 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             solarLayer.visible = solarFade > 0 && optionsRef.current.showPlanets;
             cloud?.setFade(solarFade);
             cloud?.setCameraDistance(camera.position.length() * AU_PER_LY);
-            cloud?.setVisible(optionsRef.current.showSmallBodies);
+            oort.setVisible(optionsRef.current.showOort);
+            oort.update(camera.position.length());
             if (solar) solarLayer.near = solarNearPlane();
             starDisc.update(camera, mount.clientHeight);
             syncCameras();
@@ -1180,6 +1258,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                 .forEach(disposeObject);
             solar?.dispose();
             cloud?.dispose();
+            oort.dispose();
             starDisc.dispose();
             bloomPass.dispose();
             composer.dispose();
@@ -1264,9 +1343,24 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         setFocus({ type: 'star', index });
     };
 
+    // Fly out to an overview of an asteroid / comet region, switching it on
+    const viewRegion = (id) => {
+        const s = sceneRef.current;
+        if (!s) return;
+        if (id === 'oort') setShowOort(true);
+        else setHiddenGroups(prev => new Set([...prev].filter(g => g !== id)));
+        setShowPlanets(true);
+        const pose = s.regionPose(REGION_VIEW_AU[id]);
+        s.setFollow(null);
+        s.flyTo(pose.position, pose.target, pose.minDistance);
+        setFocus({ type: 'region', id });
+    };
+
     // Stars, planets and moons: fly straight in, as their cards' buttons do
     const handleSearchSelect = (item) => {
-        if (item.type === 'constellation') {
+        if (item.type === 'region') {
+            viewRegion(item.id);
+        } else if (item.type === 'constellation') {
             setSelectedAbbrev(item.abbrev);
             viewConstellation(item.abbrev);
         } else if (item.type === 'star') {
@@ -1360,7 +1454,22 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         sceneRef.current?.solar?.setRingWaveScale(exaggerateRingWaves ? RING_WAVE_EXAGGERATION : 1);
     }, [exaggerateRingWaves, starBuffers, planetFacts, moonsData]);
 
-    // The point cloud follows showSmallBodies in the render loop
+    // "Asteroids & comets": on if anything in it is shown; switching it
+    // turns everything in it on or off (each can then be switched alone)
+    const smallGroupIds = (smallBodies?.meta.groups ?? []).map(g => g.id);
+    const smallParts = [showSmallBodies, showOort, ...smallGroupIds.filter(id => id !== 'other').map(id => !hiddenGroups.has(id))];
+    const smallAnyOn = smallParts.some(Boolean);
+    const smallAllOn = smallParts.every(Boolean);
+    const setAllSmallBodies = (on) => {
+        setShowSmallBodies(on);
+        setShowOort(on);
+        setHiddenGroups(on ? new Set() : new Set(smallGroupIds));
+    };
+    const masterBoxRef = useRef(null);
+    useEffect(() => {
+        if (masterBoxRef.current) masterBoxRef.current.indeterminate = smallAnyOn && !smallAllOn;
+    });
+
     useEffect(() => {
         sceneRef.current?.solar?.setShowSmallBodies(showSmallBodies);
     }, [showSmallBodies, starBuffers, planetFacts, moonsData, smallBodies]);
@@ -1473,6 +1582,9 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         const f = solar.byId.get(focus.id).facts;
         title = f.name;
         subtitle = { star: 'Our star', planet: 'Planet', moon: `Moon of ${f.parent}`, ...SMALL_BODY_TYPE_LABELS }[f.type];
+    } else if (focus.type === 'region') {
+        title = SMALL_BODY_REGIONS[focus.id].label;
+        subtitle = focus.id === 'oort' ? 'A model: never seen directly' : 'Asteroids & comets';
     } else if (focus.type === 'ring') {
         const f = RING_FEATURES_BY_ID.get(focus.id);
         title = f.name;
@@ -1577,18 +1689,31 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                             <>
                                 <label
                                     className={`universe-3d-checkbox universe-3d-sub-option ${showPlanets ? '' : 'disabled'}`}
-                                    title="Asteroids, comets and dwarf planets from JPL's Small-Body Database"
+                                    title="Asteroids, comets and dwarf planets from JPL's Small-Body Database: switches everything below"
                                 >
                                     <input
+                                        ref={masterBoxRef}
                                         type="checkbox"
-                                        checked={showSmallBodies}
+                                        checked={smallAnyOn}
                                         disabled={!showPlanets}
-                                        onChange={(e) => setShowSmallBodies(e.target.checked)}
+                                        onChange={() => setAllSmallBodies(!smallAnyOn)}
                                     />
                                     Asteroids &amp; comets
                                 </label>
-                                {showPlanets && showSmallBodies && (
+                                {showPlanets && (
                                     <div className="universe-3d-groups">
+                                        <label
+                                            className="universe-3d-checkbox universe-3d-group"
+                                            title="Dwarf planets, mission targets and famous comets, with names and cards"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={showSmallBodies}
+                                                onChange={(e) => setShowSmallBodies(e.target.checked)}
+                                            />
+                                            <span className="universe-3d-swatch" style={{ background: '#d8d2c8' }} />
+                                            Named (Ceres, Halley…)
+                                        </label>
                                         {smallBodies.meta.groups.filter(g => g.id !== 'other').map(g => (
                                             <label key={g.id} className="universe-3d-checkbox universe-3d-group">
                                                 <input
@@ -1605,6 +1730,18 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                                                 {g.name}
                                             </label>
                                         ))}
+                                        <label
+                                            className="universe-3d-checkbox universe-3d-group"
+                                            title="Where long-period comets come from, out to ~1.6 light-years: never seen, drawn from the usual model"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={showOort}
+                                                onChange={(e) => setShowOort(e.target.checked)}
+                                            />
+                                            <span className="universe-3d-swatch" style={{ background: '#9fb4d8' }} />
+                                            Oort cloud (model)
+                                        </label>
                                         <label
                                             className="universe-3d-checkbox universe-3d-group"
                                             title={`Adds ${smallBodies.meta.tiers[1].count.toLocaleString()} smaller asteroids (a ${Math.round(smallBodies.meta.tiers[1].count * 12 / 1e6)} MB download, heavy for phones)`}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { KM_PER_AU, SMALL_BODY_TYPE_LABELS } from '../utils/universe3d';
-import { perihelionDate, semiMajorAxis, smallBodyPeriodDays } from '../utils/smallBodies';
+import { currentElements, historyYears, perihelionDate, semiMajorAxis, smallBodyPeriodDays } from '../utils/smallBodies';
 
 // A named asteroid, dwarf planet or comet (small_bodies.json `named`).
 // Uses the star card's styles (.star-info-*)
@@ -43,10 +43,13 @@ const formatDate = (date) => date.toLocaleDateString(undefined, { year: 'numeric
 // distances: {sun, earth} in AU, now. time: the clock (ms)
 function SmallBodyInfoCard({ body, distances, time, onClose, onFlyTo }) {
     const b = body.smallBody;
-    const bound = b.e < 1;
-    const period = smallBodyPeriodDays(b);
-    const perihelion = perihelionDate(b, new Date(time));
+    // The orbit as it is at the clock's time (it changes over the centuries)
+    const el = currentElements(b, new Date(time));
+    const bound = el.e < 1;
+    const period = smallBodyPeriodDays(el);
+    const perihelion = perihelionDate(el, new Date(time));
     const perihelionPast = perihelion.getTime() < time;
+    const years = historyYears(b);
     const classLabel = CLASS_LABELS[b.class];
 
     return (
@@ -90,20 +93,33 @@ function SmallBodyInfoCard({ body, distances, time, onClose, onFlyTo }) {
                         <>
                             {formatDays(period)}
                             <div className="star-info-muted">
-                                {formatAu(b.q)} to {formatAu(semiMajorAxis(b) * (1 + b.e))} from the Sun
+                                {formatAu(el.q)} to {formatAu(semiMajorAxis(el) * (1 + el.e))} from the Sun
                             </div>
                         </>
                     ) : (
                         <>
                             Not bound to the Sun
-                            <div className="star-info-muted">passing through once, {formatAu(b.q)} from the Sun at closest</div>
+                            <div className="star-info-muted">passing through once, {formatAu(el.q)} from the Sun at closest</div>
                         </>
                     )}
-                    {b.i > 90 && <div className="star-info-muted">goes round backwards (tilted {Math.round(b.i)}°)</div>}
+                    {el.i > 90 && <div className="star-info-muted">goes round backwards (tilted {Math.round(el.i)}°)</div>}
                 </dd>
 
                 <dt>{perihelionPast ? 'Closest to Sun' : 'Next closest'}</dt>
                 <dd>{formatDate(perihelion)}</dd>
+
+                {body.surfaceMap && (
+                    <>
+                        <dt>Surface map</dt>
+                        <dd>
+                            {body.surfaceMap.from}
+                            <div className="star-info-muted">
+                                by <a href={body.surfaceMap.href} target="_blank" rel="noopener noreferrer">{body.surfaceMap.by}</a>
+                            </div>
+                            {body.surfaceMap.note && <div className="star-info-muted">{body.surfaceMap.note}</div>}
+                        </dd>
+                    </>
+                )}
 
                 {b.discovery && (
                     <>
@@ -116,8 +132,10 @@ function SmallBodyInfoCard({ body, distances, time, onClose, onFlyTo }) {
             {b.note && <p className="star-info-origin">{b.note}</p>}
             {b.name_origin && <p className="star-info-muted star-info-origin">Name: {b.name_origin}</p>}
             <p className="star-info-muted star-info-origin">
-                Position from its orbit around the Sun alone (JPL Small-Body Database): close for years
-                around now, drifting over decades as the planets tug it.
+                {years
+                    ? `Orbit from JPL Horizons, which includes the planets' pull, ${years[0]}-${years[1]}`
+                        + (years[0] > 1600 || years[1] < 2499 ? ': only approximate outside those years.' : '.')
+                    : 'Position from its orbit around the Sun alone (JPL Small-Body Database): close for years around now, drifting over decades as the planets tug it.'}
             </p>
 
             <button className="button-primary star-info-fly" onClick={onFlyTo}>

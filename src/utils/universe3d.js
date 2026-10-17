@@ -329,6 +329,19 @@ export const SMALL_BODY_TYPE_LABELS = {
     interstellar: 'Interstellar object',
 };
 
+// Asteroid and comet regions (small_bodies.json group ids, plus the Oort
+// cloud model) for search: label and other names
+export const SMALL_BODY_REGIONS = {
+    main: { label: 'Asteroid belt', terms: ['main belt', 'main asteroid belt'] },
+    hilda: { label: 'Hildas', terms: ['hilda asteroids', 'hilda group'] },
+    trojan: { label: 'Jupiter Trojans', terms: ['trojans', 'trojan asteroids', 'greeks'] },
+    neo: { label: 'Near-Earth asteroids', terms: ['neo', 'near earth objects', 'near-earth objects'] },
+    centaur: { label: 'Centaurs', terms: ['centaur'] },
+    tno: { label: 'Kuiper belt', terms: ['trans-neptunian objects', 'tno', 'edgeworth-kuiper belt'] },
+    comet: { label: 'Comets', terms: ['comet', 'periodic comets'] },
+    oort: { label: 'Oort cloud', terms: ['oort'] },
+};
+
 // Other names a body can be searched by (Latin names; "Solar System" for the Sun)
 const BODY_ALIASES = {
     Sun: ['Sol', 'Solar System'],
@@ -381,6 +394,19 @@ export function buildSearchIndex(constellationData, starBuffers, lineStarInfo, p
             terms: [b.name, b.fullname].map(normalizeSearchText),
             sortKey: b.type === 'dwarf planet' ? -15 : 10,
         });
+    }
+    if (smallBodies) {
+        const counts = new Map(smallBodies.groups.map((g, k) => [g.id, smallBodies.tiers.reduce((n, t) => n + t.group_counts[k], 0)]));
+        for (const [id, region] of Object.entries(SMALL_BODY_REGIONS)) {
+            items.push({
+                type: 'region',
+                id,
+                label: region.label,
+                sublabel: id === 'oort' ? 'Model: where long-period comets come from' : `${counts.get(id).toLocaleString()} known`,
+                terms: [region.label, ...region.terms].map(normalizeSearchText),
+                sortKey: -12,
+            });
+        }
     }
 
     for (const c of Object.values(constellationData)) {

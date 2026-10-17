@@ -80,7 +80,7 @@ function Title({ onSelectRegularQuiz, onSelectSkyView, onSelectStudy, onSelectUn
                             <li>Star distances: Hipparcos (ESA) and <a href="https://www.cosmos.esa.int/gaia" target="_blank" rel="noopener noreferrer">Gaia DR3</a> (ESA/Gaia/DPAC)</li>
                             <li>Planet textures: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a> (CC BY 4.0)</li>
                             <li>Moons, asteroids and comets: <a href="https://ssd.jpl.nasa.gov/" target="_blank" rel="noopener noreferrer">NASA/JPL Solar System Dynamics</a> (Horizons, Small-Body Database)</li>
-                            <li>Moon and Pluto maps: <a href="https://astrogeology.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS Astrogeology</a> and <a href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a> (Galileo, Cassini, Voyager, New Horizons)</li>
+                            <li>Moon, Pluto, Ceres and Vesta maps: <a href="https://astrogeology.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS Astrogeology</a> and <a href="https://github.com/nasa/NASA-3D-Resources" target="_blank" rel="noopener noreferrer">NASA 3D Resources</a> (Galileo, Cassini, Voyager, New Horizons, Dawn)</li>
                             <li>Stereographic projections & rendering: David Pan</li>
                             <li>Mythology & history: <a href="https://en.wikipedia.org/" target="_blank" rel="noopener noreferrer">Wikipedia</a></li>
                         </ul>

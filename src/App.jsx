@@ -7,6 +7,7 @@ import QuizResults from './components/QuizResults';
 import SkyView from './components/SkyView';
 import StudyPage from './components/StudyPage';
 import { generateQuestions, generateSingleQuestion } from './utils/quizHelpers';
+import { attachSmallBodyHistory } from './utils/smallBodies';
 
 // Split out so three.js is only downloaded when 3D mode opens
 const Universe3D = lazy(() => import('./components/Universe3D'));
@@ -261,11 +262,21 @@ function App() {
             }
             return response;
         });
+        // The named bodies' Horizons history; without it they use one element
+        // set (drifting over decades)
+        const history = fetchOk('small_bodies_history.bin')
+            .then(response => response.arrayBuffer())
+            .catch(error => {
+                console.error('Error loading small body history:', error);
+                return null;
+            });
         return Promise.all([
             fetchOk('small_bodies.json').then(response => response.json()),
             fetchOk('small_bodies.bin').then(response => response.arrayBuffer()),
+            history,
         ])
-            .then(([meta, buffer]) => {
+            .then(([meta, buffer, historyBuffer]) => {
+                if (historyBuffer) attachSmallBodyHistory(meta, historyBuffer);
                 const data = { meta, points: new Uint16Array(buffer) };
                 setSmallBodies(data);
                 return data;

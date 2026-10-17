@@ -11,6 +11,7 @@
 // is its own Points object, so it can be coloured and switched off alone.
 
 import * as THREE from 'three';
+import { eccentricAnomaly } from './moons.js';
 import { GAUSS_K, OBLIQUITY_RAD, julianDate } from './smallBodies.js';
 
 // Group colours (small_bodies.json group ids)
@@ -50,6 +51,8 @@ const MIN_ALPHA = 0.008;
 const JUPITER_RATE = 2 * Math.PI / 4332.59;  // rad/day
 const RESONANT_RATE = { trojan: 1, hilda: 1.5 };
 const FIELDS_PER_POINT = 6;
+// Points are only picked while the cloud is at least this visible
+const PICK_MIN_FADE = 0.3;
 
 const vertexShader = `
     #define TWO_PI 6.283185307179586
@@ -111,11 +114,35 @@ const fragmentShader = `
     }
 `;
 
+// The vertex shader's maths in JS (doubles): point k of a tier's rows at
+// `days` since the epoch -> out[o..o+2] (AU, scene frame)
+const COS_EPS = Math.cos(OBLIQUITY_RAD), SIN_EPS = Math.sin(OBLIQUITY_RAD);
+function pointPosition(rows, k, logA, meanMotion, days, out, o) {
+    const r = k * FIELDS_PER_POINT;
+    const a = Math.exp(logA[0] + (logA[1] - logA[0]) * rows[r] / 65535);
+    const e = rows[r + 1] / 65535;
+    const inc = rows[r + 2] / 65535 * Math.PI;
+    const node = rows[r + 3] / 65535 * 2 * Math.PI;
+    const w = rows[r + 4] / 65535 * 2 * Math.PI;
+    const n = meanMotion || GAUSS_K / (a * Math.sqrt(a));
+    const M = (((rows[r + 5] / 65535 * 2 * Math.PI + n * days) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const E = eccentricAnomaly(M, e);
+    const px = a * (Math.cos(E) - e), py = a * Math.sqrt(1 - e * e) * Math.sin(E);
+    const cw = Math.cos(w), sw = Math.sin(w), ci = Math.cos(inc), si = Math.sin(inc), cn = Math.cos(node), sn = Math.sin(node);
+    const x1 = cw * px - sw * py, y1 = sw * px + cw * py, y2 = ci * y1;
+    const x = cn * x1 - sn * y2, y = sn * x1 + cn * y2, z = si * y1;
+    out[o] = x;
+    out[o + 1] = SIN_EPS * y + COS_EPS * z;
+    out[o + 2] = -(COS_EPS * y - SIN_EPS * z);
+}
+
 // meta: small_bodies.json. Returns
 //   addTier(tierIndex, Uint16Array): draw a tier's points (0 default, 1 more)
 //   hasTier(tierIndex), update(date), setFade(f), setCameraDistance(au), setVisible(on),
 //   setGroupVisible(groupId, on), setTierVisible(tierIndex, on), setHaze(on),
-//   dispose()
+//   pick(camera, width, height, x, y, radiusPx) -> {index, groupId, position} | null
+//     (the default tier's point nearest a screen point; index into its rows
+//     and small_bodies_names.json), dispose()
 export function buildSmallBodyCloud(scene, meta, pixelRatio) {
     const group = new THREE.Group();
     scene.add(group);
@@ -134,8 +161,58 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
         for (const o of objects) o.points.visible = !hiddenGroups.has(o.groupId) && !hiddenTiers.has(o.tier);
     };
 
+    // Hover picking: the default tier's positions, worked out in JS when
+    // first needed and kept until the time changes
+    let pickRows = null;
+    let pickCache = null;  // {days, positions: Float32Array}
+    const pickPositions = () => {
+        const days = shared.uDays.value;
+        if (pickCache?.days === days) return pickCache.positions;
+        const positions = pickCache?.positions ?? new Float32Array(meta.tiers[0].count * 3);
+        let start = 0;
+        meta.groups.forEach(({ id }, g) => {
+            const count = meta.tiers[0].group_counts[g];
+            const meanMotion = (RESONANT_RATE[id] ?? 0) * JUPITER_RATE;
+            for (let k = start; k < start + count; k++) pointPosition(pickRows, k, logA, meanMotion, days, positions, k * 3);
+            start += count;
+        });
+        pickCache = { days, positions };
+        return positions;
+    };
+    const viewProjection = new THREE.Matrix4();
+    const pick = (camera, width, height, mx, my, radiusPx) => {
+        if (!pickRows || !group.visible || shared.uFade.value < PICK_MIN_FADE) return null;
+        const positions = pickPositions();
+        viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        const m = viewProjection.elements;
+        let best = null;
+        let bestDist = radiusPx;
+        let start = 0;
+        meta.groups.forEach(({ id }, g) => {
+            const count = meta.tiers[0].group_counts[g];
+            if (!hiddenGroups.has(id)) {
+                for (let k = start; k < start + count; k++) {
+                    const x = positions[k * 3], y = positions[k * 3 + 1], z = positions[k * 3 + 2];
+                    const w = m[3] * x + m[7] * y + m[11] * z + m[15];
+                    if (w <= 0) continue;  // behind the camera
+                    const sx = ((m[0] * x + m[4] * y + m[8] * z + m[12]) / w + 1) / 2 * width;
+                    const sy = (1 - (m[1] * x + m[5] * y + m[9] * z + m[13]) / w) / 2 * height;
+                    const d = Math.hypot(sx - mx, sy - my);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        best = { index: k, groupId: id };
+                    }
+                }
+            }
+            start += count;
+        });
+        if (best) best.position = Array.from(positions.subarray(best.index * 3, best.index * 3 + 3));
+        return best;
+    };
+
     const addTier = (tier, data) => {
         if (objects.some(o => o.tier === tier)) return;
+        if (tier === 0) pickRows = data;
         const { group_counts: counts } = meta.tiers[tier];
         const look = TIER_LOOK[tier];
         let start = 0;
@@ -200,6 +277,7 @@ export function buildSmallBodyCloud(scene, meta, pixelRatio) {
             applyVisibility();
         },
         setHaze: (on) => { shared.uLinear.value = on ? 1 : 0; },
+        pick,
         dispose: () => {
             scene.remove(group);
             for (const { points } of objects) {

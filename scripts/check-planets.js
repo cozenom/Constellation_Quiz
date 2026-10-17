@@ -1,9 +1,12 @@
 // Checks src/utils/planets.js against Skyfield + JPL DE421, and
-// src/utils/moons.js (with public/data/moons.json) against JPL Horizons.
+// src/utils/moons.js (with public/data/moons.json) and
+// src/utils/smallBodies.js (with public/data/small_bodies*) against JPL
+// Horizons.
 //
 // Reference positions come from Star_Data (run there first, skypy env):
 //   python scripts/tools/planet_reference.py
 //   python scripts/tools/moon_reference.py
+//   python scripts/tools/small_body_reference.py
 // Then here:
 //   node scripts/check-planets.js
 //
@@ -14,6 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { moonPosition } from '../src/utils/moons.js';
 import { geocentricMoon, heliocentricPosition, SOLAR_SYSTEM_BODIES } from '../src/utils/planets.js';
+import { attachSmallBodyHistory, historyYears, smallBodyPosition } from '../src/utils/smallBodies.js';
 
 const REF = '../../Star_Data/output/planet_reference.json';  // relative to this file
 const ref = JSON.parse(readFileSync(new URL(REF, import.meta.url)));
@@ -91,6 +95,51 @@ for (const [code, refs] of Object.entries(moonRef.moons)) {
     const ok = now <= MOON_LIMIT_DEG;
     if (!ok) failed = true;
     console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${m.name.padEnd(8)}${errs.map(e => `${e.toFixed(2)}°`.padStart(9)).join('')}`);
+}
+
+// ---------- Named small bodies (utils/smallBodies.js) vs JPL Horizons ----------
+// Reference: Star_Data scripts/tools/small_body_reference.py. Each position
+// blends two-body orbits from the two nearest Horizons samples
+// (small_bodies_history.bin); the error is shown as km and as the angle
+// seen from the Sun, and must stay under SMALL_BODY_LIMIT_DEG wherever the
+// history covers the date. "(no history)" shows the single 2026 SBDB orbit
+// for comparison. Bennu's history covers only 1900-2135 ("-").
+const SMALL_BODY_LIMIT_DEG = 0.05;
+const sbRef = JSON.parse(readFileSync(new URL('../../Star_Data/output/small_body_reference.json', import.meta.url)));
+const sbMeta = JSON.parse(readFileSync(new URL('../public/data/small_bodies.json', import.meta.url)));
+const sbPlain = JSON.parse(JSON.stringify(sbMeta.named));  // without history
+const historyFile = readFileSync(new URL('../public/data/small_bodies_history.bin', import.meta.url));
+attachSmallBodyHistory(sbMeta, historyFile.buffer.slice(historyFile.byteOffset, historyFile.byteOffset + historyFile.length));
+const sbYears = sbRef.dates.map(jd => jdToDate(jd).getUTCFullYear());
+const curated = JSON.parse(readFileSync(new URL('../../Star_Data/curated/small_bodies.json', import.meta.url))).bodies;
+const KM_PER_AU_ = 149597870.7;
+
+console.log(`\nNamed small bodies, error vs Horizons in km (angle from the Sun; limit ${SMALL_BODY_LIMIT_DEG} deg):`);
+console.log(`  ${''.padEnd(19)}${sbYears.map(y => String(y).padStart(15)).join('')}`);
+for (const [sstr, refs] of Object.entries(sbRef.bodies)) {
+    const k = curated.findIndex(c => c.sstr === sstr);
+    const b = sbMeta.named[k];
+    const cells = [], plainCells = [];
+    let ok = true;
+    refs.forEach((ref, d) => {
+        if (!ref) {
+            cells.push('-'.padStart(15));
+            plainCells.push('-'.padStart(15));
+            return;
+        }
+        const date = jdToDate(sbRef.dates[d]);
+        const r = sceneToIcrs(smallBodyPosition(b, date));
+        const p = sceneToIcrs(smallBodyPosition(sbPlain[k], date));
+        const err = norm(sub(r, ref)), plainErr = norm(sub(p, ref));
+        const deg = err / norm(ref) * 180 / Math.PI;
+        const [y0, y1] = historyYears(b);
+        if (sbYears[d] >= y0 && sbYears[d] <= y1 && deg > SMALL_BODY_LIMIT_DEG) ok = false;
+        cells.push(`${Math.round(err * KM_PER_AU_).toLocaleString('en')} (${deg.toFixed(3)}°)`.padStart(15));
+        plainCells.push(`${(plainErr / norm(ref) * 180 / Math.PI).toFixed(2)}°`.padStart(15));
+    });
+    if (!ok) failed = true;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${b.name.slice(0, 14).padEnd(14)}${cells.join('')}`);
+    console.log(`       ${'(no history)'.padEnd(14)}${plainCells.join('')}`);
 }
 
 process.exit(failed ? 1 : 0);
