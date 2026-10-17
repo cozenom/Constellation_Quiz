@@ -53,7 +53,7 @@ function KeybindsPanel({ screen }) {
                     { keys: ['Space'], label: 'Play / pause time' },
                     { keys: ['[', ']'], label: 'Time slower / faster' },
                     { keys: ['T'], label: 'Back to now' },
-                    { keys: ['Esc'], label: 'Close card / back to menu' }
+                    { keys: ['Esc'], label: 'Close card / deselect' }
                 ];
 
             case 'results':

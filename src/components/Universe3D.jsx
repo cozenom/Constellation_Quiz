@@ -1564,16 +1564,14 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         s.solar?.setHighlightOrbit(selectedBody);
     }, [selectedStar, selectedBody, starBuffers, planetFacts, moonsData]);
 
-    // Keyboard: Esc closes the card, then goes back. L lines, N names, R reset.
+    // Keyboard: Esc closes the card and clears the selection (it never leaves
+    // the 3D view: the Back button does). L lines, N names, R reset.
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') {
                 if (e.code !== 'Escape') return;
             }
-            if (e.code === 'Escape') {
-                if (selectedStar !== null || selectedBody !== null || selectedRing !== null || selectedRegion !== null) selectStar(null);
-                else onBack();
-            }
+            if (e.code === 'Escape') selectStar(null);  // clears every selection
             if (e.code === 'KeyL') setShowLines(prev => !prev);
             if (e.code === 'KeyN') setShowLabels(prev => !prev);
             if (e.code === 'KeyR') resetView();
