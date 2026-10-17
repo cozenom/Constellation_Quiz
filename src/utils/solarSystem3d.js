@@ -800,6 +800,19 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
         smallBodyList.push(body);
     }
     let showSmallBodies = true;
+    // Region parts switched off ('group:part', see setHiddenParts): their
+    // named bodies hide too. One-time visitors (no region) count as
+    // 'comet:once'.
+    let hiddenParts = new Set();
+    const partKey = (body) => (body.smallBody.group ? `${body.smallBody.group}:${body.smallBody.subgroup}` : 'comet:once');
+    function isShown(body) {
+        return !body.smallBody || (showSmallBodies && !hiddenParts.has(partKey(body)));
+    }
+    function applySmallBodyVisibility() {
+        for (const body of smallBodyList) body.mesh.parent.visible = isShown(body);
+        // (lines not sampled yet stay hidden until they are)
+        for (const orbit of orbits) if (orbit.body) orbit.line.visible = orbit.sampledAt !== null && isShown(orbit.body);
+    }
     const spinningSmall = smallBodyList.filter(b => b.smallBody.spin);
     const byId = new Map(bodies.map(b => [b.id, b]));
     const moonBodies = bodies.filter(b => b.parentId && b.id !== 'Moon');
@@ -834,13 +847,14 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     // to sample, and their body must sit exactly on its line up close).
     // bodyAt() -> Vector3: the body in the line's frame (sampleOrbit lines,
     // see placeBody), so the line can be drawn through it
-    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments, closed = true, everyFrame = false, bodyAt = null }) => {
+    // body: a small body whose orbit this is (hidden with it, see isShown)
+    const addOrbit = ({ sample, periodDays, color, opacity, parent = orbitGroup, segments, closed = true, everyFrame = false, bodyAt = null, body = null }) => {
         const vertices = bodyAt ? segments + 1 : segments;
         const line = makeOrbitLine(new Float32Array(vertices * 3), color, opacity, closed);
         line.frustumCulled = false;  // samples move round the orbit
         line.visible = false;        // until first sampled
         parent.add(line);
-        const orbit = { line, sample, periodDays, segments, everyFrame, bodyAt, sampledAt: null, loop: null, origin: null };
+        const orbit = { line, sample, periodDays, segments, everyFrame, bodyAt, body, sampledAt: null, loop: null, origin: null };
         orbits.push(orbit);
         return orbit;
     };
@@ -855,7 +869,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
         orbit.loop = loop;
         orbit.origin = [loop[mid * 3], loop[mid * 3 + 1], loop[mid * 3 + 2]];
         orbit.line.position.set(...orbit.origin);
-        orbit.line.visible = true;
+        orbit.line.visible = !orbit.body || isShown(orbit.body);
         orbit.sampledAt = date.getTime();
         if (orbit.bodyAt) {
             placeBody(orbit, date);
@@ -925,7 +939,7 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     const smallBodyOrbitLine = (body, opacity) => addOrbit({
         sample: (d) => smallBodyOrbit(body.smallBody, d, 512),
         periodDays: smallBodyPeriodDays(body.smallBody), color: body.color, opacity,
-        parent: smallOrbitGroup, segments: 513, closed: false, everyFrame: true,
+        parent: smallOrbitGroup, segments: 513, closed: false, everyFrame: true, body,
     });
     for (const body of smallBodyList.filter(b => b.type === 'dwarf planet')) smallBodyOrbitLine(body);
 
@@ -1171,13 +1185,19 @@ export function buildSolarSystem(scene, facts, moonsData, pixelRatio, smallBodie
     return {
         bodies,
         byId,
-        isShown: (body) => !body.smallBody || showSmallBodies,
+        isShown,
+        // The region part a named small body belongs to ('group:part')
+        partKey: (body) => (body.smallBody ? partKey(body) : null),
+        setHiddenParts: (parts) => {
+            hiddenParts = new Set(parts);
+            applySmallBodyVisibility();
+        },
         setCometOrbits,
         update,
         setShowSmallBodies: (on) => {
             showSmallBodies = on;
             smallOrbitGroup.visible = on;
-            for (const body of smallBodyList) body.mesh.parent.visible = on;
+            applySmallBodyVisibility();
         },
         // 1 near the Sun, 0 far out (log scale), from camera distance in AU
         fadeForDistance: (au) => 1 - THREE.MathUtils.smoothstep(

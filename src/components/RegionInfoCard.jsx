@@ -99,7 +99,8 @@ const fmtYears = (days) => {
 // regionId: SMALL_BODY_REGIONS key; meta: small_bodies.json; bodies:
 // Solar System bodies (named small bodies and Pluto are listed);
 // time: the clock (ms); hiddenParts: Set of 'region:part' switched off;
-// onTogglePart('region:part') switches one (its dots, and orbits for comets)
+// onTogglePart('region:part') switches one: its dots, its named members,
+// and for comets their orbits
 function RegionInfoCard({ regionId, meta, bodies, time, hiddenParts, onTogglePart, onSelectBody, onClose }) {
     const info = REGION_INFO[regionId];
     const counts = meta.regions?.[regionId] ?? {};
@@ -169,13 +170,23 @@ function RegionInfoCard({ regionId, meta, bodies, time, hiddenParts, onTogglePar
 
             {isComets && (
                 <div className="region-part">
-                    <div className="region-part-head static">
+                    {/* No dots drawn: switches its named members */}
+                    <button
+                        className={`region-part-head ${hiddenParts.has('comet:once') ? 'off' : ''}`}
+                        onClick={() => onTogglePart('comet:once')}
+                        title={hiddenParts.has('comet:once') ? 'Show these again' : 'Hide these'}
+                        aria-pressed={!hiddenParts.has('comet:once')}
+                    >
                         <span className="universe-3d-swatch" style={{ background: 'transparent', border: '1px solid #94a3b8' }} />
-                        <strong>Passing through</strong>
-                        <span className="region-count">{(meta.unbound_comets ?? 0).toLocaleString()}</span>
-                    </div>
+                        <strong>Seen once</strong>
+                        <span className="region-count">{(meta.unbound_comets?.count ?? 0).toLocaleString()}</span>
+                    </button>
                     <div className="star-info-muted region-part-about">
-                        On open orbits, seen once: not drawn. Includes the visitors from other stars.
+                        Not drawn: their orbits are open, or they were seen too briefly to tell.{' '}
+                        {(meta.unbound_comets?.sungrazers ?? 0).toLocaleString()} are tiny sungrazers the SOHO
+                        telescope caught diving into the Sun, most of them pieces of one great comet that broke up
+                        (the Kreutz family). Most others are Oort cloud comets on their first visit, a few were
+                        flung out by Jupiter, and just three came from other stars.
                     </div>
                     {unbound.length > 0 && <ul className="region-members">{unbound.map(memberRow)}</ul>}
                 </div>

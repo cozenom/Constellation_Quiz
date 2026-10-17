@@ -1378,7 +1378,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
             selectStar(item.starIndex);
             flyToStar(item.starIndex);
         } else if (item.type === 'planet') {
-            if (sceneRef.current?.solar?.byId.get(item.id)?.smallBody) setShowSmallBodies(true);
+            revealBody(item.id);
             selectBody(item.id);
             flyToBody(item.id);
         }
@@ -1479,7 +1479,18 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
         for (const [group, parts] of Object.entries(smallBodies?.meta.subgroup_ids ?? {})) {
             for (const part of parts) cloud?.setPartVisible(group, part, !hiddenParts.has(`${group}:${part}`));
         }
+        sceneRef.current?.solar?.setHiddenParts(hiddenParts);
     }, [hiddenParts, starBuffers, planetFacts, moonsData, smallBodies]);
+
+    // Going to a named small body: make sure it's shown (named bodies on,
+    // its region part on)
+    const revealBody = (id) => {
+        const solar = sceneRef.current?.solar;
+        const key = solar?.byId.get(id) && solar.partKey(solar.byId.get(id));
+        if (!key) return;
+        setShowSmallBodies(true);
+        setHiddenParts(prev => (prev.has(key) ? new Set([...prev].filter(k => k !== key)) : prev));
+    };
 
     // "Asteroids & comets": on if anything in it is shown; switching it
     // turns everything in it on or off (each can then be switched alone)
@@ -1849,7 +1860,7 @@ function Universe3D({ constellationData, stars3d, planetFacts, moonsData, smallB
                         return next;
                     })}
                     onSelectBody={(id) => {
-                        setShowSmallBodies(true);
+                        revealBody(id);
                         selectBody(id);
                         flyToBody(id);
                     }}

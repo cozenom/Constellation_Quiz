@@ -634,12 +634,8 @@ body:has(.universe-3d-screen) .stars-toggle {
     }
 }
 
-/* Region card (RegionInfoCard): parts with counts, named members */
-.region-info {
-    max-height: calc(100vh - 9rem);
-    overflow-y: auto;
-}
-
+/* Region card (RegionInfoCard): parts with counts, named members.
+   Its height limit is .star-info's, which stops above the clock */
 .region-part {
     margin-top: 0.75rem;
 }
